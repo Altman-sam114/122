@@ -24,6 +24,43 @@
 - 蓝色：初始快照/基准状态，不是运行时推进状态。
 - 紫色：命令管线，玩家、AI、未来聊天命令都要走这里。
 
+## 0.1 云端协作验证闭环
+
+这张图是项目协作和验证流，不是游戏运行时逻辑。默认只使用 `main` 直推触发云端验证；Agent C 必须下载未加密结果包复核。
+
+```mermaid
+flowchart TD
+    HUMAN["人工提出目标<br/>说明范围、禁止项、验收标准"]:::input
+    A["Agent A<br/>读 AGENTS / flow / test / 源码<br/>写版本化实现提示词"]:::agent
+    B0["Agent B 开始<br/>git fetch origin<br/>确认当前分支 main"]:::git
+    B1["Agent B 实现<br/>只改本轮相关文件<br/>不做业务外扩"]:::agent
+    LOCAL["本机轻量检查<br/>git diff --check / plutil / YAML / JSON<br/>不跑本机 xcodebuild 和模拟器"]:::check
+    COMMIT["main commit<br/>git add + git commit<br/>记录本轮改动"]:::git
+    PUSH["main push<br/>git push origin main<br/>触发云端验证"]:::git
+    GHA["GitHub Actions<br/>.github/workflows/ci-results.yml<br/>静态检查 + 云端 Xcode build"]:::cloud
+    ART["未加密结果包 artifact<br/>manifest / junit / xcodebuild.log<br/>failure summary / xcresult"]:::artifact
+    C0["Agent C 下载<br/>gh auth login<br/>gh run download 到 /private/tmp/wwiihexv0-c-review-run/"]:::agent
+    C1["Agent C 核对<br/>branch=main<br/>commitSha / runId / runAttempt 匹配 origin/main"]:::check
+    PASS{"Actions 与结果包通过?"}:::decision
+    ACCEPT["验收通过<br/>更新 flow / update_log<br/>人工复核进入下一轮"]:::ok
+    REJECT["退回清单<br/>列失败日志路径、manifest 差异、修复要求"]:::warn
+    FIX["Agent B 追加修复 commit<br/>仍在 main 上提交<br/>再次 push origin/main"]:::git
+
+    HUMAN --> A --> B0 --> B1 --> LOCAL --> COMMIT --> PUSH --> GHA --> ART --> C0 --> C1 --> PASS
+    PASS -->|是| ACCEPT
+    PASS -->|否| REJECT --> FIX --> PUSH
+
+    classDef input fill:#fef3c7,stroke:#d97706,color:#1f1600
+    classDef agent fill:#e0e7ff,stroke:#4f46e5,color:#111827
+    classDef git fill:#dcfce7,stroke:#16a34a,color:#052e16
+    classDef check fill:#ccfbf1,stroke:#0f766e,color:#042f2e
+    classDef cloud fill:#dbeafe,stroke:#2563eb,color:#0f172a
+    classDef artifact fill:#f8f9fb,stroke:#6b7280,color:#111827
+    classDef decision fill:#fff7ed,stroke:#ea580c,color:#1f1300
+    classDef ok fill:#dcfce7,stroke:#15803d,color:#052e16
+    classDef warn fill:#ffedd5,stroke:#f97316,color:#431407
+```
+
 ## 1. 总主线：从地图数据到游戏行动
 
 这张图看全局。左上是地图数据怎么进入游戏；中间是 hex、region、theater、front、deploy 的分层关系；右侧是玩家/AI 命令如何统一进入规则系统；底部是 UI 和日志怎么读取结果。

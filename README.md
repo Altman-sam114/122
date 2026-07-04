@@ -1,6 +1,12 @@
 # WWIIHexV0 — iOS / macOS 二战 AI 战略战棋游戏
 
-> **当前状态：v0.5 元帅决策链分支 `v0.5-marshal-decision-chain`。默认战争 AI 已加入“元帅 -> 模拟 LLM JSON -> decoder -> compiler -> ZoneDirective”决策链；下游仍收口到 `WarCommandExecutor -> RuleEngine`。统治者层只作为后续上游预留，当前 v0.5 主链路不调用 `RulerAgent`，也不恢复 Cabinet / Minister。历史测试基线曾达到 v0.37 Probe 18/0、Stage Regression 69/0、Full 226/0；当前工作流默认不跑 Xcode / XCTest / 模拟器测试，只按 `md/test/test.md` 做轻量检查。**
+> **当前状态：`main` 云端化快照。默认战争 AI 已加入“元帅 -> 模拟 LLM JSON -> decoder -> compiler -> ZoneDirective”决策链；下游仍收口到 `WarCommandExecutor -> RuleEngine`。统治者层只作为后续上游预留，当前主链路不调用 `RulerAgent`，也不恢复 Cabinet / Minister。历史测试基线曾达到 v0.37 Probe 18/0、Stage Regression 69/0、Full 226/0；当前工作流默认本机只跑 `md/test/test.md` 允许的轻量检查，重验证交给 GitHub Actions。**
+
+---
+
+## 协作与云端验证
+
+项目默认使用 `main` 直推触发 GitHub Actions 云端验证。本机只跑 `md/test/test.md` 允许的轻量检查；云端 workflow 会生成未加密 `ci-results` artifact，供 Agent C 下载并核对 manifest、JUnit 摘要、构建日志和失败摘要。完整 Agent A/B/C 规则见 `AGENTS.md`，云端检查细节见 `md/test/test.md`。
 
 ---
 

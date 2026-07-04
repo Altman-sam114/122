@@ -1,0 +1,243 @@
+name: WWIIHexV0 CI Results
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  ci-results:
+    name: Build and package CI results
+    runs-on: macos-15
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build artifact metadata
+        id: meta
+        shell: bash
+        run: |
+          short_sha="${GITHUB_SHA::7}"
+          branch_slug="$(printf '%s' "${GITHUB_REF_NAME}" | tr '/[:space:]' '--')"
+          version="cloud-main-ci-v1"
+          artifact_name="wwiihexv0-ci-${version}-${branch_slug}-${short_sha}-run${GITHUB_RUN_ID}-attempt${GITHUB_RUN_ATTEMPT}"
+          echo "short_sha=${short_sha}" >> "${GITHUB_OUTPUT}"
+          echo "branch_slug=${branch_slug}" >> "${GITHUB_OUTPUT}"
+          echo "version=${version}" >> "${GITHUB_OUTPUT}"
+          echo "artifact_name=${artifact_name}" >> "${GITHUB_OUTPUT}"
+
+      - name: Run checks and cloud build
+        id: ci
+        shell: bash
+        continue-on-error: true
+        env:
+          CI_VERSION: ${{ steps.meta.outputs.version }}
+          SHORT_SHA: ${{ steps.meta.outputs.short_sha }}
+          ARTIFACT_NAME: ${{ steps.meta.outputs.artifact_name }}
+          PROJECT_NAME: WWIIHexV0
+          XCODE_PROJECT: WWIIHexV0.xcodeproj
+          XCODE_SCHEME: WWIIHexV0
+          XCODE_DESTINATION: generic/platform=iOS
+          DERIVED_DATA_PATH: .derivedData-ci
+          RESULT_BUNDLE_PATH: ci-results/WWIIHexV0-build.xcresult
+          JUNIT_PATH: ci-results/junit.xml
+          BUILD_LOG_PATH: ci-results/xcodebuild.log
+          STATIC_LOG_PATH: ci-results/static-checks.log
+          FAILURE_SUMMARY_PATH: ci-results/ci-failure-summary.md
+        run: |
+          mkdir -p ci-results
+          : > "${STATIC_LOG_PATH}"
+          : > "${BUILD_LOG_PATH}"
+
+          status=0
+          static_outcome="success"
+          build_outcome="success"
+          test_outcome="skipped"
+          probe_outcome="skipped"
+          failure_notes=()
+
+          run_static_check() {
+            local label="$1"
+            shift
+            {
+              echo "## ${label}"
+              "$@"
+              local rc=$?
+              echo
+              echo "exit=${rc}"
+              echo
+              return "${rc}"
+            } >> "${STATIC_LOG_PATH}" 2>&1
+          }
+
+          if ! run_static_check "git diff --check" git diff --check; then
+            static_outcome="failure"
+            status=1
+            failure_notes+=("- git diff --check failed. See ${STATIC_LOG_PATH}.")
+          fi
+
+          if ! run_static_check "plutil project.pbxproj" plutil -lint "${XCODE_PROJECT}/project.pbxproj"; then
+            static_outcome="failure"
+            status=1
+            failure_notes+=("- plutil failed for ${XCODE_PROJECT}/project.pbxproj. See ${STATIC_LOG_PATH}.")
+          fi
+
+          if ! run_static_check "workflow yaml parse" ruby -e 'require "yaml"; YAML.load_file(".github/workflows/ci-results.yml"); puts "yaml ok"'; then
+            static_outcome="failure"
+            status=1
+            failure_notes+=("- Workflow YAML parse failed. See ${STATIC_LOG_PATH}.")
+          fi
+
+          if ! run_static_check "JSON data parse" bash -lc 'for f in WWIIHexV0/Data/*.json; do python3 -m json.tool "$f" >/dev/null || exit 1; done'; then
+            static_outcome="failure"
+            status=1
+            failure_notes+=("- JSON data parse failed. See ${STATIC_LOG_PATH}.")
+          fi
+
+          rm -rf "${DERIVED_DATA_PATH}" "${RESULT_BUNDLE_PATH}"
+          set +e
+          xcodebuild \
+            -project "${XCODE_PROJECT}" \
+            -scheme "${XCODE_SCHEME}" \
+            -configuration Debug \
+            -destination "${XCODE_DESTINATION}" \
+            -derivedDataPath "${DERIVED_DATA_PATH}" \
+            -resultBundlePath "${RESULT_BUNDLE_PATH}" \
+            CODE_SIGNING_ALLOWED=NO \
+            build > "${BUILD_LOG_PATH}" 2>&1
+          build_rc=$?
+          set -e
+
+          if [ "${build_rc}" -ne 0 ]; then
+            build_outcome="failure"
+            status=1
+            failure_notes+=("- xcodebuild build failed with exit ${build_rc}. See ${BUILD_LOG_PATH}.")
+          fi
+
+          if [ "${#failure_notes[@]}" -eq 0 ]; then
+            cat > "${FAILURE_SUMMARY_PATH}" <<'EOF'
+          # CI Failure Summary
+
+          No CI failures were detected.
+
+          Tests and probes are currently marked skipped by policy. See `ci-artifact-manifest.json` for the explicit skip reason.
+          EOF
+          else
+            {
+              echo "# CI Failure Summary"
+              echo
+              printf '%s\n' "${failure_notes[@]}"
+              echo
+              echo "Tests and probes are currently marked skipped by policy. See manifest for details."
+            } > "${FAILURE_SUMMARY_PATH}"
+          fi
+
+          export STATUS="${status}"
+          export STATIC_OUTCOME="${static_outcome}"
+          export BUILD_OUTCOME="${build_outcome}"
+          export TEST_OUTCOME="${test_outcome}"
+          export PROBE_OUTCOME="${probe_outcome}"
+          export TEST_SKIP_REASON="Project policy keeps XCTest, Probe, simulator, and UI tests out of the default path until a user explicitly requests them."
+          export CREATED_AT="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          from xml.sax.saxutils import escape
+
+          results = Path("ci-results")
+          manifest = {
+              "version": os.environ["CI_VERSION"],
+              "branch": os.environ["GITHUB_REF_NAME"],
+              "commitSha": os.environ["GITHUB_SHA"],
+              "shortSha": os.environ["SHORT_SHA"],
+              "runId": os.environ["GITHUB_RUN_ID"],
+              "runAttempt": os.environ["GITHUB_RUN_ATTEMPT"],
+              "workflowName": "WWIIHexV0 CI Results",
+              "artifactName": os.environ["ARTIFACT_NAME"],
+              "createdAt": os.environ["CREATED_AT"],
+              "projectName": os.environ["PROJECT_NAME"],
+              "scheme": os.environ["XCODE_SCHEME"],
+              "destination": os.environ["XCODE_DESTINATION"],
+              "resultBundlePath": os.environ["RESULT_BUNDLE_PATH"],
+              "junitPath": os.environ["JUNIT_PATH"],
+              "buildLogPath": os.environ["BUILD_LOG_PATH"],
+              "staticChecksLogPath": os.environ["STATIC_LOG_PATH"],
+              "failureSummaryPath": os.environ["FAILURE_SUMMARY_PATH"],
+              "staticChecksOutcome": os.environ["STATIC_OUTCOME"],
+              "buildOutcome": os.environ["BUILD_OUTCOME"],
+              "testOutcome": os.environ["TEST_OUTCOME"],
+              "testSkipReason": os.environ["TEST_SKIP_REASON"],
+              "probeOutcome": os.environ["PROBE_OUTCOME"],
+              "projectSpecificReports": [
+                  os.environ["RESULT_BUNDLE_PATH"],
+                  os.environ["STATIC_LOG_PATH"],
+              ],
+          }
+          (results / "ci-artifact-manifest.json").write_text(
+              json.dumps(manifest, indent=2, ensure_ascii=False) + "\n",
+              encoding="utf-8",
+          )
+
+          failures = 0
+          skipped = 0
+          cases = []
+          for name, outcome, log_path in [
+              ("static-checks", os.environ["STATIC_OUTCOME"], os.environ["STATIC_LOG_PATH"]),
+              ("xcodebuild-build", os.environ["BUILD_OUTCOME"], os.environ["BUILD_LOG_PATH"]),
+          ]:
+              if outcome == "failure":
+                  failures += 1
+                  cases.append(
+                      f'<testcase classname="WWIIHexV0CI" name="{escape(name)}">'
+                      f'<failure message="{escape(name)} failed">See {escape(log_path)}</failure>'
+                      f'</testcase>'
+                  )
+              else:
+                  cases.append(f'<testcase classname="WWIIHexV0CI" name="{escape(name)}"/>')
+
+          skipped += 1
+          cases.append(
+              '<testcase classname="WWIIHexV0CI" name="xctest-and-probes">'
+              f'<skipped message="{escape(os.environ["TEST_SKIP_REASON"])}"/>'
+              '</testcase>'
+          )
+
+          junit = (
+              '<?xml version="1.0" encoding="UTF-8"?>\n'
+              f'<testsuite name="WWIIHexV0 CI" tests="{len(cases)}" failures="{failures}" errors="0" skipped="{skipped}">\n'
+              + "\n".join(cases)
+              + "\n</testsuite>\n"
+          )
+          Path(os.environ["JUNIT_PATH"]).write_text(junit, encoding="utf-8")
+          PY
+
+          echo "${status}" > ci-results/ci-status.txt
+          exit "${status}"
+
+      - name: Upload CI result package
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.meta.outputs.artifact_name }}
+          path: ci-results
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Fail if CI checks failed
+        if: always()
+        shell: bash
+        run: |
+          status="1"
+          if [ -f ci-results/ci-status.txt ]; then
+            status="$(cat ci-results/ci-status.txt)"
+          fi
+          exit "${status}"

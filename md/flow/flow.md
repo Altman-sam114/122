@@ -1,4 +1,4 @@
-# WWIIHexV0 核心流程文档（v0.5 元帅决策链分支）
+# WWIIHexV0 核心流程文档（main 当前核心链路）
 
 > 本文是项目当前核心逻辑的接手文档。目标不是复述历史设计，而是按当前代码真实链路说明：数据如何进入游戏，hex / region / theater / front / deploy 如何派生，主游戏和地图编辑器如何共同维护同一套地图语义，AI / 玩家命令如何落到规则系统。
 
@@ -42,6 +42,35 @@ MapEditor / JSON 数据
 - 玩家、AI、后续聊天命令最终都必须经过 `Command` / `ZoneDirective -> WarCommandExecutor -> RuleEngine`，不能直接改 `GameState`。
 - v0.5 默认战争 AI 上游是 `MarshalAgent -> TheaterDirective JSON -> TheaterDirectiveDecoder -> TheaterDirectiveCompiler`，下游执行收口到 `ZoneDirective -> WarCommandExecutor -> RuleEngine`。
 - 统治者层只作为后续方向预留；当前 v0.5 主链路不调用 `RulerAgent`，也不写统治者决策记录。
+
+---
+
+## 0.1 云端协作与验证闭环
+
+本节记录协作制度，不改变游戏业务逻辑。本项目默认从本地重测试迁移为：
+
+```text
+人工提出目标
+  -> Agent A 读文档/源码并写版本化提示词
+  -> Agent B 基于 main 实现
+  -> Agent B 本机只跑 md/test/test.md 允许的轻量检查
+  -> Agent B commit 到 main 并 push origin/main
+  -> GitHub Actions 运行 .github/workflows/ci-results.yml
+  -> Actions 上传未加密 ci-results artifact
+  -> Agent C 使用 gh 下载 artifact 到 /private/tmp/wwiihexv0-c-review-<run_id>/
+  -> Agent C 核对 manifest / junit / xcodebuild.log / failure summary
+      -> 失败：退回 Agent B 在 main 追加修复 commit
+      -> 通过：确认 origin/main 最新 run 与 artifact 一致，并补齐核心文档
+```
+
+当前默认协作规则：
+
+- `main` 是唯一默认上传、提交、推送和云端验证分支。
+- 历史分支如 `v0.4`、`v0.5-marshal-decision-chain`、`v0.7-tactical-upgrade`、`v1.1-macos-main-game` 仍可作为历史记录和差异来源，但本轮不写入默认工作流。
+- 不默认创建 PR，不设计 `smalldata_test`、`develop`、`codeb/...` 或候选分支合并制度。
+- 本机默认不跑 `xcodebuild build/test`、Probe、Smoke、Stage Regression、Dynamic Theater Regression、Full、模拟器或 UI test。
+- 云端 workflow 当前执行静态检查与 `WWIIHexV0` scheme 的 iOS generic build，并把 XCTest/Probe 在 manifest 中明确标记为 `skipped`。后续若人工授权，可把更多重测试迁入云端 workflow。
+- Agent C 不能只看 Agent B 文字汇报；必须下载并核对未加密结果包。manifest 的 `branch`、`commitSha`、`runId`、`runAttempt` 必须与 `origin/main` 最新 run 对齐。
 
 ---
 
