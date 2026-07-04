@@ -42,11 +42,21 @@ struct HUDView: View {
                     metric("Phase", gameState.phase.displayName)
                     metric("Victory", victoryText)
                 }
+
+                GridRow {
+                    metric("Manpower", "\(activeLedger.stockpile.manpower)")
+                    metric("Industry", "\(activeLedger.stockpile.industry)")
+                }
+
+                GridRow {
+                    metric("Supplies", "\(activeLedger.stockpile.supplies)")
+                    metric("Queue", "\(activeLedger.productionQueue.count)")
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)
-        .background(Color(.systemBackground))
+        .background(PlatformStyles.systemBackground)
         .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 
@@ -68,5 +78,9 @@ struct HUDView: View {
             return "Ongoing"
         }
         return "\(winner.displayName) Victory"
+    }
+
+    private var activeLedger: FactionEconomyLedger {
+        gameState.economyState.ledger(for: gameState.activeFaction)
     }
 }

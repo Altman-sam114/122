@@ -42,6 +42,34 @@ enum BaseTerrain: String, Codable, Equatable, CaseIterable {
         }
     }
 
+    var armorSlowdownCost: Int {
+        switch self {
+        case .plain:
+            return 0
+        case .hill:
+            return 1
+        case .forest,
+             .city,
+             .fortress:
+            return 1
+        case .mountain:
+            return 2
+        }
+    }
+
+    var supportsInfantryDefenseBonus: Bool {
+        switch self {
+        case .forest,
+             .city,
+             .fortress:
+            return true
+        case .plain,
+             .mountain,
+             .hill:
+            return false
+        }
+    }
+
     var isObjectiveTerrain: Bool {
         self == .city || self == .fortress
     }

@@ -54,7 +54,7 @@ struct CommandPanelView: View {
             }
         }
         .padding(12)
-        .background(Color(.systemBackground))
+        .background(PlatformStyles.systemBackground)
         .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 

@@ -4,6 +4,7 @@ struct RootGameView: View {
     @ObservedObject var container: AppContainer
     @State private var selectedCompactPanel: CompactInfoPanel = .unit
     @State private var isInfoExpanded = false
+    @State private var isGeneralProfilePresented = false
 
     var body: some View {
         GeometryReader { proxy in
@@ -70,7 +71,23 @@ struct RootGameView: View {
                     .allowsHitTesting(false)
             }
         }
-        .background(Color(.systemBackground))
+        .background(PlatformStyles.systemBackground)
+        .sheet(isPresented: $isGeneralProfilePresented) {
+            if let general = container.selectedGeneral {
+                GeneralProfileView(
+                    general: general,
+                    assignment: container.selectedGeneralAssignment,
+                    zone: container.selectedGeneralCommandZone,
+                    assignedDivisions: container.selectedGeneralAssignedDivisions,
+                    hqUnderAttack: container.selectedGeneralHQUnderAttack,
+                    onClose: { isGeneralProfilePresented = false }
+                )
+            } else {
+                Text("No general selected.")
+                    .font(.headline)
+                    .padding()
+            }
+        }
     }
 
     private var boardView: some View {
@@ -140,12 +157,59 @@ struct RootGameView: View {
                         onResupply: container.resupplySelected,
                         onEndTurn: container.advanceOrRunAI
                     )
+                    GeneralCommandPanelView(
+                        zone: container.selectedGeneralCommandZone,
+                        general: container.selectedGeneral,
+                        assignment: container.selectedGeneralAssignment,
+                        assignedDivisions: container.selectedGeneralAssignedDivisions,
+                        targetRegion: container.selectedGeneralTargetRegion,
+                        targetZone: container.selectedGeneralTargetZone,
+                        hqUnderAttack: container.selectedGeneralHQUnderAttack,
+                        plannedOperations: container.selectedGeneralPlannedOperations,
+                        canHoldLine: container.canOrderSelectedGeneralHoldLine,
+                        canAttackRegion: container.canOrderSelectedGeneralAttackRegion,
+                        onShowProfile: { isGeneralProfilePresented = true },
+                        onHoldLine: container.orderSelectedGeneralHoldLine,
+                        onAttackRegion: container.orderSelectedGeneralAttackRegion
+                    )
                 case .region:
                     RegionInspectorView(inspectorState: container.selectedRegionInspectorState)
+                case .general:
+                    GeneralCommandPanelView(
+                        zone: container.selectedGeneralCommandZone,
+                        general: container.selectedGeneral,
+                        assignment: container.selectedGeneralAssignment,
+                        assignedDivisions: container.selectedGeneralAssignedDivisions,
+                        targetRegion: container.selectedGeneralTargetRegion,
+                        targetZone: container.selectedGeneralTargetZone,
+                        hqUnderAttack: container.selectedGeneralHQUnderAttack,
+                        plannedOperations: container.selectedGeneralPlannedOperations,
+                        canHoldLine: container.canOrderSelectedGeneralHoldLine,
+                        canAttackRegion: container.canOrderSelectedGeneralAttackRegion,
+                        onShowProfile: { isGeneralProfilePresented = true },
+                        onHoldLine: container.orderSelectedGeneralHoldLine,
+                        onAttackRegion: container.orderSelectedGeneralAttackRegion
+                    )
                 case .log:
                     EventLogView(entries: container.displayEventLog)
+                case .economy:
+                    EconomyPanelView(
+                        gameState: container.gameState,
+                        playerFaction: container.playerFaction,
+                        observerModeEnabled: container.observerModeEnabled,
+                        onQueueProduction: container.queueProduction
+                    )
+                case .diplomacy:
+                    DiplomacyPanelView(
+                        diplomacyState: container.gameState.diplomacyState,
+                        activeFaction: container.gameState.activeFaction
+                    )
                 case .agent:
-                    AgentPanelView(record: container.lastAgentDecisionRecord)
+                    AgentPanelView(
+                        record: container.lastAgentDecisionRecord,
+                        rulerRecord: container.gameState.diplomacyState.latestRulerRecord,
+                        directiveRecords: container.lastWarDirectiveRecords
+                    )
                 }
             }
             .padding(.horizontal, 8)
@@ -157,7 +221,10 @@ struct RootGameView: View {
 private enum CompactInfoPanel: String, CaseIterable, Identifiable {
     case unit = "Unit"
     case region = "Region"
+    case general = "General"
     case log = "Log"
+    case economy = "Economy"
+    case diplomacy = "Diplomacy"
     case agent = "AI"
 
     var id: String {

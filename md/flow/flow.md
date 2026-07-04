@@ -1,4 +1,4 @@
-# WWIIHexV0 核心流程文档（v0.37）
+# WWIIHexV0 核心流程文档（v0.5 元帅决策链分支）
 
 > 本文是项目当前核心逻辑的接手文档。目标不是复述历史设计，而是按当前代码真实链路说明：数据如何进入游戏，hex / region / theater / front / deploy 如何派生，主游戏和地图编辑器如何共同维护同一套地图语义，AI / 玩家命令如何落到规则系统。
 
@@ -16,10 +16,14 @@ MapEditor / JSON 数据
   -> GameState
   -> Hex controller / Division coord
   -> Region 聚合
+  -> EconomyState 收入 / 生产 / 补员
   -> Initial Theater snapshot + runtime hexToTheater
   -> FrontLine 动态 hex 接触
   -> WarDeployment hexToFrontZone + FRONT/DEPTH/GARRISON
-  -> ZoneCommanderAgent / 手写 ZoneDirective
+  -> MarshalAgent / TheaterDirective JSON
+  -> TheaterDirectiveDecoder
+  -> TheaterDirectiveCompiler
+  -> ZoneCommanderAgent fallback / 手写 ZoneDirective
   -> WarCommandExecutor
   -> RuleEngine
   -> CommandExecutor
@@ -34,7 +38,10 @@ MapEditor / JSON 数据
 - `regionToTheater` 是初始/基础战区归属，不是运行时推进层。
 - `hexToTheater` 是运行时动态战区权威。
 - `hexToFrontZone` 是部署层动态归属权威。
+- `EconomyState` 是 faction 级经济总账；收入来自受控 region、城市、工厂、基础设施和补给值，但战术占领仍以 hex 为准。
 - 玩家、AI、后续聊天命令最终都必须经过 `Command` / `ZoneDirective -> WarCommandExecutor -> RuleEngine`，不能直接改 `GameState`。
+- v0.5 默认战争 AI 上游是 `MarshalAgent -> TheaterDirective JSON -> TheaterDirectiveDecoder -> TheaterDirectiveCompiler`，下游执行收口到 `ZoneDirective -> WarCommandExecutor -> RuleEngine`。
+- 统治者层只作为后续方向预留；当前 v0.5 主链路不调用 `RulerAgent`，也不写统治者决策记录。
 
 ---
 
@@ -55,10 +62,12 @@ map: MapState
 theaterState: TheaterState
 frontLineState: FrontLineState
 warDeploymentState: WarDeploymentState
+economyState: EconomyState
 divisions: [Division]
 victoryState
 eventLog
 warDirectiveRecords
+playerCommandState
 ```
 
 状态含义：
@@ -68,8 +77,9 @@ warDirectiveRecords
 - `theaterState` 保存初始战区快照与运行时动态战区。
 - `frontLineState` 从动态战区相邻 hex 派生。
 - `warDeploymentState` 从动态战区/前线/单位位置派生，供 AI 调度单位。
+- `economyState` 保存 manpower、industry、supplies、生产队列、上回合收入/维护费/补员消耗，不直接改变战术占领权。
 - `eventLog` 给 UI 和调试看。
-- `warDirectiveRecords` 记录战争指令执行回放，供 v0.36/v0.37 后续接 LLM / 聊天命令审计。
+- `warDirectiveRecords` 记录战争指令执行回放，供 v0.36+ 后续接 LLM / 聊天命令审计。
 
 ### 1.2 MapState / Hex
 
@@ -326,6 +336,96 @@ isCoreZone
 
 这层是 AI 调度能否“看见部队”的关键。历史上的“AI 看起来不动”根因之一就是突破后的单位被误判成 garrison，从 `unitsFront` 调度池消失。现在前线/敌区/敌控 hex 会强制把这种单位归到 front。
 
+### 1.7 后续统治者层预留
+
+v0.5 当前不接入统治者层。工作树中可能存在 `WWIIHexV0/Core/DiplomacyState.swift`、`WWIIHexV0/Agents/RulerAgent.swift` 等其他版本方向文件，但它们不是本 v0.5 分支的默认战争 AI 主链路，`TurnManager` 当前不调用 `RulerAgent`。
+
+后续若加入统治者层，必须满足这些边界：
+
+- 统治者只能位于元帅上游，输出国家级姿态、优先方向或约束条件。
+- 统治者不得直接生成底层 `Command`，不得绕过 `MarshalAgent` / `ZoneDirective`。
+- 统治者不得直接修改 `HexTile.controller`、`Division.coord`、`regionToTheater`、`hexToTheater` 或 `hexToFrontZone`。
+- 若需要审计记录，必须单独设计数据 schema，并在 `md/flow/*`、`README.md`、`update_log.md` 中同步说明。
+
+### 1.8 EconomyState / EconomyRules
+
+源码：`WWIIHexV0/Core/EconomyState.swift`、`WWIIHexV0/Rules/EconomyRules.swift`
+
+v0.8 新增初级回合经济层。它是 faction 级总账，不是第三套地图权威。
+
+`EconomyState`：
+
+```text
+ledgers: [Faction: FactionEconomyLedger]
+lastResolvedTurn
+```
+
+`FactionEconomyLedger`：
+
+```text
+faction
+stockpile: EconomyResources
+lastIncome
+lastUpkeep
+lastReinforcementSpend
+productionQueue: [ProductionOrder]
+lastUpdatedTurn
+```
+
+`EconomyResources` 只包含三项：
+
+```text
+manpower
+industry
+supplies
+```
+
+收入算法：
+
+```text
+对 faction 控制且 passable 的每个 region:
+  如果该 region 没有任何真实己方控制 hex，跳过
+  cityLevel = EconomyRules.cityLevel(region, map)
+  coreBonus = region.coreOf 为空或包含 faction ? 1 : 0
+  manpower = max(1, cityLevel.manpowerGrowth + coreBonus * 4 + infrastructure)
+  industry = max(0, factories + cityLevel.industryValue + infrastructure / 3)
+  supplies = max(1, supplyValue * 3 + factories + infrastructure / 2)
+```
+
+城市等级不是单独 JSON schema，当前从既有字段推导：
+
+- capital、victoryPoints >= 5 或 factories >= 5 -> `metropolis`。
+- victoryPoints >= 2、factories >= 2 或 supplyValue >= 3 -> `town`。
+- 有 city / fortress / factory 但不满足上面条件 -> `village`。
+- 没有城市、堡垒或工厂信号 -> `none`。
+
+生产队列由 `Command.queueProduction(kind:)` 进入规则系统：
+
+```text
+EconomyPanelView
+  -> AppContainer.queueProduction
+  -> Command.queueProduction
+  -> RuleEngine
+  -> CommandValidator.validateProduction
+  -> CommandExecutor.executeQueueProduction
+  -> EconomyRules.queueProduction
+```
+
+排产时预付资源，完成时才部署单位或发放 supply stockpile。完成单位只能放到本方控制、passable、空置、非敌邻，且位于首都、城镇/大都会、工厂、高基建、高补给 region 或 supply source 的后方 hex。找不到安全部署点时订单保留到下回合继续尝试。
+
+自动补员在 active faction 结束回合时发生，只处理：
+
+```text
+本阵营
+未毁灭
+未撤退
+supplied
+strength < maxStrength
+不与敌军相邻
+```
+
+每个单位每回合最多恢复 2 strength，并按装甲、摩托化、火炮权重扣 manpower / industry / supplies。v0.8 不恢复 organization。
+
 ---
 
 ## 2. 数据启动流程
@@ -398,6 +498,7 @@ DEBUG 下资源读取优先源码目录 `WWIIHexV0/Data/*.json`，不是旧 bund
 
 1. `bootstrapIfNeeded`
    - 只补缺失层。
+   - 先用 `EconomyRules.bootstrapIfNeeded` 为旧状态补 faction 经济总账。
    - 如果 state 有 region 但缺 theater/front/deployment，会从当前 map/divisions 生成。
    - App 初始化、命令提交后会用它兜底。
 
@@ -673,6 +774,83 @@ handleBoardTap(coord)
 
 当前开局不会在 `RootGameView` 自动 `.task { runAIIfNeeded() }`。AI 行动由 `advanceOrRunAI()` 或命令提交后的 `runAIIfNeeded()` 触发。
 
+### 4.3 v1.1 主游戏 macOS target
+
+源码：
+
+- `WWIIHexV0/App/WWIIHexV0MacApp.swift`
+- `WWIIHexV0/SpriteKit/BoardSceneView.swift`
+- `WWIIHexV0/SpriteKit/BoardScene.swift`
+- `WWIIHexV0/UI/PlatformStyles.swift`
+
+v1.1 新增独立 macOS 主游戏 target：
+
+```text
+WWIIHexV0Mac
+  -> WWIIHexV0MacApp
+  -> AppContainer.bootstrap()
+  -> RootGameView(container:)
+  -> BoardSceneView
+  -> BoardScene
+```
+
+这个 target 和既有 target 的边界：
+
+- `WWIIHexV0`：iOS 主游戏 target。
+- `WWIIHexV0Mac`：macOS 主游戏 target。
+- `MapEditorMac`：macOS 地图编辑器 target，不是主游戏入口。
+
+`WWIIHexV0Mac` 复用主游戏数据和规则，不新增一套 mac 专用规则。resource phase 包含：
+
+```text
+ardennes_v0_scenario.json
+ardennes_v02_regions.json
+general_agents.json
+generals.json
+terrain_rules.json
+unit_templates.json
+```
+
+DEBUG 下 `DataLoader` 仍优先读源码目录 `WWIIHexV0/Data/*.json`；bundle resources 是 release / fallback 路径。
+
+`BoardSceneView` 现在有平台分支：
+
+```text
+iOS:
+  UIViewRepresentable
+  -> SKView
+  -> BoardScene touch input
+
+macOS:
+  NSViewRepresentable
+  -> BoardEventSKView
+  -> BoardScene mouse / scroll / magnify input
+```
+
+macOS 输入桥接逻辑：
+
+```text
+鼠标点击
+  -> BoardScene.mouseDown / mouseUp
+  -> layout.pixelToHex
+  -> onHexTapped(coord)
+  -> AppContainer.handleBoardTap
+
+鼠标拖拽
+  -> BoardScene.mouseDragged
+  -> camera.position 更新
+  -> clampCamera
+
+滚轮 / 触控板缩放
+  -> BoardEventSKView.scrollWheel / magnify
+  -> scene.convertPoint(fromView:)
+  -> BoardScene.handleScrollWheel / handleMagnify
+  -> zoomCamera(anchor:)
+  -> clampCamera
+```
+
+注意：macOS 点击仍只进入 `AppContainer.handleBoardTap`。移动、攻击、结束回合和 AI 行动仍由 `RuleEngine` / `WarCommandExecutor` 处理；v1.1 不允许通过 AppKit 或 SpriteKit 直接修改 `GameState`。
+
 ---
 
 ## 5. 命令执行流程
@@ -689,6 +867,7 @@ attack(attackerId, targetId)
 hold(divisionId)
 allowRetreat(divisionId)
 resupply(divisionId)
+queueProduction(kind)
 endTurn
 ```
 
@@ -696,9 +875,10 @@ endTurn
 
 ```text
 RuleEngine.execute(command, in: state)
-  -> CommandValidator.validate(command, in: state)
+  -> EconomyRules.bootstrapIfNeeded(state)
+  -> CommandValidator.validate(command, in: preparedState)
   -> invalid: 返回 CommandResult，state 不变
-  -> valid: CommandExecutor.execute(command, in: state)
+  -> valid: CommandExecutor.execute(command, in: preparedState)
 ```
 
 ### 5.2 校验规则
@@ -741,6 +921,13 @@ faction 匹配 activeFaction
 
 ```text
 phaseAllowsCommands
+```
+
+生产排队：
+
+```text
+phaseAllowsCommands
+active faction economy ledger 有足够 manpower / industry / supplies
 ```
 
 ### 5.3 移动与占领
@@ -878,6 +1065,12 @@ resolveCombatResult
 
 ```text
 SupplyRules.updateSupplyStates
+EconomyRules.resolveFactionTurn(for: activeFaction)
+  -> 收入入账
+  -> 支付战略补给维护费
+  -> supplies 短缺时 supplied 单位降为 lowSupply
+  -> 安全后方自动补员
+  -> 推进生产队列并部署完成单位
 SupplyRules.advanceRetreats
 SupplyRules.applyEncirclementAttrition
 VictoryRules.updateVictoryState
@@ -887,6 +1080,7 @@ activeFaction:
   allies -> germany, phase germanAI, turn += 1
 
 resetActionsForActiveFaction
+StrategicStateBootstrapper.refreshRuntimeState
 appendEvent("Turn advanced ...")
 ```
 
@@ -894,24 +1088,60 @@ appendEvent("Turn advanced ...")
 
 ## 6. AI / 战争指令流程
 
-### 6.1 当前默认战争 AI 管线
+### 6.1 v0.5 默认元帅决策链
 
 源码：`WWIIHexV0/Turn/TurnManager.swift`、`WWIIHexV0/Agents/ZoneCommanderAgent.swift`、`WWIIHexV0/Commands/WarDirective.swift`、`WWIIHexV0/Commands/WarCommandExecutor.swift`
 
-v0.37 默认路径：
+v0.5 分支默认路径：
 
 ```text
 AppContainer.runAIIfNeeded
   -> runAISequence
-  -> TurnManager.runAITurn(... pipelineMode: .zoneDirective)
-  -> TheaterCommanderPool.envelope(for: faction, in: state)
-  -> ZoneCommanderAgent.makeDirective(for: zone, in: state)
-  -> DirectiveEnvelope
+  -> TurnManager.runAITurn(... pipelineMode: .marshalDirective)
+  -> MarshalAgent.resolve
+  -> MarshalBattlefieldSummarizer.summary
+  -> SimulatedMarshalLLMClient.completeTheaterDirectiveJSON
+  -> TheaterDirectiveDecoder.parse
+  -> TheaterDirectiveCompiler.compile
+  -> DirectiveEnvelope / ZoneDirective
   -> WarCommandExecutor.execute(directive, in: state)
   -> RuleEngine.execute(Command)
   -> WarDirectiveRecord
   -> RuleEngine.execute(.endTurn)
 ```
+
+`MarshalAgent` 是元帅层，不是单位，也不是新规则执行器。它只读取降维摘要并输出 `TheaterDirectiveEnvelope` JSON：
+
+```text
+TheaterDirectiveEnvelope
+  schemaVersion = 5
+  issuerId / turn / faction
+  strategicIntent
+  directives: [TheaterDirective]
+
+TheaterDirective
+  zoneId
+  category offense/defense
+  tactic
+  priority
+  targetTheaterId
+  weightedRegions / focusRegionId / supportRegionIds
+  reserveBias
+  intensity / maxCommittedUnits / exploitDepth
+  rationale
+```
+
+`TheaterDirectiveDecoder` 负责从模拟 LLM 文本中提取 fenced JSON，使用 `JSONDecoder` 解码，并校验 schemaVersion、issuerId、turn、faction、zone 存在性、zone 阵营、region id、target theater/front zone 与 tactic/category 一致性。解码或校验失败时，不执行半成品 JSON，`MarshalAgent` fallback 到 `TheaterCommanderPool`。
+
+`TheaterDirectiveCompiler` 把元帅意图降级到现有 `ZoneDirective`：
+
+- offense -> `ZoneDirective.attack`，保留 target theater、weighted/focus/support regions、intensity、maxCommittedUnits、exploitDepth。
+- defense -> `ZoneDirective.defend`，把 reserveBias 转成 targetReserves，把 focus/weighted regions 转成 strongpointRegionIds，把 supportRegionIds 转成 fallbackRegionIds。
+- 某个 zone 没有元帅 directive 或编译失败时，使用 `TheaterCommanderPool` 给该 zone 的旧 directive。
+
+最终执行由 `TurnManager.executeDirectiveEnvelope` 统一完成。`.marshalDirective` 和显式 `.zoneDirective` 共享同一段 WarCommandExecutor 执行、WarDirectiveRecord 记录、endTurn 推进逻辑。
+
+统治者层是后续预留方向，当前 v0.5 主路径不调用 `RulerAgent`，也不在 `DirectiveEnvelope` 与执行层之间插入姿态塑形。
 
 Legacy Agent D 仍存在，但只在显式 `.legacyAgentOrder` 分支运行：
 
@@ -924,6 +1154,16 @@ AgentContextBuilder
 ```
 
 默认不得把 Legacy 管线接回战争 AI 主路径。
+
+v0.37 直接将军池路径仍可显式使用：
+
+```text
+TurnManager.runAITurn(... pipelineMode: .zoneDirective)
+  -> TheaterCommanderPool.envelope
+  -> ZoneCommanderAgent.makeDirective
+  -> DirectiveEnvelope
+  -> WarCommandExecutor
+```
 
 ### 6.2 AI 触发条件
 
@@ -951,6 +1191,10 @@ allies:
 ```text
 visibleEnemyStrengthByRegion
 friendlyFrontStrength
+mobileFriendlyStrength
+artillerySupportStrength
+friendlyDepthStrength
+pressure / supplyWarningCount
 hasContestedForwardPresence
 hasRecentStaticDefense
   -> BinaryTacticClassifier.classify
@@ -974,10 +1218,21 @@ shouldAttack =
 
 分类结果：
 
-- offense / `standardAttack`
-- defense / `holdPosition`
+- offense：
+  - `blitzkrieg`：机动兵力占比高且 adjustedRatio >= 1.65。
+  - `spearhead`：机动兵力可用，adjustedRatio >= 1.35，且有可见敌 region；用于定点矛头。
+  - `breakthrough`：adjustedRatio >= 1.35，向弱点突破。
+  - `fireCoverage`：炮兵/远程支援可用但优势不足，先火力覆盖。
+  - `feint`：优势不足但需要牵制时少量佯攻。
+  - `guerrillaWarfare`：机动兵力可用、敌 region 多、优势有限时袭扰纵深。
+  - `standardAttack`：普通进攻 fallback。
+- defense：
+  - `lastStand`：极端劣势、无纵深预备队且压力高时死守。
+  - `defenseInDepth`：有纵深预备队且压力/劣势明显时纵深防御。
+  - `elasticDefense`：压力、补给警告或劣势时弹性防御。
+  - `holdPosition`：普通防御 fallback。
 
-当前 `TacticConditionChecker` 对现有战术总是允许。后续 blitzkrieg / breakthrough 等条件尚未实现。
+`TacticConditionChecker` 不再恒放行：闪电战/游击战要求机动单位，火力覆盖要求炮兵或远程单位，佯攻要求前线单位，纵深防御要求 depth 预备队；不满足条件会降级为 `holdPosition`。
 
 进攻 directive：
 
@@ -987,12 +1242,46 @@ ZoneDirective(
   attack: AttackParameters(
     targetTheaterId,
     weightedRegions,
-    intensity: .limitedCounter
+    intensity,
+    focusRegionId,
+    supportRegionIds,
+    convergenceRegionId,
+    coordinatedZoneIds,
+    maxCommittedUnits,
+    exploitDepth
   ),
   category: .offense,
-  tactic: .standardAttack,
-  commandTarget: .theater(target)
+  tactic: blitzkrieg / spearhead / breakthrough / pincerMovement / fireCoverage / feint / guerrillaWarfare / standardAttack,
+  commandTarget: .region(focusRegionId) 或 .theater(target)
 )
+```
+
+定点突破目标选择：
+
+```text
+priorityRegions =
+  focusRegionId
+  + commandTarget.region
+  + convergenceRegionId
+  + weightedRegions
+  + supportRegionIds
+
+若 tactic weakPointFocus:
+  对候选 region 评分：
+    enemyStrength 越低越优先
+    terrain.movementCost 越低越优先
+    region 内有 road 越优先
+    city victoryPoints + supplyValue + factories + infrastructure 越高越优先
+  最优 region 放到候选首位
+```
+
+钳形攻势数据层：
+
+```text
+pincerMovement 使用 convergenceRegionId + coordinatedZoneIds
+每个 zone 仍各自编译成一条 ZoneDirective
+执行器只推进本 zone 成功移动的具体 hex
+会师/包围效果仍交给补给、前线、动态战区同步派生
 ```
 
 防御 directive：
@@ -1000,14 +1289,21 @@ ZoneDirective(
 ```text
 ZoneDirective(
   zoneId,
-  defense: DefenseParameters(targetReserves: 1, stance: .holdLine),
+  defense: DefenseParameters(
+    targetReserves,
+    stance,
+    fallbackRegionIds,
+    counterattackRegionIds,
+    strongpointRegionIds,
+    maxFrontCommitment
+  ),
   category: .defense,
-  tactic: .holdPosition,
+  tactic: holdPosition / elasticDefense / defenseInDepth / lastStand,
   commandTarget: .theater(self)
 )
 ```
 
-`AttackIntensity` 字段仍存在，但当前执行层没有按 `infiltration / limitedCounter / allOut` 分流。这是 v0.37 明确推迟到 1.x 的事项。
+`AttackIntensity` 仍是参数字段；v0.7/v1.0 的真实分流主要由 `tactic` 决定。v1.0 已把 `.infiltration` 解释为默认低投入上限，但执行器不绕过 `RuleEngine` 给强度加直接伤害。
 
 ### 6.4 WarCommandExecutor 如何翻译指令
 
@@ -1023,8 +1319,10 @@ func execute(_ directive: ZoneDirective, in state: GameState) -> WarCommandExecu
 
 ```text
 如果 directive.tactic 存在:
-  standardAttack -> executeAttack
-  holdPosition -> executeDefense
+  standardAttack / blitzkrieg / spearhead / breakthrough / pincerMovement / fireCoverage / feint / guerrillaWarfare
+    -> executeAttack(tactic)
+  holdPosition / elasticDefense / defenseInDepth / lastStand
+    -> executeDefense(tactic)
 否则按 parameters:
   attack -> executeAttack
   defend -> executeDefense
@@ -1034,7 +1332,16 @@ func execute(_ directive: ZoneDirective, in state: GameState) -> WarCommandExecu
 
 ```text
 zone 必须存在且有 frontSegments
-unitIds = unitsFront + 部分 unitsDepth（保留 targetReserves）
+lastStand:
+  不保留 depth，全力 holdLine
+elasticDefense:
+  stance 强制 flexible，前线单位优先 allowRetreat
+defenseInDepth:
+  前线单位 allowRetreat
+  保留 targetReserves 个 depth 预备队
+  其余 depth 机动单位优先反击可见敌军，否则向 fallback/strongpoint region 移动
+普通防御:
+  unitIds = unitsFront + 部分 unitsDepth（保留 targetReserves）
 对每个可行动单位:
   找 lightestFrontRegion
   如果单位已在该 region:
@@ -1053,14 +1360,47 @@ unitIds = unitsFront + 部分 unitsDepth（保留 targetReserves）
 zone 必须存在
 targetZoneId = AttackParameters.targetTheaterId.rawValue
 segments = 指向 targetZone 的 frontSegments，若为空则用全部 frontSegments
-attackingUnitIds = unitsFront；若 unitsFront 为空，使用 unitsDepth
+
+按 tactic 得到 AttackTacticProfile:
+  blitzkrieg / spearhead:
+    includeDepthUnits = true
+    mobileOnlyWhenAvailable = true
+    weakPointFocus = true
+    holdNonCommittedFront = true
+  breakthrough:
+    includeDepthUnits = true
+    weakPointFocus = true
+  pincerMovement:
+    includeDepthUnits = true
+    mobileOnlyWhenAvailable = true
+    convergenceRegionId 可作为深目标
+  fireCoverage:
+    artilleryFirst = true
+    attackOnly = true；没有射程目标则 hold，不主动推进
+  feint:
+    只投入 maxCommittedUnits 或默认约 1/3 前线单位
+  guerrillaWarfare:
+    mobileOnlyWhenAvailable = true
+    allowDeepTarget = true
+    默认只投入约半数前线+纵深单位
+
+attackingUnitIds =
+  unitsFront
+  + profile.includeDepthUnits ? unitsDepth : unitsFront 为空时 fallback unitsDepth
+  -> 过滤可行动单位
+  -> 需要时优先机动单位
+  -> 按 artillery / mobile / attack / movement / strength 排序
+  -> 应用 maxCommittedUnits
 
 对每个可行动单位:
   targetEnemyRegion =
-    weightedRegions 中仍相邻/可见的 region
+    focus / commandTarget.region / convergence / weighted / support 中仍相邻或允许深目标的 region
     或 front segment 相邻敌 region
+    weakPointFocus 时用敌军强度、地形、道路、战略价值重排
   如果射程内有 visible enemy division:
     .attack
+  否则如果 fireCoverage:
+    .hold
   否则如果能找到 tacticalDestination:
     .move
   否则:
@@ -1357,14 +1697,19 @@ MapEditorGameResourceBridge.loadDefaultDocument
 
 ## 10. 当前已知边界
 
-- 真 LLM 尚未接入；当前默认是 MockAI / ZoneCommanderAgent。
-- `AttackIntensity` 不分流执行。
+- 真 LLM 尚未接入；当前只用 `SimulatedMarshalLLMClient` 模拟 fenced JSON 输出和解码流程。
+- 默认 AI 上游已是 `MarshalAgent -> TheaterDirectiveEnvelope -> TheaterDirectiveDecoder -> TheaterDirectiveCompiler`，下游执行必须是 `ZoneDirective -> WarCommandExecutor -> RuleEngine`。
+- 元帅层不能直接输出底层 `Command`，不能直接修改地图、单位、hex controller 或动态战区权威。
+- 统治者层只作为未来方向预留，当前 v0.5 不在主链路调用。
+- 当前工作树存在外交/经济/UI 等非 v0.5 方向残留，合并前需要单独审查文件归属和 public API 冲突。
+- `AttackIntensity.infiltration` 已在 `WarCommandExecutor` 中解释为默认低投入上限；`.limitedCounter` 和 `.allOut` 仍主要依赖 tactic profile 与显式 `maxCommittedUnits`。
 - `TacticConditionChecker` 当前总是允许现有战术。
 - 战区互助接口 `requestSupport` / `getAvailableForces` / `notifyThreat` 有模型但没有主流程调用方。
 - 攻击不会自动占领目标 hex，只有移动会占领。
 - Legacy Agent D 管线仍保留，不应删除，也不应默认接回主战争 AI。
 - `RegionCommand` / AgentOrder v2 仍可桥接到 hex command，但当前默认战争 AI 是 ZoneDirective。
 - 地图编辑器的 theater assignment 是初始战区划分，不是运行时动态战区脚本。
+- 历史回退的 Cabinet/Minister/StrategicDirective 管线仍不得恢复；v0.5 当前实现没有把内阁或部长塞进 `GameState`。
 
 ---
 
@@ -1394,3 +1739,104 @@ MapEditorGameResourceBridge.loadDefaultDocument
 - 少量 Swift 改动：仅在不会触发全项目构建时，对直接改动文件做单文件语法检查。
 
 多分支或多子 Agent 并发后，即使不跑测试，也必须检查文件重叠、public API 分叉、数据 schema 分叉、Xcode project 冲突和文档口径冲突。未完成冲突检查前，不得声称候选分支可合并。
+
+---
+
+## 12. v1.0 UI / AI / Playtest 分支收口
+
+v1.0 分支名：`v1.0-ui-ai-playtest`。
+
+该分支不改变战术权威和命令权威，只让当前主游戏更适合人工初版试玩和后续调参：
+
+```text
+GameState / WarDirectiveRecord / EventLog
+  -> RootGameView
+  -> HUD + Info tabs
+  -> AgentPanelView 展示 raw JSON / command results / zone directives
+  -> EventLogView 展示最近 60 条分类日志
+
+BoardScene
+  -> 缓存 unit display hex
+  -> 排序绘制单位
+  -> deployment 图层复用 WarDeploymentManager 计算 role
+
+Marshal / ZoneDirective
+  -> AttackParameters.intensity
+  -> WarCommandExecutor.attackTacticProfile
+  -> infiltration 低投入上限
+  -> RuleEngine 仍是唯一执行权威
+```
+
+算法变化：
+
+- AI 面板从只展示 `AgentDecisionRecord` 扩展为同时展示 `WarDirectiveRecord`，每条 directive 可看到 zone、attack/defend、tactic、命令成功/拒绝数量和目标 region。
+- 日志面板用 `LogDisplayEntry` 保存 entry + category，避免 body 内对同一条日志重复分类。
+- 单位绘制先缓存 `unitDisplayHex` 再排序，避免 comparator 重复计算。
+- `AttackIntensity.infiltration` 在无显式 `maxCommittedUnits` 时默认只投入约半数前线/纵深候选单位，避免渗透/袭扰全线压上。
+
+试玩观察重点：
+
+- UI：HUD、Info tabs、Economy、Diplomacy、AI panel 是否可读。
+- 地图：hex/province/initial/dynamic/front/deploy 图层是否清晰。
+- AI：raw JSON、zone directive、diagnostics 是否能解释 AI 回合。
+- 规则：玩家和 AI 行动是否仍能追溯到 `CommandResultSummary` / `WarDirectiveRecord`。
+- 性能体感：地图拖动、图层切换、日志面板滚动是否有明显卡顿。
+
+当前限制：
+
+- 未跑 Xcode / XCTest / 模拟器 / 性能测试。
+- 当前工作树含多版本未提交改动，v1.0 合并前必须重新审查 `project.pbxproj`、Swift 新文件引用、AI schema 和文档版本口径。
+
+---
+
+## 13. v0.4 将军养成、将军 UI 与玩家双轨命令
+
+v0.4 分支名：`v0.4-generals-command-ui-final`。
+
+该分支把 0.41-0.48 的将军与玩家命令链路收口到当前代码，仍保持命令权威不变：
+
+```text
+Data/generals.json
+  -> DataLoader.loadGeneralRegistry
+  -> GeneralRegistry / GeneralDispatcher
+  -> FrontZone.generalAssignment
+  -> AppContainer.selectedGeneral*
+  -> GeneralCommandPanelView / GeneralProfileView
+
+玩家微操单位
+  -> AppContainer.submit(Command)
+  -> RuleEngine
+  -> PlayerCommandState.micromanagedDivisionIds
+  -> WarCommandExecutor.execute(... excluding: lockedIds)
+
+玩家宏观将军命令
+  -> GeneralCommandPanelView 按钮
+  -> AppContainer 组装 ZoneDirective
+  -> WarCommandExecutor
+  -> RuleEngine
+  -> WarDirectiveRecord + PlayerPlannedOperation
+  -> BoardScene 计划线 / 金色微操单位圈
+```
+
+核心算法：
+
+- 将军数据：`GeneralData` 从 `generals.json` 读取，包含阵营、军衔、倾向、技能、头像占位、履历、偏好 theater/region、忠诚和满意度基线。
+- 初始分配：`RegionNodeDefinition.assignedGeneralId` 可由地图 JSON / MapEditor 写入。`DataLoader` 在生成 `WarDeploymentState` 后收集 region 种子，调用 `GeneralDispatcher.assignGenerals`。
+- 指派规则：
+  1. 如果 FrontZone 已有合法同阵营 `generalAssignment`，保留该将军，只刷新 `assignedDivisionIds`。
+  2. 否则优先使用该 zone 下 region 的 `assignedGeneralId`。
+  3. 再按将军 `preferredTheaterIds` / `preferredRegionIds` 匹配。
+  4. 最后从同阵营未占用将军池取第一名；没有可用将军时安全空岗。
+- HQ 逻辑：不生成占格子的 HQ 单位。`GeneralAssignment.hqRegionId` 指向战区内友方城市或最大 region，`GeneralDispatcher.isHQUnderAttack` 通过 region controller 判断 HQ 是否被夺。
+- 将军养成初步：`GeneralAssignment` 保存 `loyalty`、`satisfaction`、`interventionCount`。玩家直接微操某个将军辖下单位时，记录干预次数并轻微降低满意度。
+- 微操锁：玩家在己方 phase 对具体师执行 move/attack/hold/resupply/allowRetreat 后，该师 id 写入 `PlayerCommandState.micromanagedDivisionIds`。本回合玩家再下达战区宏观命令时，`WarCommandExecutor.execute(... excluding:)` 会跳过这些师，避免同一回合被将军指令覆盖。`endTurn` 或 active faction / turn 改变时清空锁。
+- 半自动指令：`GeneralCommandPanelView` 的 `Hold Line` 生成 defense `ZoneDirective`，`Attack Region` 根据当前选中敌方 region 和相邻玩家 FrontZone 生成 attack `ZoneDirective`，直接复用 `WarCommandExecutor -> RuleEngine`，不通过 `TurnManager.runDirectiveTurn`，因此不会自动结束玩家回合。
+- 记录与反馈：玩家宏观命令写入 `WarDirectiveRecord` 和 `PlayerPlannedOperation`。`BoardScene` 只读 `PlayerCommandState.plannedOperations`，画源 region 到目标 region 的箭头；防御命令画源点圆环。玩家微操锁定单位在 `UnitNode` 上显示金色底圈。
+- UI：`RootGameView` 新增 `General` tab，Unit tab 也嵌入 `GeneralCommandPanelView`。`GeneralProfileView` 用 sheet 展示将军身份、履历、技能、忠诚/满意度、干预次数、HQ 状态和辖下部队。
+
+边界：
+
+- v0.4 不让将军或 UI 直接修改 `GameState` 战术权威；所有行动仍要走 `Command` / `ZoneDirective -> WarCommandExecutor -> RuleEngine`。
+- v0.4 没有实现真正抗命、政变、完整 RPG 成长树或真实 LLM 聊天解析；当前是忠诚/满意度和干预次数的可视化与数据底座。
+- v0.4 没有做自由手绘前线。采用 region 锚点法：选择战区/目标 region 后自动画箭头，符合 0.44 文档中的移动端妥协方案。
+- 当前工作树混有 v0.5、v0.7、v0.9、v1.x 外部改动；合并前必须重新做文件/API/schema/project 冲突审查。

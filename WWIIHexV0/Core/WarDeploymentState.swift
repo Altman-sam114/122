@@ -94,4 +94,27 @@ struct WarDeploymentState: Codable, Equatable {
             turn: turn
         )
     }
+
+    func preservingGeneralAssignments(from previous: WarDeploymentState) -> WarDeploymentState {
+        var next = self
+        for zoneId in next.frontZones.keys {
+            guard let previousAssignment = previous.frontZones[zoneId]?.generalAssignment,
+                  let zone = next.frontZones[zoneId] else {
+                continue
+            }
+            let divisionIds = stableUnique(zone.unitsFront + zone.unitsDepth + zone.unitsGarrison)
+            next.frontZones[zoneId]?.generalAssignment = previousAssignment.withAssignedDivisionIds(divisionIds)
+        }
+        return next
+    }
+
+    private func stableUnique(_ values: [String]) -> [String] {
+        var seen: Set<String> = []
+        var result: [String] = []
+        for value in values where !seen.contains(value) {
+            seen.insert(value)
+            result.append(value)
+        }
+        return result.sorted()
+    }
 }

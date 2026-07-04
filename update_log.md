@@ -719,6 +719,445 @@ TheaterCommanderPool -> ZoneCommanderAgent -> ZoneDirective -> WarCommandExecuto
 - v0.37 是命令层地基工程，不新增玩法机制。
 - v0.4 可以在此基础上接玩家聊天/命令 UI，但必须继续共用 `ZoneDirective -> WarCommandExecutor -> RuleEngine`。
 
+## v0.5 - 元帅层、模拟 LLM JSON 与决策链规范化
+
+完成日期：2026-07-04
+
+目标分支：`v0.5-marshal-decision-chain`
+
+分支审计：本轮开始时创建并切换过该分支；后续轻量审计中当前 checkout 先后显示为 `v0.9-ruler-diplomacy`、`v0.4-generals-command-ui-resume`、`v1.1-macos-main-game`、`v1.0-ui-ai-playtest` 等非 v0.5 分支，且工作树已有多批其他版本未提交改动。用户同意切换后，当前 checkout 已确认回到 `v0.5-marshal-decision-chain`；合并前仍必须审查 dirty worktree 中非 v0.5 文件归属和文件级冲突。
+
+核心更新：
+
+- 新增元帅层 `MarshalAgent`，在战区将军上游读取降维战场摘要并产出战役级意图。
+- 默认战争 AI 管线升级为：
+
+```text
+MarshalAgent
+  -> MarshalBattlefieldSummarizer
+  -> SimulatedMarshalLLMClient
+  -> TheaterDirectiveDecoder
+  -> TheaterDirectiveCompiler
+  -> ZoneDirective
+  -> WarCommandExecutor
+  -> RuleEngine
+```
+
+- 新增 `TheaterDirectiveEnvelope` / `TheaterDirective` 作为 v0.5 LLM-facing JSON schema。
+- 新增 `TheaterDirectiveDecoder`，支持 fenced JSON 提取、`JSONDecoder` 解码、schemaVersion / issuer / turn / faction / zone / region / tactic-category 校验。
+- 新增 `SimulatedMarshalLLMClient`，只模拟 LLM 接口和 JSON 输出，不接真实网络、本地模型或云端 API。
+- 新增 `TheaterDirectiveCompiler`，把元帅意图降级为现有 `ZoneDirective`；缺失或失败时 fallback 到 `TheaterCommanderPool`。
+- `WarPipelineMode` 新增 `.marshalDirective`，`AppContainer` 和 `TurnManager` 默认使用该模式；旧 `.zoneDirective` 和 `.legacyAgentOrder` 仍保留为显式路径。
+- `TurnManager` 抽出公共 `executeDirectiveEnvelope`，确保元帅链路和旧将军池链路共享同一执行、记录和 endTurn 逻辑。
+- v0.5 收口时移除 v0.9 旁支曾插入的 `RulerAgent` 塑形调用；当前 `.marshalDirective` 与显式 `.zoneDirective` 都不写统治者记录，统治者仅作为后续上游预留。
+- 新增实现记录文档，详细写明本分支算法、边界、fallback 和轻量验证。
+
+关键系统：
+
+- `WWIIHexV0/Commands/WarDirective.swift`
+- `WWIIHexV0/Agents/ZoneCommanderAgent.swift`
+- `WWIIHexV0/Turn/TurnManager.swift`
+- `WWIIHexV0/Core/WarPipelineMode.swift`
+- `WWIIHexV0/App/AppContainer.swift`
+- `md/prompt/anti生成/v0.5/anti/0.50_v0.5_marshal_implementation_record.md`
+- `md/flow/flow.md`
+- `md/flow/flowchart.md`
+- `README.md`
+
+验证记录：
+
+- `git rev-parse --abbrev-ref HEAD`：`v0.5-marshal-decision-chain`。
+- 轻量单文件语法检查通过：
+  - `swiftc -parse WWIIHexV0/Commands/WarDirective.swift`
+  - `swiftc -parse WWIIHexV0/Agents/ZoneCommanderAgent.swift`
+  - `swiftc -parse WWIIHexV0/Turn/TurnManager.swift`
+  - `swiftc -parse WWIIHexV0/App/AppContainer.swift`
+  - `swiftc -parse WWIIHexV0/Core/WarPipelineMode.swift`
+- `plutil -lint WWIIHexV0.xcodeproj/project.pbxproj`：OK。
+- `jq empty` 已通过：
+  - `WWIIHexV0/Data/ardennes_v02_regions.json`
+  - `WWIIHexV0/Data/general_agents.json`
+  - `WWIIHexV0/Data/generals.json`
+  - `WWIIHexV0/Data/terrain_rules.json`
+  - `WWIIHexV0/Data/unit_templates.json`
+- 文档尾随空白扫描：无命中。
+- 旧默认测试口径扫描（`AGENTS.md`、`md/flow/flow.md`）：无命中。
+- Cabinet/Minister 旧污染源码扫描：无命中。
+- v0.5 当前文档与 `TurnManager` 的 `RulerAgent` 默认接入残留扫描：无命中。
+- `git diff --check`：通过，无输出。
+
+未跑：
+
+- 未跑 Xcode / XCTest / 模拟器 / Probe / Smoke / Stage Regression / Dynamic Theater Regression / Full；原因是当前 `AGENTS.md` 与 `md/test/test.md` 规定默认只做轻量检查，且本轮用户明确禁止跑 Xcode。
+
+备注：
+
+- 本轮没有恢复历史回退的 `CabinetState`、`DirectiveBoard`、`MinisterDecisionProvider`、`RulerDirectiveFactory`、`national_cabinet.json` 或部长系统。
+- 统治者层仅作为未来元帅上游预留方向，不在 v0.5 当前实现中落地。
+- 当前工作树还存在不属于本 v0.5 核心目标的高级战术、外交、经济、UI 和地图编辑器方向未提交改动；v0.5 实现选择兼容现有工作树，不回滚其他改动。
+
+## v0.8 - 初级经济、生产、城市、地形与补兵
+
+完成日期：2026-07-04
+
+目标分支：`codex/v0.8-economy-production`
+
+分支审计：本轮早期创建 v0.8 分支曾因 `.git` 写入权限受限失败；期间当前 checkout 先后观察到其他版本分支，且工作树已有多批其他版本未提交改动。最终已通过受控审批成功创建 `codex/v0.8-economy-production`，但创建后仍观察到外部 checkout 漂移。因此本记录描述当前工作树中的 v0.8 经济系统实现，合并前必须重新确认当前分支、分支基点、文件级冲突、public API 冲突和 Xcode project 引用。
+
+核心更新：
+
+- 新增 `EconomyState`，建立 faction 级 manpower、industry、supplies 总账、生产队列、上回合收入/维护费/补员消耗。
+- 新增 `EconomyRules`，从真实己方 hex 控制证据、region 城市、工厂、基础设施和补给值聚合收入。
+- `GameState` 增加 `economyState`，旧存档缺失时 fallback `.empty`。
+- `StrategicStateBootstrapper` 与 `RuleEngine` 在需要时 bootstrap 经济总账，保证旧状态第一次执行命令也有经济账本。
+- `Command` 新增 `queueProduction(kind:)`，经 `CommandValidator` 检查 phase 和资源，经 `CommandExecutor` 调 `EconomyRules.queueProduction` 预付成本并入队。
+- `CommandExecutor.executeEndTurn` 增加 active faction 经济结算：收入、战略补给维护费、短缺降级、自动补兵、生产队列推进和完成部署。
+- 自动补兵只处理本阵营、未毁灭、未撤退、supplied、非敌邻、strength 未满的单位，每回合每单位最多恢复 2 strength，按兵种权重扣资源。
+- 生产完成单位只能部署到本方控制、passable、空置、非敌邻，且位于首都、城镇/大都会、工厂、高基建、高补给 region 或 supply source 的后方 hex；找不到安全部署点时订单保留。
+- `BaseTerrain`、`MovementRules`、`CombatRules` 增加地形加成：装甲进困难地形额外移动成本，装甲攻击平原加成，攻击困难地形惩罚，步兵在森林/城市/堡垒防御加成。
+- 新增 `EconomyPanelView`，`RootGameView` 接入 Economy tab，`HUDView` 展示经济摘要，Region inspector 展示城市等级和经济产出。
+- `project.pbxproj` 当前已有 `EconomyState.swift`、`EconomyRules.swift`、`EconomyPanelView.swift` 引用，未新增重复 UUID。
+- 新增 v0.8 实现记录，详细写明规则算法、接入点、非目标、轻量检查和风险。
+
+关键系统：
+
+- `WWIIHexV0/Core/EconomyState.swift`
+- `WWIIHexV0/Rules/EconomyRules.swift`
+- `WWIIHexV0/Core/GameState.swift`
+- `WWIIHexV0/Core/StrategicStateBootstrapper.swift`
+- `WWIIHexV0/Commands/Command.swift`
+- `WWIIHexV0/Rules/CommandValidator.swift`
+- `WWIIHexV0/Rules/CommandExecutor.swift`
+- `WWIIHexV0/Rules/RuleEngine.swift`
+- `WWIIHexV0/Core/Terrain.swift`
+- `WWIIHexV0/Rules/MovementRules.swift`
+- `WWIIHexV0/Rules/CombatRules.swift`
+- `WWIIHexV0/UI/EconomyPanelView.swift`
+- `WWIIHexV0/UI/RootGameView.swift`
+- `WWIIHexV0/UI/HUDView.swift`
+- `WWIIHexV0/SpriteKit/MapDisplayAdapter.swift`
+- `WWIIHexV0/UI/RegionInspectorView.swift`
+- `md/prompt/anti生成/v0.8/anti/0.80_v0.8_economy_implementation_record.md`
+- `md/prompt/anti生成/v0.8/anti/0.80_overall_analysis_report.md`
+- `md/flow/flow.md`
+- `md/flow/flowchart.md`
+
+验证记录：
+
+- 轻量 Swift parse 通过：
+  - 核心规则集合，含 `EconomyState.swift`、`EconomyRules.swift`、`GameState.swift`、`Command.swift`、`CommandValidator.swift`、`CommandExecutor.swift`、`RuleEngine.swift`、`StrategicStateBootstrapper.swift`、`MovementRules.swift`、`CombatRules.swift` 等。
+  - 核心规则集合 + `PlatformStyles.swift` + `EconomyPanelView.swift`。
+  - 核心规则集合 + `MapDisplayAdapter.swift` + `PlatformStyles.swift` + `EconomyPanelView.swift` + `HUDView.swift` + `RegionInspectorView.swift`。
+- `plutil -lint WWIIHexV0.xcodeproj/project.pbxproj`：通过。
+- `jq empty WWIIHexV0/Data/ardennes_v02_regions.json`：通过。
+- 改动文档尾随空白检查：通过。
+- 旧默认测试口径残留检查：通过。
+
+未跑：
+
+- 未跑 Xcode / XCTest / 模拟器 / Probe / Smoke / Stage Regression / Dynamic Theater Regression / Full / 性能测试；原因是当前规范和用户要求均禁止本轮主动跑 Xcode 与重测试。
+
+备注：
+
+- v0.8 不接真实 LLM 经济部长、不做完整商品价格网、不恢复 organization、不做空军/海军/战略轰炸/工厂损毁。
+- `RegionDataSet.toRegions()` 仍有历史 fallback：owner/controller 缺失最终落到 `.allies`。v0.8 经济收入已加真实 hex 控制守卫，但数据层中立语义建议后续单独修。
+- 当前 AI 不会主动排产；规则层已支持 active faction 通过统一 `Command` 排产，AI 经济策略留后续版本。
+
+## v1.0 - UI / AI / 初版试玩收口
+
+完成日期：2026-07-04
+
+分支：`v1.0-ui-ai-playtest`
+
+分支审计：续接收尾时当前 checkout 曾显示为 `v1.1-macos-main-game`，切回 `v1.0-ui-ai-playtest` 后又在轻量检查期间漂到 `v0.9-ruler-diplomacy` 和 `v0.5-marshal-decision-chain`。`v1.0-ui-ai-playtest` 分支已存在且与当前基线一致；交付前最后一次即时核对显示当前分支为 `v1.0-ui-ai-playtest`。由于当前工作树存在外部 checkout 漂移风险，合并前必须重新做分支与冲突审查。
+
+核心更新：
+
+- 创建并切换到 1.0 分支，围绕主游戏 UI、MockAI 行为、轻量性能和试玩记录做收口。
+- `AgentPanelView` 接入 `WarDirectiveRecord`，AI tab 现在展示 zone、directive type、tactic、成功/拒绝命令数、目标 region 和 diagnostics。
+- `EventLogView` 改为 `LogDisplayEntry` 展示模型，最近 60 条日志每条只计算一次分类，并补充 diplomacy 日志分类。
+- `BoardScene.drawUnits` 缓存单位显示 hex 后排序，部署图层复用同一个 `WarDeploymentManager` 计算 role。
+- `WarCommandExecutor` 开始解释 `AttackIntensity.infiltration`，无显式投入上限时限制默认投入单位数；佯攻/袭扰保留低投入策略。
+- `PlatformStyles` 补充跨平台面板样式；Economy / Diplomacy 面板收口到跨平台背景和更可读字号。
+- 新增 1.0 分支实现记录，写明 UI、性能、MockAI、试玩观察点、风险和未跑重测试原因。
+
+关键系统：
+
+- `WWIIHexV0/UI/PlatformStyles.swift`
+- `WWIIHexV0/UI/RootGameView.swift`
+- `WWIIHexV0/UI/AgentPanelView.swift`
+- `WWIIHexV0/UI/EventLogView.swift`
+- `WWIIHexV0/UI/EconomyPanelView.swift`
+- `WWIIHexV0/UI/DiplomacyPanelView.swift`
+- `WWIIHexV0/SpriteKit/BoardScene.swift`
+- `WWIIHexV0/Commands/WarCommandExecutor.swift`
+- `md/prompt/anti生成/v1.0/anti/1.00_v1.0_ui_ai_playtest_implementation_record.md`
+- `md/flow/flow.md`
+- `md/flow/flowchart.md`
+
+验证记录：
+
+- `git branch --show-current`：切回后曾返回 `v1.0-ui-ai-playtest`，但后续轻量检查期间又返回 `v0.9-ruler-diplomacy` 和 `v0.5-marshal-decision-chain`；分支漂移未完全消除。
+- `plutil -lint WWIIHexV0.xcodeproj/project.pbxproj`：OK。
+- `jq empty WWIIHexV0/Data/ardennes_v02_regions.json`：通过，无输出。
+- `jq empty WWIIHexV0/Data/generals.json`：通过，无输出。
+- `git diff --check`：通过，无输出。
+- `rg -n "[[:blank:]]+$" AGENTS.md README.md update_log.md md/test/test.md md/flow/flow.md md/flow/flowchart.md md/prompt/anti生成/v1.0/anti/1.00_v1.0_ui_ai_playtest_implementation_record.md`：无命中。
+- `rg -n "默认先跑|默认 Probe|Probe -> Smoke|Stage Regression -> Full|代码改动按 .*Probe" AGENTS.md md/flow/flow.md`：无命中。
+- 冲突标记扫描（AGENTS.md、README.md、update_log.md、md/flow、WWIIHexV0、MapEditor）：无命中。
+
+未跑：
+
+- 未跑 Xcode / XCTest / 模拟器 / Probe / Smoke / Stage Regression / Dynamic Theater Regression / Full / 性能测试；原因是 `AGENTS.md`、`md/test/test.md` 和用户要求均禁止本轮主动跑重测试。
+
+备注：
+
+- 本轮并发子 agent 中 UI 只读定位完成，AI / 性能子 agent 因外部 503 失败，主线程接回实现。
+- 当前工作树仍含 v0.5 / v0.7 / v1.1 等方向未提交改动，合并前必须做文件级、public API、schema、Xcode project 和文档口径冲突审查。
+
+## v0.9 - 统治者、多国家、阵营集团与初步外交状态
+
+完成日期：2026-07-04
+
+分支：`v0.9-ruler-diplomacy`
+
+核心更新：
+
+- 新增 `DiplomacyState`，在 `GameState` 中保存国家、阵营集团、国家间外交关系和统治者决策记录。
+- 新增 `CountryProfile`、`DiplomaticBloc`、`DiplomaticRelation`、`DiplomaticStatus`、`RulerStrategicPosture`、`RulerDecisionRecord` 等数据结构。
+- 开局外交种子：
+  - Germany 规则阵营：`German Reich`，`Axis`，`ruler_germany`。
+  - Allies 规则阵营：`United States`、`United Kingdom`、`Belgium`，`Allied Coalition`，主统治者 `ruler_allies`。
+  - 同阵营关系为 `allied`，跨阵营关系为 `atWar`。
+- 新增 `RulerAgent`：读取外交、前线、部署、历史战争指令记录，生成 `RulerStrategicSnapshot`，选择 `offensive` / `defensive` / `coalitionMaintenance` / `stabilizeFront` 姿态。
+- `RulerAgent` 只塑形 `DirectiveEnvelope`：
+  - offensive：攻击强度提升为 `allOut`，按 region priority 重排目标。
+  - defensive：攻击 directive 转为 `holdLine` 防御 directive。
+  - coalitionMaintenance：提高防御预备队。
+  - stabilizeFront：降低 `allOut` 为 `limitedCounter`，或采用 `flexible` 防御。
+- `TurnManager` 在 `.marshalDirective` 与显式 `.zoneDirective` 路径中执行 `applyRuler`，写入 `RulerDecisionRecord` 和 `.diplomacy` 日志后，再交给 `WarCommandExecutor -> RuleEngine`。
+- `DataLoader` 和 `StrategicStateBootstrapper` 会为新局或旧存档补齐外交状态。
+- 新增 `DiplomacyPanelView`，`RootGameView` 增加 `Diplomacy` 面板，`AgentPanelView` 展示最近统治者 posture / focus。
+- `GameLogCategory` 新增 `diplomacy`。
+- 修复 `RulerStrategicSnapshot` 静态去重调用；修复 `hostileCountryIds(to:)` 在多盟友共享同一敌国时重复计数的问题。
+- 新增 v0.9 实现记录，详细写明本分支算法、边界、冲突情况和未跑重测试原因。
+
+关键系统：
+
+- `WWIIHexV0/Core/DiplomacyState.swift`
+- `WWIIHexV0/Agents/RulerAgent.swift`
+- `WWIIHexV0/Core/GameState.swift`
+- `WWIIHexV0/Core/StrategicStateBootstrapper.swift`
+- `WWIIHexV0/Data/DataLoader.swift`
+- `WWIIHexV0/Core/GameLogEntry.swift`
+- `WWIIHexV0/Turn/TurnManager.swift`
+- `WWIIHexV0/UI/DiplomacyPanelView.swift`
+- `WWIIHexV0/UI/AgentPanelView.swift`
+- `WWIIHexV0/UI/RootGameView.swift`
+- `WWIIHexV0.xcodeproj/project.pbxproj`
+- `md/flow/flow.md`
+- `md/flow/flowchart.md`
+- `README.md`
+- `md/prompt/anti生成/v0.9/anti/0.90_v0.9_ruler_diplomacy_implementation_record.md`
+
+验证记录：
+
+- `git branch --show-current`：`v0.9-ruler-diplomacy`。
+- `plutil -lint WWIIHexV0.xcodeproj/project.pbxproj`：OK。
+- `jq empty WWIIHexV0/Data/ardennes_v02_regions.json`：通过，无输出。
+- `jq empty WWIIHexV0/Data/generals.json`：通过，无输出。
+- `rg -n "[[:blank:]]+$" AGENTS.md README.md update_log.md md/test/test.md md/flow/flow.md md/flow/flowchart.md md/prompt/anti生成/v0.9/anti/0.90_v0.9_ruler_diplomacy_implementation_record.md`：无命中。
+- `rg -n "默认先跑|默认 Probe|Probe -> Smoke|Stage Regression -> Full|代码改动按 .*Probe" AGENTS.md md/flow/flow.md`：无命中。
+- 冲突标记扫描（README.md、update_log.md、md/flow、v0.9 实现记录与相关 Swift 文件）：无命中。
+- `swiftc -parse WWIIHexV0/Core/DiplomacyState.swift WWIIHexV0/Agents/RulerAgent.swift WWIIHexV0/UI/DiplomacyPanelView.swift`：通过，无输出。
+
+未跑：
+
+- 未跑 Xcode / XCTest / 模拟器 / app 启动 / Probe / Smoke / Stage Regression / Dynamic Theater Regression / Full；原因是当前规范与本轮用户要求均禁止主动跑 Xcode 和重测试。
+
+备注：
+
+- 本轮尝试把国家/外交、AI 管线、文档三块拆给子 Agent 并行，但子 Agent 调用返回 503，没有可用产物；最终由主 Agent 在当前分支内完成实现和整合。
+- 当前工作树已有 v0.5 元帅层、经济层、v1.1 macOS target、地图编辑器和 UI 等未提交改动；v0.9 选择兼容当前源码，不回滚其他改动。合并前仍需做文件级冲突审查。
+- 多国家当前是战略身份层，底层规则阵营仍是 `Faction.germany` / `Faction.allies`。后续若要国家级参战、中立、投降、宣战或外交行动，需要先设计国家级权限和命令入口。
+
+## v1.1 - 主游戏 macOS target
+
+完成日期：2026-07-04
+
+分支：`v1.1-macos-main-game`
+
+核心更新：
+
+- 新增独立主游戏 macOS app target `WWIIHexV0Mac`，区别于既有 iOS 主游戏 target `WWIIHexV0` 和地图编辑器 target `MapEditorMac`。
+- 新增 macOS 主入口 `WWIIHexV0MacApp`，复用 `AppContainer.bootstrap()` 与 `RootGameView(container:)`，默认窗口 1440x900，最小内容区域 1200x760。
+- `WWIIHexV0Mac` resource phase 接入主游戏默认 JSON：`ardennes_v0_scenario.json`、`ardennes_v02_regions.json`、`general_agents.json`、`generals.json`、`terrain_rules.json`、`unit_templates.json`。
+- `BoardSceneView` 增加 macOS `NSViewRepresentable` 分支，用 `BoardEventSKView` 承载 `BoardScene`，iOS 继续使用 `UIViewRepresentable` 分支。
+- `BoardScene` 增加 macOS 鼠标点击、拖拽平移、滚轮/触控板缩放；点击仍只回调 `onHexTapped`，后续由 `AppContainer.handleBoardTap -> RuleEngine` 处理。
+- 新增 `PlatformStyles`，将主游戏 UI 的 `Color(.systemBackground)` / `Color(.tertiarySystemBackground)` 替换为 iOS/macOS 条件背景色。
+- 因当前工作树已有经济、外交、统治者、将领 registry 等源码引用，`project.pbxproj` 同步把这些已被引用的支持文件和 `generals.json` 接入相关 target phase，但本轮不改这些业务逻辑。
+- 新增 v1.1 实现记录，详细写明 target 设计、输入桥接算法、资源加载、轻量检查和风险。
+
+关键系统：
+
+- `WWIIHexV0.xcodeproj/project.pbxproj`
+- `WWIIHexV0/App/WWIIHexV0MacApp.swift`
+- `WWIIHexV0/SpriteKit/BoardScene.swift`
+- `WWIIHexV0/SpriteKit/BoardSceneView.swift`
+- `WWIIHexV0/UI/PlatformStyles.swift`
+- `WWIIHexV0/UI/RootGameView.swift`
+- `md/prompt/anti生成/v1.1/anti/1.10_v1.1_macos_main_game_implementation_record.md`
+- `md/flow/flow.md`
+- `md/flow/flowchart.md`
+- `README.md`
+
+验证记录：
+
+- `plutil -lint WWIIHexV0.xcodeproj/project.pbxproj` 通过。
+
+未跑：
+
+- 未跑 Xcode / XCTest / 模拟器 / macOS app 启动 / Probe / Smoke / Stage Regression / Dynamic Theater Regression / Full；原因是当前规范与用户要求均禁止本轮主动跑 Xcode 和重测试。
+
+备注：
+
+- v1.1 是平台承载和输入桥接分支，不改变 `Command` / `ZoneDirective` / `WarCommandExecutor` / `RuleEngine` 规则权威链路。
+- 当前工作树存在多条其他方向的未提交改动；v1.1 选择兼容当前源码引用并记录风险，不回滚其他人改动。
+
+## v0.7 - 高级战术与命令扩展
+
+完成日期：2026-07-04
+
+目标分支：`v0.7-tactical-upgrade`
+
+分支审计：本轮曾创建并切换到 `v0.7-tactical-upgrade`，但连续接力时当前 checkout 多次显示为其他分支，且工作树已有多批 v0.5 / v1.0 / v1.1 / UI / 经济 / 外交方向未提交改动。按项目规则，本轮未回滚这些改动；合并前必须重新确认分支归属和文件级冲突。
+
+核心更新：
+
+- `TacticName` 扩展为进攻 8 类、防御 4 类：
+  - 进攻：`standardAttack`、`blitzkrieg`、`spearhead`、`breakthrough`、`pincerMovement`、`fireCoverage`、`feint`、`guerrillaWarfare`。
+  - 防御：`holdPosition`、`elasticDefense`、`defenseInDepth`、`lastStand`。
+- `AttackParameters` 新增 `focusRegionId`、`supportRegionIds`、`convergenceRegionId`、`coordinatedZoneIds`、`maxCommittedUnits`、`exploitDepth`，支持定点突破、钳形会师、投入上限和纵深目标意图。
+- `DefenseParameters` 新增 `fallbackRegionIds`、`counterattackRegionIds`、`strongpointRegionIds`、`maxFrontCommitment`，支持弹性防御、纵深防御和死守口径。
+- `TheaterDirective` 新增 `convergenceRegionId` / `coordinatedZoneIds`，并补自定义 decode，旧 JSON 缺字段时仍兼容。
+- `TheaterDirectiveDecoder` 校验 convergence region 和 coordinated zone 存在性，继续校验 tactic/category 一致性。
+- `BinaryTacticClassifier` 从二元分类升级为读取兵力比、机动兵力、炮兵支援、纵深预备队、压力和补给警告的战术分类器。
+- `TacticConditionChecker` 从恒 true 改为按战术最低条件放行：机动战术要求机动单位，火力覆盖要求炮兵/远程单位，佯攻要求前线单位，纵深防御要求 depth 预备队。
+- `WarCommandExecutor` 新增 `AttackTacticProfile`，按战术控制单位来源、机动优先、炮兵优先、只攻击不推进、弱点聚焦、深目标候选、非矛头单位 hold 和投入上限。
+- 定点突破弱点评分落地：
+
+```text
+enemyStrength 越低越优先
+terrain.movementCost 越低越优先
+region 内有 road 越优先
+city.victoryPoints + supplyValue + factories 越高越优先
+guerrillaWarfare 额外参考 infrastructure
+```
+
+- `defenseInDepth` 新增独立执行路径：一线 `allowRetreat`，保留预备队，其余 depth 机动单位尝试反击，否则向 fallback / strongpoint 防御地形移动。
+- `fireCoverage` 落地为炮兵/远程优先、能打则打、无目标则 hold，不主动推进。
+- `feint` 落地为少量前线单位牵制，默认约 1/3 前线投入。
+- `blitzkrieg` / `spearhead` 落地为机动优先、集中弱点、可使用 depth 单位，非矛头前线单位 hold。
+- `pincerMovement` 落地为 convergence / coordinated 数据层和单 zone 执行器 profile；多 zone 会师由元帅层或人工下发多条 directive，包围效果交给动态战区/前线/补给派生。
+- `MockAICommander` 保留新增 attack 参数，避免 allOut 包装时丢失 focus/convergence/coordinated 字段。
+- 新增 v0.7 实现记录文档，详细写明算法、边界、冲突风险和轻量检查口径。
+
+关键系统：
+
+- `WWIIHexV0/Commands/WarDirective.swift`
+- `WWIIHexV0/Commands/WarCommandExecutor.swift`
+- `WWIIHexV0/Agents/ZoneCommanderAgent.swift`
+- `WWIIHexV0/Agents/MockAICommander.swift`
+- `md/prompt/anti生成/v0.7/anti/0.70_v0.7_tactical_upgrade_implementation_record.md`
+- `md/flow/flow.md`
+- `md/flow/flowchart.md`
+- `md/flow/03_ai_zone_directive_pipeline.mermaid`
+- `README.md`
+
+验证记录：
+
+- 轻量单文件语法检查通过：
+  - `swiftc -parse WWIIHexV0/Commands/WarDirective.swift`
+  - `swiftc -parse WWIIHexV0/Commands/WarCommandExecutor.swift`
+  - `swiftc -parse WWIIHexV0/Agents/ZoneCommanderAgent.swift`
+  - `swiftc -parse WWIIHexV0/Agents/MockAICommander.swift`
+
+未跑：
+
+- 未跑 Xcode / XCTest / 模拟器 / Probe / Smoke / Stage Regression / Dynamic Theater Regression / Full；原因是当前 `AGENTS.md` 与 `md/test/test.md` 规定默认只做轻量检查，且本轮用户明确禁止跑 Xcode。
+
+遗留风险：
+
+- 未做运行时战局验证，战术效果和 AI 行为只通过源码与轻量 parse 检查确认语法层可用。
+- 当前工作树混有其他版本改动，合并前必须做文件/API/schema/文档冲突检查。
+
+## v0.4 - 将军养成初步、将军 UI 与玩家双轨命令
+
+完成日期：2026-07-04
+
+目标分支：`v0.4-generals-command-ui-final`
+
+分支审计：本轮从一个已混入 v0.9 / v0.5 / v1.x 外部未提交改动的工作树创建 0.4 续作分支。期间 checkout 又被外部切到 `codex/v0.8-economy-production`，最终已重新固定到 `v0.4-generals-command-ui-final`。按项目规则，本轮没有回滚外部改动；只在当前分支继续补齐 0.4 将军和玩家命令链路。合并前必须重新审查 project、public API、JSON schema 和文档口径冲突。
+
+核心更新：
+
+- 新增实体将军数据链：`generals.json`、`GeneralData`、`GeneralRegistry`、`GeneralDispatcher`。
+- `RegionNodeDefinition` / MapEditor region draft 支持 `assignedGeneralId`，默认阿登 region JSON 已给蒙哥马利、魏刚、古德里安、里布写入初始种子。
+- `FrontZone` 增加 `generalAssignment`，记录将军 id、HQ region、辖下 division、忠诚、满意度和玩家干预次数。
+- `WarDeploymentState.preservingGeneralAssignments` 与 AppContainer 刷新逻辑保留/补齐将军分配，避免部署层重建后将军丢失。
+- `TheaterCommanderPool` 在 AppContainer 构造时可由 `GeneralDispatcher.commanderPool` 使用真实将军配置，缺失时仍 fallback 到自动 commander。
+- 新增 `PlayerCommandState` 和 `PlayerPlannedOperation`，保存本回合微操锁和玩家战区计划。
+- 玩家微操 move/attack/hold/resupply/allowRetreat 成功后锁定该师，降低所属将军满意度并增加干预次数；结束回合或阵营/回合变化时清空锁。
+- `WarCommandExecutor.execute` 新增兼容参数 `excluding excludedDivisionIds`，在进攻、防御、纵深防御和非矛头 hold 阶段跳过玩家微操部队。
+- `AppContainer` 新增玩家宏观将军命令：`Hold Line` 生成 defense `ZoneDirective`，`Attack Region` 根据当前选中敌方 region 和相邻玩家 FrontZone 生成 attack `ZoneDirective`，执行后不自动结束回合。
+- 新增 `GeneralCommandPanelView` 与 `GeneralProfileView`，展示将军头像占位、军衔、风格、技能、履历、忠诚/满意度、HQ 状态、辖下部队和计划操作。
+- `RootGameView` 新增 `General` tab，Unit tab 也嵌入将军命令面板。
+- `BoardScene` 根据 `PlayerPlannedOperation` 画进攻箭头/防御圆环，`UnitNode` 对本回合玩家微操单位画金色圈。
+- `WarDirectiveRecord` 记录玩家宏观指令结果，AI 面板与日志可继续共用同一复盘数据。
+
+关键系统：
+
+- `WWIIHexV0/Data/generals.json`
+- `WWIIHexV0/Agents/GeneralRegistry.swift`
+- `WWIIHexV0/Core/GeneralAssignment.swift`
+- `WWIIHexV0/Core/PlayerCommandState.swift`
+- `WWIIHexV0/Core/FrontZone.swift`
+- `WWIIHexV0/Core/WarDeploymentState.swift`
+- `WWIIHexV0/Data/DataLoader.swift`
+- `WWIIHexV0/Data/RegionDataSet.swift`
+- `MapEditor/MapEditorDocument.swift`
+- `MapEditor/MapEditorExporter.swift`
+- `MapEditor/MapEditorGameResourceBridge.swift`
+- `WWIIHexV0/App/AppContainer.swift`
+- `WWIIHexV0/Commands/WarCommandExecutor.swift`
+- `WWIIHexV0/UI/GeneralCommandPanelView.swift`
+- `WWIIHexV0/UI/GeneralProfileView.swift`
+- `WWIIHexV0/UI/RootGameView.swift`
+- `WWIIHexV0/SpriteKit/BoardScene.swift`
+- `WWIIHexV0/SpriteKit/UnitNode.swift`
+- `WWIIHexV0.xcodeproj/project.pbxproj`
+- `md/prompt/anti生成/0.4/v0.4_generals_command_ui_branch_record.md`
+- `md/flow/flow.md`
+- `md/flow/flowchart.md`
+
+验证记录：
+
+- `jq empty WWIIHexV0/Data/generals.json` 通过。
+- `jq empty WWIIHexV0/Data/ardennes_v02_regions.json` 通过。
+- `plutil -lint WWIIHexV0.xcodeproj/project.pbxproj` 通过，输出 `OK`。
+- `git diff --check` 通过。
+- 文档尾随空白检查无匹配。
+- 单文件轻量 parse 通过：`PlayerCommandState.swift`、`GeneralAssignment.swift`、`GeneralRegistry.swift`、`GeneralCommandPanelView.swift`、`GeneralProfileView.swift`、`WarCommandExecutor.swift`、`AppContainer.swift`、`BoardScene.swift`、`UnitNode.swift`、`RootGameView.swift`。
+
+未跑：
+
+- 未跑 Xcode / XCTest / 模拟器 / Probe / Smoke / Stage Regression / Dynamic Theater Regression / Full；原因是当前 `AGENTS.md`、`md/test/test.md` 和用户要求均禁止本轮主动跑 Xcode 与重测试。
+
+遗留风险：
+
+- 未做运行时 UI 点击和 SpriteKit 视觉验证，按钮行为、sheet 展示、计划线位置仍需后续人工或授权轻量运行确认。
+- 当前工作树混有其他版本改动，合并前必须重新做文件/API/schema/project 冲突审查。
+
 ## 历史维护记录
 
 以下提交不作为正式 v 版本，但影响项目资料完整性：
@@ -730,3 +1169,5 @@ TheaterCommanderPool -> ZoneCommanderAgent -> ZoneDirective -> WarCommandExecuto
 - 2026-06-24 至 2026-06-25：补充 0.36 提示词、0.355 截止分析、20 回合文档更新。
 - 2026-06-27：创建 `AGENT.md`，写入后续 Codex 接手项目时的架构、测试、文档维护和交付规则。
 - 2026-07-04：更新当前协作规范：默认禁止 Xcode / XCTest / 模拟器 / 性能类重测试，只做轻量语法/格式检查；新增多版本分支、并发子 Agent 和合并前冲突检查规则。关键文件：`AGENTS.md`、`md/test/test.md`、`md/flow/flow.md`、`README.md`、`md/prompt/v0.f/fable-5-重构优化总提示词.md`。
+- 2026-07-04：新增拿破仑战争迁移总提示词，规划 v3.0-v3.8 从 WWIIHexV0 迁移为 AI Agent 驱动拿战游戏的版本路线、最终发布效果、并发子 Agent 分工、轻量检查和风险边界。关键文件：`md/prompt/v3.0-拿战迁移/codex-v3.0-拿战aiagent迁移总提示词.md`。
+- 2026-07-04：新增明末迁移总提示词，规划 v4.0-v4.8 从 WWIIHexV0 迁移为 AI Agent 驱动明末历史策略游戏的产品目标、版本路线、最终发布效果、并发子 Agent 分工、轻量检查和风险边界。关键文件：`md/prompt/v4.0-明末迁移/codex-v4.0-明末aiagent迁移总提示词.md`。

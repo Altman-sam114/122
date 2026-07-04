@@ -2,11 +2,15 @@ import Foundation
 
 struct StrategicStateBootstrapper {
     func bootstrapIfNeeded(_ state: GameState) -> GameState {
-        guard !state.map.regions.isEmpty else {
-            return state
+        var next = EconomyRules().bootstrapIfNeeded(state)
+        if next.diplomacyState.countries.isEmpty {
+            next.diplomacyState = DiplomacyState.initial(for: Faction.allCases, turn: next.turn)
+            next.appendEvent("Diplomacy state bootstrapped with countries, blocs, and initial war relations.")
         }
 
-        var next = state
+        guard !state.map.regions.isEmpty else {
+            return next
+        }
 
         if next.theaterState.theaters.isEmpty || next.theaterState.regionToTheater.isEmpty {
             next.theaterState = TheaterSystem().makeInitialFixedTheaters(
@@ -79,12 +83,13 @@ struct StrategicStateBootstrapper {
             divisions: next.divisions,
             turn: next.turn
         )
-        next.warDeploymentState = WarDeploymentState.bootstrapFrontZones(
+        let rebuiltDeployment = WarDeploymentState.bootstrapFrontZones(
             from: next.theaterState,
             map: next.map,
             divisions: next.divisions,
             turn: next.turn
         )
+        next.warDeploymentState = rebuiltDeployment.preservingGeneralAssignments(from: state.warDeploymentState)
         return next
     }
 }

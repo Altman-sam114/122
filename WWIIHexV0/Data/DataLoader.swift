@@ -51,11 +51,16 @@ struct DataLoader {
                 divisions: state.divisions,
                 turn: state.turn
             )
-            state.warDeploymentState = WarDeploymentManager().makeInitialState(
+            let deploymentState = WarDeploymentManager().makeInitialState(
                 map: state.map,
                 theaterState: state.theaterState,
                 divisions: state.divisions,
                 turn: state.turn
+            )
+            state.warDeploymentState = assignGenerals(
+                to: deploymentState,
+                map: state.map,
+                regionData: regionData
             )
         }
 
@@ -108,11 +113,16 @@ struct DataLoader {
             divisions: divisions,
             turn: turn
         )
-        let warDeploymentState = WarDeploymentManager().makeInitialState(
+        let deploymentState = WarDeploymentManager().makeInitialState(
             map: map,
             theaterState: theaterState,
             divisions: divisions,
             turn: turn
+        )
+        let warDeploymentState = assignGenerals(
+            to: deploymentState,
+            map: map,
+            regionData: regionData
         )
 
         return GameState(
@@ -125,6 +135,7 @@ struct DataLoader {
             theaterState: theaterState,
             frontLineState: frontLineState,
             warDeploymentState: warDeploymentState,
+            diplomacyState: DiplomacyState.initial(from: scenario.factions, turn: turn),
             divisions: divisions,
             victoryState: .ongoing,
             selectedUnitSummary: nil,
@@ -161,6 +172,11 @@ struct DataLoader {
 
     func loadGeneralAgents() throws -> [GeneralAgentDefinition] {
         try loadJSON(GeneralAgentCatalogDefinition.self, named: "general_agents").agents
+    }
+
+    func loadGeneralRegistry() throws -> GeneralRegistry {
+        let catalog = try loadJSON(GeneralCatalogDefinition.self, named: "generals")
+        return GeneralRegistry(generals: catalog.generals)
     }
 
     /// v0.2: 加载阿登省份图数据。失败时抛 DataLoaderError。
@@ -426,6 +442,22 @@ struct DataLoader {
         if !errors.isEmpty {
             throw DataLoaderError.validationFailed(errors)
         }
+    }
+
+    private func assignGenerals(
+        to deploymentState: WarDeploymentState,
+        map: MapState,
+        regionData: RegionDataSet
+    ) -> WarDeploymentState {
+        let registry = (try? loadGeneralRegistry()) ?? .empty
+        let seedAssignments = Dictionary(uniqueKeysWithValues: regionData.regions.compactMap { definition in
+            definition.assignedGeneralId.map { (definition.id, $0) }
+        })
+        return GeneralDispatcher(registry: registry).assignGenerals(
+            to: deploymentState,
+            map: map,
+            seedAssignments: seedAssignments
+        )
     }
 
     private func makeDivisions(from definitions: [InitialUnitDefinition]) throws -> [Division] {

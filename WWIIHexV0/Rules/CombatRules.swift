@@ -21,7 +21,12 @@ struct CombatRules {
     }
 
     func effectiveDefense(for defender: Division, attackedBy attacker: Division, in state: GameState) -> Int {
-        let baseDefense = defender.defense + terrainDefenseBonus(for: defender, attackedBy: attacker, in: state)
+        var baseDefense = defender.defense + terrainDefenseBonus(for: defender, attackedBy: attacker, in: state)
+        if let defenderTile = state.map.tile(at: defender.coord),
+           defender.isInfantryHeavy,
+           defenderTile.baseTerrain.supportsInfantryDefenseBonus {
+            baseDefense = max(1, Int((Double(baseDefense) * 1.3).rounded()))
+        }
         guard defender.retreatMode == .hold else {
             return baseDefense
         }
@@ -44,8 +49,25 @@ struct CombatRules {
     }
 
     func damage(attacker: Division, defender: Division, in state: GameState) -> Int {
-        let rawDamage = attacker.attack - effectiveDefense(for: defender, attackedBy: attacker, in: state) / 2
+        let rawDamage = effectiveAttack(for: attacker, against: defender, in: state) -
+            effectiveDefense(for: defender, attackedBy: attacker, in: state) / 2
         return clamp(rawDamage + flankBonus(attacker: attacker, defender: defender), min: 1, max: 8)
+    }
+
+    func effectiveAttack(for attacker: Division, against defender: Division, in state: GameState) -> Int {
+        guard let defenderTile = state.map.tile(at: defender.coord) else {
+            return attacker.attack
+        }
+
+        var multiplier = 1.0
+        if attacker.isArmor && defenderTile.baseTerrain == .plain {
+            multiplier += 0.2
+        }
+        if attacker.isArmor && defenderTile.baseTerrain.armorSlowdownCost > 0 {
+            multiplier -= 0.1
+        }
+
+        return max(1, Int((Double(attacker.attack) * multiplier).rounded()))
     }
 
     func attackDamage(attacker: Division, defender: Division, in state: GameState) -> CombatDamage {

@@ -14,6 +14,7 @@ enum CommandValidationError: String, Codable, Equatable {
     case invalidTargetFaction
     case regionNotFound
     case invalidRegionForHex
+    case insufficientResources
 }
 
 struct CommandValidation: Codable, Equatable {

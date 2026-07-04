@@ -88,7 +88,8 @@ enum MapEditorGameResourceBridge {
                     infrastructure: definition.infrastructure,
                     supplyValue: definition.supplyValue,
                     factories: definition.factories,
-                    coreOf: definition.coreOf
+                    coreOf: definition.coreOf,
+                    assignedGeneralId: definition.assignedGeneralId
                 )
             )
         })

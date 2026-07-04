@@ -105,6 +105,7 @@ struct MapEditorRegionDraft: Codable, Equatable, Identifiable {
     var supplyValue: Int
     var factories: Int
     var coreOf: [Faction]
+    var assignedGeneralId: String?
 
     init(
         id: RegionId,
@@ -114,7 +115,8 @@ struct MapEditorRegionDraft: Codable, Equatable, Identifiable {
         infrastructure: Int = 0,
         supplyValue: Int = 0,
         factories: Int = 0,
-        coreOf: [Faction] = []
+        coreOf: [Faction] = [],
+        assignedGeneralId: String? = nil
     ) {
         self.id = id
         self.name = name ?? id.rawValue
@@ -124,6 +126,7 @@ struct MapEditorRegionDraft: Codable, Equatable, Identifiable {
         self.supplyValue = supplyValue
         self.factories = factories
         self.coreOf = coreOf
+        self.assignedGeneralId = assignedGeneralId
     }
 }
 

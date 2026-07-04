@@ -17,6 +17,7 @@ final class AppContainer: ObservableObject {
 
     let commandHandler: GameCommandHandling
     let dataLoader: DataLoader
+    let generalRegistry: GeneralRegistry
     let playerFaction: Faction
     let warPipelineMode: WarPipelineMode
     let turnManager: TurnManager?
@@ -26,15 +27,18 @@ final class AppContainer: ObservableObject {
         gameState: GameState,
         commandHandler: GameCommandHandling,
         dataLoader: DataLoader,
+        generalRegistry: GeneralRegistry = .empty,
         playerFaction: Faction = .allies,
         turnManager: TurnManager? = nil,
-        warPipelineMode: WarPipelineMode = .zoneDirective,
+        warPipelineMode: WarPipelineMode = .marshalDirective,
         observerModeEnabled: Bool = false,
         mapDisplayLayer: MapDisplayLayer = .hex
     ) {
-        self.gameState = StrategicStateBootstrapper().bootstrapIfNeeded(gameState)
+        let bootstrappedState = StrategicStateBootstrapper().bootstrapIfNeeded(gameState)
+        self.gameState = Self.refreshGeneralAssignments(in: bootstrappedState, registry: generalRegistry)
         self.commandHandler = commandHandler
         self.dataLoader = dataLoader
+        self.generalRegistry = generalRegistry
         self.playerFaction = playerFaction
         self.warPipelineMode = warPipelineMode
         self.turnManager = turnManager
@@ -55,26 +59,42 @@ final class AppContainer: ObservableObject {
         let dataLoader = DataLoader()
         let gameState = dataLoader.loadInitialGameState()
         let commandHandler = RuleEngine()
+        let generalRegistry = (try? dataLoader.loadGeneralRegistry()) ?? .empty
         let guderian = GameAgent.guderian(from: dataLoader, state: gameState)
-        let bootstrappedState = StrategicStateBootstrapper().bootstrapIfNeeded(gameState)
+        let bootstrappedState = Self.refreshGeneralAssignments(
+            in: StrategicStateBootstrapper().bootstrapIfNeeded(gameState),
+            registry: generalRegistry
+        )
         let turnManager = TurnManager(
             agent: guderian,
             provider: MockAIClient(),
             providerName: "MockAI",
             commandHandler: commandHandler,
-            commanderPool: Self.buildCommanderPool(state: bootstrappedState)
+            commanderPool: Self.buildCommanderPool(state: bootstrappedState, registry: generalRegistry),
+            marshalAgent: Self.buildMarshalAgent(faction: .germany, state: bootstrappedState)
         )
         return AppContainer(
             gameState: bootstrappedState,
             commandHandler: commandHandler,
             dataLoader: dataLoader,
-            turnManager: turnManager
+            generalRegistry: generalRegistry,
+            turnManager: turnManager,
+            warPipelineMode: .marshalDirective
         )
     }
 
     func submit(_ command: Command) {
+        let stateBeforeCommand = gameState
         let result = commandHandler.execute(command, in: gameState)
-        gameState = StrategicStateBootstrapper().bootstrapIfNeeded(result.state)
+        var nextState = StrategicStateBootstrapper().bootstrapIfNeeded(result.state)
+        if result.succeeded {
+            nextState = applyPlayerCommandBookkeeping(
+                command,
+                to: nextState,
+                previousState: stateBeforeCommand
+            )
+        }
+        gameState = refreshGeneralAssignments(in: nextState)
         lastCommandMessage = result.message
 
         let status = result.succeeded ? "accepted" : "rejected"
@@ -88,7 +108,7 @@ final class AppContainer: ObservableObject {
             return
         }
 
-        gameState = StrategicStateBootstrapper().refreshRuntimeState(gameState)
+        gameState = refreshedRuntimeState(gameState)
         guard shouldRunAI(for: gameState.activeFaction, phase: gameState.phase) else {
             return
         }
@@ -105,7 +125,7 @@ final class AppContainer: ObservableObject {
                 observerEnabled: observerEnabled
             )
             await MainActor.run {
-                self.gameState = outcome.state
+                self.gameState = self.refreshedRuntimeState(outcome.state)
                 self.lastAgentDecisionRecord = outcome.record
                 self.lastWarDirectiveRecords = outcome.directiveRecords
                 self.lastCommandMessage = outcome.record.errors.isEmpty
@@ -174,6 +194,67 @@ final class AppContainer: ObservableObject {
         submit(.resupply(divisionId: division.id))
     }
 
+    func orderSelectedGeneralHoldLine() {
+        guard let zone = selectedGeneralCommandZone else {
+            appendInteractionEvent("General order rejected: no allied front zone selected.")
+            return
+        }
+
+        let directive = ZoneDirective(
+            zoneId: zone.id,
+            defense: DefenseParameters(
+                targetReserves: max(1, min(2, zone.unitsDepth.count)),
+                stance: .holdLine
+            ),
+            category: .defense,
+            tactic: .holdPosition
+        )
+        submitPlayerDirective(
+            directive,
+            sourceRegionId: sourceRegionId(for: zone, targetZoneId: nil),
+            targetRegionId: nil
+        )
+    }
+
+    func orderSelectedGeneralAttackRegion() {
+        guard let target = selectedAttackTarget else {
+            appendInteractionEvent("General order rejected: select an enemy front region to attack.")
+            return
+        }
+        guard let zone = selectedGeneralCommandZone else {
+            appendInteractionEvent("General order rejected: no allied source front zone available.")
+            return
+        }
+
+        let directive = ZoneDirective(
+            zoneId: zone.id,
+            attack: AttackParameters(
+                targetTheaterId: TheaterId(target.zone.id.rawValue),
+                weightedRegions: [target.region.id],
+                intensity: .limitedCounter,
+                focusRegionId: target.region.id,
+                maxCommittedUnits: max(1, min(3, zone.unitsFront.count + zone.unitsDepth.count))
+            ),
+            category: .offense,
+            tactic: .standardAttack,
+            commandTarget: .region(target.region.id)
+        )
+        submitPlayerDirective(
+            directive,
+            sourceRegionId: sourceRegionId(for: zone, targetZoneId: target.zone.id),
+            targetRegionId: target.region.id
+        )
+    }
+
+    func queueProduction(_ kind: ProductionKind) {
+        guard !observerModeEnabled else {
+            appendInteractionEvent("Production rejected: observer mode is read-only.")
+            return
+        }
+
+        submit(.queueProduction(kind: kind))
+    }
+
     func endTurn() {
         submit(.endTurn)
     }
@@ -196,7 +277,9 @@ final class AppContainer: ObservableObject {
 
     func resetGame() {
         isRunningAI = false
-        gameState = StrategicStateBootstrapper().bootstrapIfNeeded(dataLoader.loadInitialGameState())
+        gameState = refreshGeneralAssignments(
+            in: StrategicStateBootstrapper().bootstrapIfNeeded(dataLoader.loadInitialGameState())
+        )
         selectedUnitId = nil
         selectedHex = nil
         selectedRegionId = nil
@@ -229,6 +312,67 @@ final class AppContainer: ObservableObject {
         return mapDisplayAdapter.unitInspectorState(for: selectedDivision)
     }
 
+    var selectedGeneralCommandZone: FrontZone? {
+        inferredPlayerCommandZone()
+    }
+
+    var selectedGeneral: GeneralData? {
+        generalRegistry.general(id: selectedGeneralAssignment?.generalId)
+    }
+
+    var selectedGeneralAssignment: GeneralAssignment? {
+        selectedGeneralCommandZone?.generalAssignment
+    }
+
+    var selectedGeneralAssignedDivisions: [Division] {
+        guard let assignment = selectedGeneralAssignment else {
+            return []
+        }
+        let assignedIds = Set(assignment.assignedDivisionIds)
+        return gameState.divisions
+            .filter { assignedIds.contains($0.id) }
+            .sorted { $0.id < $1.id }
+    }
+
+    var selectedGeneralHQUnderAttack: Bool {
+        guard let zone = selectedGeneralCommandZone else {
+            return false
+        }
+        return GeneralDispatcher(registry: generalRegistry).isHQUnderAttack(
+            zone: zone,
+            map: gameState.map
+        )
+    }
+
+    var selectedGeneralTargetRegion: RegionNode? {
+        selectedRegionId.flatMap { gameState.map.region(id: $0) }
+    }
+
+    var selectedGeneralTargetZone: FrontZone? {
+        guard let selectedRegionId else {
+            return nil
+        }
+        return gameState.warDeploymentState.zone(for: selectedRegionId)
+    }
+
+    var selectedGeneralPlannedOperations: [PlayerPlannedOperation] {
+        let zoneId = selectedGeneralCommandZone?.id
+        return Array(gameState.playerCommandState.plannedOperations
+            .filter { operation in
+                operation.turn == gameState.turn &&
+                    (zoneId == nil || operation.zoneId == zoneId)
+            }
+            .suffix(5))
+    }
+
+    var canOrderSelectedGeneralHoldLine: Bool {
+        canIssuePlayerDirective && selectedGeneralCommandZone != nil
+    }
+
+    var canOrderSelectedGeneralAttackRegion: Bool {
+        canIssuePlayerDirective && selectedAttackTarget != nil && selectedGeneralCommandZone != nil
+    }
+
     var displayEventLog: [GameLogEntry] {
         Array((gameState.eventLog + interactionLog).suffix(80))
     }
@@ -252,8 +396,252 @@ final class AppContainer: ObservableObject {
         return division
     }
 
+    private var canIssuePlayerDirective: Bool {
+        !observerModeEnabled &&
+            gameState.activeFaction == playerFaction &&
+            gameState.phase == .alliedPlayer
+    }
+
+    private var selectedAttackTarget: (region: RegionNode, zone: FrontZone)? {
+        guard let selectedRegionId,
+              let region = gameState.map.region(id: selectedRegionId),
+              let targetZone = gameState.warDeploymentState.zone(for: selectedRegionId),
+              targetZone.faction != playerFaction else {
+            return nil
+        }
+        return (region, targetZone)
+    }
+
     private var mapDisplayAdapter: MapDisplayAdapter {
         MapDisplayAdapter(state: gameState, revealAll: observerModeEnabled)
+    }
+
+    private func refreshedRuntimeState(_ state: GameState) -> GameState {
+        refreshGeneralAssignments(
+            in: StrategicStateBootstrapper().refreshRuntimeState(state)
+        )
+    }
+
+    private func refreshGeneralAssignments(in state: GameState) -> GameState {
+        Self.refreshGeneralAssignments(in: state, registry: generalRegistry)
+    }
+
+    private static func refreshGeneralAssignments(
+        in state: GameState,
+        registry: GeneralRegistry
+    ) -> GameState {
+        guard !registry.allGenerals.isEmpty else {
+            return state
+        }
+        var next = state
+        next.warDeploymentState = GeneralDispatcher(registry: registry).assignGenerals(
+            to: state.warDeploymentState,
+            map: state.map
+        )
+        return next
+    }
+
+    private func applyPlayerCommandBookkeeping(
+        _ command: Command,
+        to state: GameState,
+        previousState: GameState
+    ) -> GameState {
+        var next = state
+        if command == .endTurn || next.activeFaction != previousState.activeFaction || next.turn != previousState.turn {
+            next.playerCommandState.clearTurnLocks()
+            return next
+        }
+
+        guard let divisionId = command.actingDivisionId,
+              previousState.activeFaction == playerFaction,
+              previousState.phase == .alliedPlayer,
+              previousState.division(id: divisionId)?.faction == playerFaction else {
+            return next
+        }
+
+        next.playerCommandState.lockDivision(divisionId)
+        return registerPlayerIntervention(for: divisionId, in: next)
+    }
+
+    private func registerPlayerIntervention(for divisionId: String, in state: GameState) -> GameState {
+        guard let zoneId = logicalZoneId(for: divisionId, in: state.warDeploymentState),
+              var zone = state.warDeploymentState.frontZones[zoneId],
+              let assignment = zone.generalAssignment else {
+            return state
+        }
+
+        var next = state
+        zone.generalAssignment = assignment.registeringPlayerIntervention(cost: 2)
+        next.warDeploymentState.frontZones[zoneId] = zone
+        return next
+    }
+
+    private func inferredPlayerCommandZone() -> FrontZone? {
+        if let division = selectedDivision,
+           division.faction == playerFaction,
+           let zoneId = gameState.warDeploymentState.zoneId(for: division.coord, map: gameState.map),
+           let zone = gameState.warDeploymentState.frontZones[zoneId],
+           zone.faction == playerFaction {
+            return zone
+        }
+
+        if let selectedRegionId,
+           let zone = gameState.warDeploymentState.zone(for: selectedRegionId),
+           zone.faction == playerFaction {
+            return zone
+        }
+
+        guard let targetZone = selectedGeneralTargetZone,
+              targetZone.faction != playerFaction else {
+            return nil
+        }
+
+        return playerZonesAdjacent(to: targetZone.id).first
+    }
+
+    private func playerZonesAdjacent(to targetZoneId: FrontZoneId) -> [FrontZone] {
+        gameState.warDeploymentState.frontZones.values
+            .filter { zone in
+                zone.faction == playerFaction &&
+                    zone.frontSegments.contains { $0.neighborEnemyZone == targetZoneId }
+            }
+            .sorted { $0.id.rawValue < $1.id.rawValue }
+    }
+
+    private func sourceRegionId(for zone: FrontZone, targetZoneId: FrontZoneId?) -> RegionId? {
+        if let selectedDivision,
+           selectedDivision.faction == zone.faction,
+           let regionId = selectedDivision.location(in: gameState.map),
+           zone.regionIds.contains(regionId) {
+            return regionId
+        }
+
+        if let selectedRegionId,
+           zone.regionIds.contains(selectedRegionId) {
+            return selectedRegionId
+        }
+
+        if let targetZoneId,
+           let segment = zone.frontSegments
+            .filter({ $0.neighborEnemyZone == targetZoneId })
+            .sorted(by: { $0.regionId.rawValue < $1.regionId.rawValue })
+            .first {
+            return segment.regionId
+        }
+
+        return zone.generalAssignment?.hqRegionId ?? zone.regionIds.first
+    }
+
+    private func logicalZoneId(for divisionId: String, in deploymentState: WarDeploymentState) -> FrontZoneId? {
+        deploymentState.frontZones.values
+            .sorted { $0.id.rawValue < $1.id.rawValue }
+            .first {
+                $0.unitsFront.contains(divisionId)
+                    || $0.unitsDepth.contains(divisionId)
+                    || $0.unitsGarrison.contains(divisionId)
+            }?
+            .id
+    }
+
+    private func submitPlayerDirective(
+        _ directive: ZoneDirective,
+        sourceRegionId: RegionId?,
+        targetRegionId: RegionId?
+    ) {
+        guard canIssuePlayerDirective else {
+            appendInteractionEvent("General order rejected: not in the player command phase.")
+            return
+        }
+        guard gameState.warDeploymentState.frontZones[directive.zoneId]?.faction == playerFaction else {
+            appendInteractionEvent("General order rejected: source zone is not controlled by the player.")
+            return
+        }
+
+        let startState = refreshedRuntimeState(gameState)
+        guard let refreshedZone = startState.warDeploymentState.frontZones[directive.zoneId],
+              refreshedZone.faction == playerFaction else {
+            appendInteractionEvent("General order rejected: source zone changed during refresh.")
+            return
+        }
+        let lockedIds = startState.playerCommandState.micromanagedDivisionIds
+        let execution = WarCommandExecutor(commandHandler: commandHandler).execute(
+            directive,
+            in: startState,
+            excluding: lockedIds
+        )
+
+        var nextState = refreshGeneralAssignments(in: execution.finalState)
+        let commandSummaries = execution.commandResults.enumerated().map { index, result in
+            CommandResultSummary.directiveCommand(
+                directiveIndex: 0,
+                commandIndex: index,
+                directive: directive,
+                command: execution.generatedCommands[index],
+                result: result
+            )
+        }
+        var diagnostics: [String] = []
+        if execution.generatedCommands.isEmpty {
+            diagnostics.append("Player directive generated no executable commands.")
+        }
+        let rejected = commandSummaries.filter { !$0.executed }
+        if !rejected.isEmpty {
+            diagnostics.append("\(rejected.count) command(s) were rejected by rules.")
+        }
+        if !lockedIds.isEmpty {
+            diagnostics.append("\(lockedIds.count) micromanaged division(s) excluded.")
+        }
+
+        let record = WarDirectiveRecord(
+            id: "player_directive_turn_\(startState.turn)_\(directive.zoneId.rawValue)_\(directive.type.rawValue)_\(targetRegionId?.rawValue ?? "hold")",
+            issuerId: "player",
+            turn: startState.turn,
+            faction: playerFaction,
+            zoneId: directive.zoneId,
+            directiveType: directive.type,
+            targetRegionIds: targetRegionId.map { [$0] } ?? directive.targetRegionIds,
+            commandResults: commandSummaries,
+            diagnostics: diagnostics,
+            category: directive.category,
+            tactic: directive.tactic,
+            commanderAgentId: refreshedZone.generalAssignment?.generalId,
+            commandTarget: directive.commandTarget
+        )
+
+        nextState.warDirectiveRecords.append(record)
+        nextState.playerCommandState.recordOperation(
+            PlayerPlannedOperation(
+                id: "player_operation_turn_\(startState.turn)_\(directive.zoneId.rawValue)_\(directive.type.rawValue)_\(targetRegionId?.rawValue ?? "hold")",
+                turn: startState.turn,
+                zoneId: directive.zoneId,
+                faction: playerFaction,
+                directiveType: directive.type,
+                sourceRegionId: sourceRegionId,
+                targetRegionId: targetRegionId,
+                createdByGeneralId: refreshedZone.generalAssignment?.generalId
+            )
+        )
+
+        gameState = nextState
+        lastWarDirectiveRecords = Array((lastWarDirectiveRecords + [record]).suffix(12))
+        lastCommandMessage = playerDirectiveMessage(for: execution, diagnostics: diagnostics)
+        appendInteractionEvent("General order submitted: \(directive.type.rawValue) \(directive.zoneId.rawValue).")
+        refreshSelectionAfterStateChange()
+    }
+
+    private func playerDirectiveMessage(
+        for execution: WarCommandExecutionResult,
+        diagnostics: [String]
+    ) -> String {
+        let acceptedCount = execution.commandResults.filter(\.succeeded).count
+        let totalCount = execution.generatedCommands.count
+        if totalCount == 0 {
+            return diagnostics.first ?? "General order produced no commands."
+        }
+        if acceptedCount == totalCount {
+            return "General order executed \(acceptedCount) command(s)."
+        }
+        return "General order executed \(acceptedCount)/\(totalCount) command(s)."
     }
 
     private func shouldRunAI(for faction: Faction, phase: GamePhase) -> Bool {
@@ -270,12 +658,12 @@ final class AppContainer: ObservableObject {
         pipelineMode: WarPipelineMode,
         observerEnabled: Bool
     ) async -> AgentTurnOutcome {
-        var currentState = StrategicStateBootstrapper().refreshRuntimeState(state)
+        var currentState = refreshedRuntimeState(state)
         var lastOutcome: AgentTurnOutcome?
         let maxSteps = observerEnabled ? 2 : 1
 
         for _ in 0..<maxSteps {
-            currentState = StrategicStateBootstrapper().refreshRuntimeState(currentState)
+            currentState = refreshedRuntimeState(currentState)
             guard shouldRunAIInSnapshot(state: currentState, observerEnabled: observerEnabled) else {
                 break
             }
@@ -286,7 +674,7 @@ final class AppContainer: ObservableObject {
                 faction: currentState.activeFaction,
                 pipelineMode: pipelineMode
             )
-            currentState = StrategicStateBootstrapper().refreshRuntimeState(outcome.state)
+            currentState = refreshedRuntimeState(outcome.state)
             lastOutcome = AgentTurnOutcome(
                 state: currentState,
                 record: outcome.record,
@@ -320,7 +708,7 @@ final class AppContainer: ObservableObject {
     }
 
     private func turnManager(for faction: Faction, state: GameState) -> TurnManager {
-        if faction == .germany, let turnManager {
+        if faction == .germany, let turnManager, generalRegistry.allGenerals.isEmpty {
             return turnManager
         }
 
@@ -346,11 +734,19 @@ final class AppContainer: ObservableObject {
             provider: MockAIClient(),
             providerName: "MockAI",
             commandHandler: commandHandler,
-            commanderPool: Self.buildCommanderPool(state: state)
+            commanderPool: Self.buildCommanderPool(state: state, registry: generalRegistry),
+            marshalAgent: Self.buildMarshalAgent(faction: faction, state: state)
         )
     }
 
-    private static func buildCommanderPool(state: GameState) -> TheaterCommanderPool {
+    private static func buildCommanderPool(
+        state: GameState,
+        registry: GeneralRegistry = .empty
+    ) -> TheaterCommanderPool {
+        if !registry.allGenerals.isEmpty {
+            return GeneralDispatcher(registry: registry).commanderPool(for: state)
+        }
+
         let agents: [any ZoneCommanderProviding] = state.warDeploymentState.frontZones.values
             .sorted { $0.id.rawValue < $1.id.rawValue }
             .map { zone in
@@ -367,6 +763,10 @@ final class AppContainer: ObservableObject {
                 return ZoneCommanderAgent(config: config)
             }
         return TheaterCommanderPool(commanders: agents)
+    }
+
+    private static func buildMarshalAgent(faction: Faction, state: GameState) -> MarshalAgent {
+        MarshalAgent(config: MarshalAgentConfig.automatic(for: faction, state: state))
     }
 
     private func handleDivisionTap(_ division: Division) {

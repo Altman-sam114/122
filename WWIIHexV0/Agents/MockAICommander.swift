@@ -42,7 +42,13 @@ struct MockAICommander {
                 attack: AttackParameters(
                     targetTheaterId: parameters.targetTheaterId,
                     weightedRegions: parameters.weightedRegions,
-                    intensity: .allOut
+                    intensity: .allOut,
+                    focusRegionId: parameters.focusRegionId,
+                    supportRegionIds: parameters.supportRegionIds,
+                    convergenceRegionId: parameters.convergenceRegionId,
+                    coordinatedZoneIds: parameters.coordinatedZoneIds,
+                    maxCommittedUnits: parameters.maxCommittedUnits,
+                    exploitDepth: parameters.exploitDepth
                 ),
                 category: directive.category,
                 tactic: directive.tactic,

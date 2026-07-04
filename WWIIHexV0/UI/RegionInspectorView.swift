@@ -17,7 +17,7 @@ struct RegionInspectorView: View {
             }
         }
         .padding(12)
-        .background(Color(.systemBackground))
+        .background(PlatformStyles.systemBackground)
         .clipShape(.rect(cornerRadius: 8))
     }
 
@@ -56,12 +56,25 @@ struct RegionInspectorView: View {
                 Text(state.region.city?.name ?? "None")
             }
 
+            LabeledContent("City Level") {
+                Text(state.cityLevel.displayName)
+            }
+
             LabeledContent("Fortress") {
                 Text(state.region.terrain == .fortress ? "Yes" : "No")
             }
 
             LabeledContent("Supply") {
                 Text("\(state.region.supplyValue)")
+            }
+
+            LabeledContent("Factories") {
+                Text("\(state.region.factories)")
+            }
+
+            LabeledContent("Output") {
+                Text("MP \(state.economicOutput.manpower), IC \(state.economicOutput.industry), SUP \(state.economicOutput.supplies)")
+                    .multilineTextAlignment(.trailing)
             }
 
             LabeledContent("Theater") {

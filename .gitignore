@@ -25,6 +25,7 @@ TestResults.xcresult/
 
 ## Other
 .DS_Store
+.worktrees/
 *.swp
 *.lock
 *.dat

@@ -8,6 +8,7 @@ final class UnitNode: SKNode {
         layout: HexLayout,
         placement: UnitDisplayPlacement,
         isSelected: Bool,
+        isPlayerManaged: Bool = false,
         fillColorOverride: SKColor? = nil
     ) {
         self.divisionId = division.id
@@ -20,6 +21,16 @@ final class UnitNode: SKNode {
 
         let width = layout.hexSize * 1.08
         let height = layout.hexSize * 0.72
+
+        if isPlayerManaged {
+            let halo = SKShapeNode(rectOf: CGSize(width: width + 8, height: height + 8), cornerRadius: min(7, layout.hexSize * 0.14))
+            halo.fillColor = SKColor(red: 0.95, green: 0.72, blue: 0.22, alpha: 0.22)
+            halo.strokeColor = SKColor(red: 1.00, green: 0.78, blue: 0.24, alpha: 0.95)
+            halo.lineWidth = max(2, layout.hexSize * 0.06)
+            halo.zPosition = -1
+            addChild(halo)
+        }
+
         let body = SKShapeNode(rectOf: CGSize(width: width, height: height), cornerRadius: min(5, layout.hexSize * 0.10))
         body.fillColor = fillColorOverride ?? TerrainStyle.unitFillColor(for: division.faction)
         body.strokeColor = isSelected ? TerrainStyle.selectedStroke : TerrainStyle.unitStrokeColor(for: division.faction)

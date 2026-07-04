@@ -28,6 +28,7 @@ struct TurnManager {
     let parser: AgentDecisionParser
     let mapper: AgentCommandMapper
     let commanderPool: TheaterCommanderPool?
+    let marshalAgent: MarshalAgent?
     let warCommandExecutor: WarCommandExecutor
 
     init(
@@ -39,6 +40,7 @@ struct TurnManager {
         parser: AgentDecisionParser = AgentDecisionParser(),
         mapper: AgentCommandMapper = AgentCommandMapper(),
         commanderPool: TheaterCommanderPool? = nil,
+        marshalAgent: MarshalAgent? = nil,
         warCommandExecutor: WarCommandExecutor? = nil
     ) {
         self.agent = agent
@@ -49,12 +51,13 @@ struct TurnManager {
         self.parser = parser
         self.mapper = mapper
         self.commanderPool = commanderPool
+        self.marshalAgent = marshalAgent
         self.warCommandExecutor = warCommandExecutor ?? WarCommandExecutor(commandHandler: commandHandler)
     }
 
     func runGermanAITurn(
         state: GameState,
-        pipelineMode: WarPipelineMode = .zoneDirective
+        pipelineMode: WarPipelineMode = .marshalDirective
     ) async -> AgentTurnOutcome {
         await runAITurn(state: state, faction: .germany, pipelineMode: pipelineMode)
     }
@@ -62,7 +65,7 @@ struct TurnManager {
     func runAITurn(
         state: GameState,
         faction: Faction,
-        pipelineMode: WarPipelineMode = .zoneDirective
+        pipelineMode: WarPipelineMode = .marshalDirective
     ) async -> AgentTurnOutcome {
         let context = contextBuilder.agentContext(for: agent, state: state, playerDirective: nil)
         let contextSummary = Self.contextSummary(context)
@@ -94,6 +97,12 @@ struct TurnManager {
         }
 
         switch pipelineMode {
+        case .marshalDirective:
+            return runMarshalDirectiveTurn(
+                state: state,
+                faction: faction,
+                contextSummary: contextSummary
+            )
         case .zoneDirective:
             return runDirectiveTurn(
                 state: state,
@@ -176,107 +185,17 @@ struct TurnManager {
     ) -> AgentTurnOutcome {
         do {
             let diagnostics = directiveDiagnostics(for: faction, state: state)
-            let envelope: DirectiveEnvelope
-            if state.warDeploymentState.frontZones.isEmpty {
-                envelope = DirectiveEnvelope(issuerId: agent.id, turn: state.turn, directives: [])
-            } else if let commanderPool {
-                envelope = commanderPool.envelope(for: faction, in: state, issuerId: agent.id)
-            } else {
-                envelope = TheaterCommanderPool.automatic(for: state).envelope(for: faction, in: state, issuerId: agent.id)
-            }
+            let envelope = makeZoneDirectiveEnvelope(state: state, faction: faction, issuerId: agent.id)
             let rawJSON = try Self.canonicalDirectiveJSON(envelope)
-            var nextState = state
-            var commandResults: [CommandResultSummary] = []
-            var directiveRecords: [WarDirectiveRecord] = []
-            var errors = diagnostics
-            if envelope.directives.isEmpty {
-                errors.append("Commander returned no directives.")
-            }
-
-            for (directiveIndex, directive) in envelope.directives.enumerated() {
-                let execution = warCommandExecutor.execute(directive, in: nextState)
-                nextState = execution.finalState
-                var perDirectiveResults: [CommandResultSummary] = []
-                var perDirectiveDiagnostics: [String] = []
-
-                if execution.generatedCommands.isEmpty {
-                    let diagnostic = "Directive \(directiveIndex) generated no executable commands."
-                    errors.append(diagnostic)
-                    perDirectiveDiagnostics.append(diagnostic)
-                }
-
-                for (commandIndex, pair) in zip(execution.generatedCommands, execution.commandResults).enumerated() {
-                    let summary = CommandResultSummary.directiveCommand(
-                        directiveIndex: directiveIndex,
-                        commandIndex: commandIndex,
-                        directive: directive,
-                        command: pair.0,
-                        result: pair.1
-                    )
-                    commandResults.append(summary)
-                    perDirectiveResults.append(summary)
-                    if !pair.1.succeeded {
-                        let diagnostic = "Directive \(directiveIndex) command \(commandIndex) rejected: \(pair.1.validation.errors.map(\.rawValue).joined(separator: ", "))."
-                        errors.append(diagnostic)
-                        perDirectiveDiagnostics.append(diagnostic)
-                    }
-                }
-
-                let record = WarDirectiveRecord(
-                    id: "war_directive_\(agent.id)_turn_\(state.turn)_\(directiveIndex)",
-                    issuerId: agent.id,
-                    turn: state.turn,
-                    faction: faction,
-                    zoneId: directive.zoneId,
-                    directiveType: directive.type,
-                    targetRegionIds: directive.targetRegionIds,
-                    commandResults: perDirectiveResults,
-                    diagnostics: perDirectiveDiagnostics,
-                    category: directive.category,
-                    tactic: directive.tactic,
-                    commanderAgentId: envelope.commanderAgentId,
-                    commandTarget: directive.commandTarget
-                )
-                nextState.warDirectiveRecords.append(record)
-                directiveRecords.append(record)
-            }
-
-            let endTurnResult = commandHandler.execute(.endTurn, in: nextState)
-            nextState = endTurnResult.state
-            commandResults.append(.endTurn(result: endTurnResult))
-            if !endTurnResult.succeeded {
-                errors.append("AI end turn failed: \(endTurnResult.validation.errors.map(\.rawValue).joined(separator: ", ")).")
-            }
-
-            if envelope.directives.isEmpty || !diagnostics.isEmpty {
-                let record = WarDirectiveRecord(
-                    id: "war_directive_\(agent.id)_turn_\(state.turn)_diagnostic",
-                    issuerId: agent.id,
-                    turn: state.turn,
-                    faction: faction,
-                    zoneId: nil,
-                    directiveType: nil,
-                    commandResults: [],
-                    diagnostics: errors
-                )
-                nextState.warDirectiveRecords.append(record)
-                directiveRecords.append(record)
-            }
-
-            return AgentTurnOutcome(
-                state: nextState,
-                record: AgentDecisionRecord(
-                    id: "agent_\(agent.id)_turn_\(state.turn)_directives",
-                    turn: state.turn,
-                    agentId: agent.id,
-                    provider: "\(providerName)+Directive",
-                    contextSummary: contextSummary,
-                    rawJSON: rawJSON,
-                    parsedIntent: "v0.352 zone directives",
-                    commandResults: commandResults,
-                    errors: errors
-                ),
-                directiveRecords: directiveRecords
+            return executeDirectiveEnvelope(
+                envelope,
+                state: state,
+                faction: faction,
+                contextSummary: contextSummary,
+                rawJSON: rawJSON,
+                parsedIntent: "zone directives",
+                providerSuffix: "Directive",
+                additionalDiagnostics: diagnostics
             )
         } catch {
             return AgentTurnOutcome(
@@ -290,6 +209,172 @@ struct TurnManager {
                 )
             )
         }
+    }
+
+    private func runMarshalDirectiveTurn(
+        state: GameState,
+        faction: Faction,
+        contextSummary: String
+    ) -> AgentTurnOutcome {
+        do {
+            let diagnostics = directiveDiagnostics(for: faction, state: state)
+            let fallbackPool = commanderPool ?? TheaterCommanderPool.automatic(for: state)
+            let marshal = marshalAgent ?? MarshalAgent(
+                config: MarshalAgentConfig.automatic(for: faction, state: state)
+            )
+            let resolution = marshal.resolve(
+                for: faction,
+                in: state,
+                fallbackPool: fallbackPool,
+                issuerId: agent.id
+            )
+            let compiledJSON = try Self.canonicalDirectiveJSON(resolution.directiveEnvelope)
+            let rawJSON = resolution.rawTheaterJSON.map {
+                "\($0)\n\nCompiled ZoneDirective JSON:\n\(compiledJSON)"
+            } ?? compiledJSON
+
+            return executeDirectiveEnvelope(
+                resolution.directiveEnvelope,
+                state: state,
+                faction: faction,
+                contextSummary: contextSummary,
+                rawJSON: rawJSON,
+                parsedIntent: resolution.theaterEnvelope?.strategicIntent ?? "marshal directives",
+                providerSuffix: "MarshalDirective",
+                additionalDiagnostics: diagnostics + resolution.diagnostics
+            )
+        } catch {
+            return AgentTurnOutcome(
+                state: state,
+                record: failureRecord(
+                    state: state,
+                    contextSummary: contextSummary,
+                    rawJSON: nil,
+                    parsedIntent: nil,
+                    errors: [error.localizedDescription]
+                )
+            )
+        }
+    }
+
+    private func makeZoneDirectiveEnvelope(
+        state: GameState,
+        faction: Faction,
+        issuerId: String
+    ) -> DirectiveEnvelope {
+        if state.warDeploymentState.frontZones.isEmpty {
+            return DirectiveEnvelope(issuerId: issuerId, turn: state.turn, directives: [])
+        }
+        if let commanderPool {
+            return commanderPool.envelope(for: faction, in: state, issuerId: issuerId)
+        }
+        return TheaterCommanderPool.automatic(for: state).envelope(for: faction, in: state, issuerId: issuerId)
+    }
+
+    private func executeDirectiveEnvelope(
+        _ envelope: DirectiveEnvelope,
+        state: GameState,
+        faction: Faction,
+        contextSummary: String,
+        rawJSON: String,
+        parsedIntent: String,
+        providerSuffix: String,
+        additionalDiagnostics: [String]
+    ) -> AgentTurnOutcome {
+        var nextState = state
+        var commandResults: [CommandResultSummary] = []
+        var directiveRecords: [WarDirectiveRecord] = []
+        var errors = additionalDiagnostics
+        if envelope.directives.isEmpty {
+            errors.append("Commander returned no directives.")
+        }
+
+        for (directiveIndex, directive) in envelope.directives.enumerated() {
+            let execution = warCommandExecutor.execute(directive, in: nextState)
+            nextState = execution.finalState
+            var perDirectiveResults: [CommandResultSummary] = []
+            var perDirectiveDiagnostics: [String] = []
+
+            if execution.generatedCommands.isEmpty {
+                let diagnostic = "Directive \(directiveIndex) generated no executable commands."
+                errors.append(diagnostic)
+                perDirectiveDiagnostics.append(diagnostic)
+            }
+
+            for (commandIndex, pair) in zip(execution.generatedCommands, execution.commandResults).enumerated() {
+                let summary = CommandResultSummary.directiveCommand(
+                    directiveIndex: directiveIndex,
+                    commandIndex: commandIndex,
+                    directive: directive,
+                    command: pair.0,
+                    result: pair.1
+                )
+                commandResults.append(summary)
+                perDirectiveResults.append(summary)
+                if !pair.1.succeeded {
+                    let diagnostic = "Directive \(directiveIndex) command \(commandIndex) rejected: \(pair.1.validation.errors.map(\.rawValue).joined(separator: ", "))."
+                    errors.append(diagnostic)
+                    perDirectiveDiagnostics.append(diagnostic)
+                }
+            }
+
+            let record = WarDirectiveRecord(
+                id: "war_directive_\(envelope.issuerId)_turn_\(state.turn)_\(directiveIndex)",
+                issuerId: envelope.issuerId,
+                turn: state.turn,
+                faction: faction,
+                zoneId: directive.zoneId,
+                directiveType: directive.type,
+                targetRegionIds: directive.targetRegionIds,
+                commandResults: perDirectiveResults,
+                diagnostics: perDirectiveDiagnostics,
+                category: directive.category,
+                tactic: directive.tactic,
+                commanderAgentId: envelope.commanderAgentId,
+                commandTarget: directive.commandTarget
+            )
+            nextState.warDirectiveRecords.append(record)
+            directiveRecords.append(record)
+        }
+
+        let endTurnResult = commandHandler.execute(.endTurn, in: nextState)
+        nextState = endTurnResult.state
+        commandResults.append(.endTurn(result: endTurnResult))
+        if !endTurnResult.succeeded {
+            errors.append("AI end turn failed: \(endTurnResult.validation.errors.map(\.rawValue).joined(separator: ", ")).")
+        }
+
+        if envelope.directives.isEmpty || !additionalDiagnostics.isEmpty {
+            let record = WarDirectiveRecord(
+                id: "war_directive_\(envelope.issuerId)_turn_\(state.turn)_diagnostic",
+                issuerId: envelope.issuerId,
+                turn: state.turn,
+                faction: faction,
+                zoneId: nil,
+                directiveType: nil,
+                commandResults: [],
+                diagnostics: errors,
+                commanderAgentId: envelope.commanderAgentId
+            )
+            nextState.warDirectiveRecords.append(record)
+            directiveRecords.append(record)
+        }
+
+        return AgentTurnOutcome(
+            state: nextState,
+            record: AgentDecisionRecord(
+                id: "agent_\(envelope.issuerId)_turn_\(state.turn)_directives",
+                turn: state.turn,
+                agentId: envelope.issuerId,
+                provider: "\(providerName)+\(providerSuffix)",
+                contextSummary: contextSummary,
+                rawJSON: rawJSON,
+                parsedIntent: parsedIntent,
+                commandResults: commandResults,
+                errors: errors
+            ),
+            directiveRecords: directiveRecords
+        )
     }
 
     private func isAITurn(faction: Faction, state: GameState) -> Bool {

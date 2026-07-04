@@ -51,6 +51,8 @@ struct RegionInspectorState: Equatable {
     let visibleEnemyDivisions: [Division]
     let objectiveNames: [String]
     let objectiveStatus: String
+    let cityLevel: CityLevel
+    let economicOutput: EconomyResources
 }
 
 struct UnitInspectorStrategicState: Equatable {
@@ -203,6 +205,9 @@ struct MapDisplayAdapter {
             ? "None"
             : "\(region.controller.displayName) controlled"
 
+        let cityLevel = EconomyRules().cityLevel(for: region, map: state.map)
+        let economicOutput = regionalEconomicOutput(for: region, cityLevel: cityLevel)
+
         return RegionInspectorState(
             region: region,
             selectedHex: selectedHex,
@@ -218,7 +223,9 @@ struct MapDisplayAdapter {
             friendlyDivisions: friendly,
             visibleEnemyDivisions: visibleEnemy,
             objectiveNames: objectiveNames,
-            objectiveStatus: objectiveStatus
+            objectiveStatus: objectiveStatus,
+            cityLevel: cityLevel,
+            economicOutput: economicOutput
         )
     }
 
@@ -269,6 +276,15 @@ struct MapDisplayAdapter {
             return region.controller
         }
         return state.map.tile(at: hex)?.controller
+    }
+
+    private func regionalEconomicOutput(for region: RegionNode, cityLevel: CityLevel) -> EconomyResources {
+        let coreBonus = region.coreOf.isEmpty || region.coreOf.contains(region.controller) ? 1 : 0
+        return EconomyResources(
+            manpower: max(1, cityLevel.manpowerGrowth + coreBonus * 4 + region.infrastructure),
+            industry: max(0, region.factories + cityLevel.industryValue + region.infrastructure / 3),
+            supplies: max(1, region.supplyValue * 3 + region.factories + region.infrastructure / 2)
+        )
     }
 
     private func stackOffset(index: Int, count: Int) -> CGPoint {

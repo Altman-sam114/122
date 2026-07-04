@@ -15,39 +15,164 @@ struct WarCommandExecutor {
     let commandHandler: GameCommandHandling
     private let occupationRules = OccupationRules()
 
+    private struct AttackTacticProfile {
+        let includeDepthUnits: Bool
+        let mobileOnlyWhenAvailable: Bool
+        let artilleryFirst: Bool
+        let attackOnly: Bool
+        let weakPointFocus: Bool
+        let allowDeepTarget: Bool
+        let holdNonCommittedFront: Bool
+        let committedUnitLimit: Int?
+    }
+
+    private struct AttackUnitSortKey: Comparable {
+        let artilleryPriority: Int
+        let mobilePriority: Int
+        let attackPower: Int
+        let movement: Int
+        let strength: Int
+        let id: String
+
+        static func < (lhs: AttackUnitSortKey, rhs: AttackUnitSortKey) -> Bool {
+            if lhs.artilleryPriority != rhs.artilleryPriority {
+                return lhs.artilleryPriority > rhs.artilleryPriority
+            }
+            if lhs.mobilePriority != rhs.mobilePriority {
+                return lhs.mobilePriority > rhs.mobilePriority
+            }
+            if lhs.attackPower != rhs.attackPower {
+                return lhs.attackPower > rhs.attackPower
+            }
+            if lhs.movement != rhs.movement {
+                return lhs.movement > rhs.movement
+            }
+            if lhs.strength != rhs.strength {
+                return lhs.strength > rhs.strength
+            }
+            return lhs.id < rhs.id
+        }
+    }
+
+    private struct ReserveSortKey: Comparable {
+        let mobilePriority: Int
+        let defensePower: Int
+        let strength: Int
+        let id: String
+
+        static func < (lhs: ReserveSortKey, rhs: ReserveSortKey) -> Bool {
+            if lhs.mobilePriority != rhs.mobilePriority {
+                return lhs.mobilePriority > rhs.mobilePriority
+            }
+            if lhs.defensePower != rhs.defensePower {
+                return lhs.defensePower > rhs.defensePower
+            }
+            if lhs.strength != rhs.strength {
+                return lhs.strength > rhs.strength
+            }
+            return lhs.id < rhs.id
+        }
+    }
+
+    private struct BreakthroughRegionSortKey: Comparable {
+        let enemyStrength: Int
+        let terrainCost: Int
+        let roadPenalty: Int
+        let valueScore: Int
+        let id: String
+
+        static func < (lhs: BreakthroughRegionSortKey, rhs: BreakthroughRegionSortKey) -> Bool {
+            if lhs.enemyStrength != rhs.enemyStrength {
+                return lhs.enemyStrength < rhs.enemyStrength
+            }
+            if lhs.terrainCost != rhs.terrainCost {
+                return lhs.terrainCost < rhs.terrainCost
+            }
+            if lhs.roadPenalty != rhs.roadPenalty {
+                return lhs.roadPenalty < rhs.roadPenalty
+            }
+            if lhs.valueScore != rhs.valueScore {
+                return lhs.valueScore > rhs.valueScore
+            }
+            return lhs.id < rhs.id
+        }
+    }
+
     init(commandHandler: GameCommandHandling = RuleEngine()) {
         self.commandHandler = commandHandler
     }
 
-    func execute(_ directive: ZoneDirective, in state: GameState) -> WarCommandExecutionResult {
+    func execute(
+        _ directive: ZoneDirective,
+        in state: GameState,
+        excluding excludedDivisionIds: Set<String> = []
+    ) -> WarCommandExecutionResult {
         if let tactic = directive.tactic {
-            return executeTactic(directive, tactic: tactic, in: state)
+            return executeTactic(
+                directive,
+                tactic: tactic,
+                in: state,
+                excluding: excludedDivisionIds
+            )
         }
 
         switch directive.parameters {
         case .defend(let parameters):
-            return executeDefense(directive, parameters: parameters, in: state)
+            return executeDefense(
+                directive,
+                parameters: parameters,
+                in: state,
+                excluding: excludedDivisionIds
+            )
         case .attack(let parameters):
-            return executeAttack(directive, parameters: parameters, in: state)
+            return executeAttack(
+                directive,
+                parameters: parameters,
+                in: state,
+                excluding: excludedDivisionIds
+            )
         }
     }
 
     private func executeTactic(
         _ directive: ZoneDirective,
         tactic: TacticName,
-        in state: GameState
+        in state: GameState,
+        excluding excludedDivisionIds: Set<String>
     ) -> WarCommandExecutionResult {
         switch tactic {
-        case .standardAttack:
+        case .standardAttack,
+             .blitzkrieg,
+             .spearhead,
+             .breakthrough,
+             .pincerMovement,
+             .fireCoverage,
+             .feint,
+             .guerrillaWarfare:
             guard case .attack(let parameters) = directive.parameters else {
                 return emptyResult(directive: directive, state: state)
             }
-            return executeAttack(directive, parameters: parameters, in: state)
-        case .holdPosition:
+            return executeAttack(
+                directive,
+                parameters: parameters,
+                tactic: tactic,
+                in: state,
+                excluding: excludedDivisionIds
+            )
+        case .holdPosition,
+             .elasticDefense,
+             .defenseInDepth,
+             .lastStand:
             guard case .defend(let parameters) = directive.parameters else {
                 return emptyResult(directive: directive, state: state)
             }
-            return executeDefense(directive, parameters: parameters, in: state)
+            return executeDefense(
+                directive,
+                parameters: parameters,
+                tactic: tactic,
+                in: state,
+                excluding: excludedDivisionIds
+            )
         }
     }
 
@@ -63,7 +188,9 @@ struct WarCommandExecutor {
     private func executeDefense(
         _ directive: ZoneDirective,
         parameters: DefenseParameters,
-        in state: GameState
+        tactic: TacticName = .holdPosition,
+        in state: GameState,
+        excluding excludedDivisionIds: Set<String>
     ) -> WarCommandExecutionResult {
         guard let zone = state.warDeploymentState.frontZones[directive.zoneId],
               !zone.frontSegments.isEmpty else {
@@ -72,6 +199,16 @@ struct WarCommandExecutor {
                 generatedCommands: [],
                 commandResults: [],
                 finalState: state
+            )
+        }
+
+        if tactic == .defenseInDepth {
+            return executeDefenseInDepth(
+                directive,
+                parameters: parameters,
+                zone: zone,
+                in: state,
+                excluding: excludedDivisionIds
             )
         }
 
@@ -84,9 +221,15 @@ struct WarCommandExecutor {
                 ($0.regionId, $0.assignedFrontUnitIds.count)
             }
         )
-        let reserveCount = min(parameters.targetReserves, zone.unitsDepth.count)
-        let depthFillers = Array(zone.unitsDepth.sorted().dropFirst(reserveCount))
-        let unitIds = stableUnique(zone.unitsFront + depthFillers)
+        let availableDepth = zone.unitsDepth.sorted().filter { !excludedDivisionIds.contains($0) }
+        let reserveCount = min(tactic == .lastStand ? 0 : parameters.targetReserves, availableDepth.count)
+        let depthFillers = Array(availableDepth.dropFirst(reserveCount))
+        let frontUnits = limitedFrontUnits(
+            zone.unitsFront.filter { !excludedDivisionIds.contains($0) },
+            maxCommitment: parameters.maxFrontCommitment
+        )
+        let unitIds = stableUnique(frontUnits + depthFillers)
+        let stance: DefenseStance = (tactic == .elasticDefense) ? .flexible : parameters.stance
 
         for unitId in unitIds {
             guard let division = nextState.division(id: unitId),
@@ -101,7 +244,7 @@ struct WarCommandExecutor {
 
             let command: Command
             if division.location(in: nextState.map) == targetRegionId {
-                command = parameters.stance == .holdLine
+                command = stance == .holdLine
                     ? .hold(divisionId: division.id)
                     : .allowRetreat(divisionId: division.id)
             } else if let destination = tacticalDestination(
@@ -111,7 +254,7 @@ struct WarCommandExecutor {
             ) {
                 command = .move(divisionId: division.id, destination: destination)
             } else {
-                command = parameters.stance == .holdLine
+                command = stance == .holdLine
                     ? .hold(divisionId: division.id)
                     : .allowRetreat(divisionId: division.id)
             }
@@ -138,7 +281,9 @@ struct WarCommandExecutor {
     private func executeAttack(
         _ directive: ZoneDirective,
         parameters: AttackParameters,
-        in state: GameState
+        tactic: TacticName = .standardAttack,
+        in state: GameState,
+        excluding excludedDivisionIds: Set<String>
     ) -> WarCommandExecutionResult {
         guard let zone = state.warDeploymentState.frontZones[directive.zoneId] else {
             return WarCommandExecutionResult(
@@ -152,7 +297,19 @@ struct WarCommandExecutor {
         let targetZoneId = FrontZoneId(parameters.targetTheaterId.rawValue)
         let sourceSegments = zone.frontSegments.filter { $0.neighborEnemyZone == targetZoneId }
         let segments = sourceSegments.isEmpty ? zone.frontSegments : sourceSegments
-        let attackingUnitIds = stableUnique(zone.unitsFront + (zone.unitsFront.isEmpty ? zone.unitsDepth : []))
+        let profile = attackTacticProfile(for: tactic, parameters: parameters, zone: zone)
+        let attackingUnitIds = attackingUnitIds(
+            for: zone,
+            profile: profile,
+            state: state,
+            excluding: excludedDivisionIds
+        )
+        let commandTargetRegionId: RegionId?
+        if case .region(let regionId) = directive.commandTarget {
+            commandTargetRegionId = regionId
+        } else {
+            commandTargetRegionId = nil
+        }
 
         var nextState = state
         var commands: [Command] = []
@@ -171,7 +328,10 @@ struct WarCommandExecutor {
                 zone: zone,
                 targetZoneId: targetZoneId,
                 segments: segments,
-                weightedRegions: parameters.weightedRegions,
+                parameters: parameters,
+                commandTargetRegionId: commandTargetRegionId,
+                tactic: tactic,
+                profile: profile,
                 state: nextState
             ) else {
                 continue
@@ -185,6 +345,8 @@ struct WarCommandExecutor {
                 state: nextState
             ) {
                 command = .attack(attackerId: division.id, targetId: target.id)
+            } else if profile.attackOnly {
+                command = .hold(divisionId: division.id)
             } else if let destination = tacticalDestination(
                 in: targetRegionId,
                 for: division,
@@ -205,6 +367,27 @@ struct WarCommandExecutor {
             )
         }
 
+        if profile.holdNonCommittedFront {
+            let committed = Set(attackingUnitIds)
+            let remainingFrontIds = stableUnique(zone.unitsFront)
+                .filter { !committed.contains($0) && !excludedDivisionIds.contains($0) }
+            for unitId in remainingFrontIds {
+                guard let division = nextState.division(id: unitId),
+                      division.faction == zone.faction,
+                      division.canAct else {
+                    continue
+                }
+                run(
+                    .hold(divisionId: division.id),
+                    fallback: .hold(divisionId: division.id),
+                    commands: &commands,
+                    results: &results,
+                    state: &nextState,
+                    relatedRecordId: relatedRecordId
+                )
+            }
+        }
+
         return WarCommandExecutionResult(
             directive: directive,
             generatedCommands: commands,
@@ -213,12 +396,262 @@ struct WarCommandExecutor {
         )
     }
 
+    private func executeDefenseInDepth(
+        _ directive: ZoneDirective,
+        parameters: DefenseParameters,
+        zone: FrontZone,
+        in state: GameState,
+        excluding excludedDivisionIds: Set<String>
+    ) -> WarCommandExecutionResult {
+        var nextState = state
+        var commands: [Command] = []
+        var results: [CommandResult] = []
+        let relatedRecordId = "war_directive_\(directive.zoneId.rawValue)_\(directive.type.rawValue)"
+        let frontUnitIds = limitedFrontUnits(
+            zone.unitsFront.filter { !excludedDivisionIds.contains($0) },
+            maxCommitment: parameters.maxFrontCommitment
+        )
+        let availableDepth = zone.unitsDepth.filter { !excludedDivisionIds.contains($0) }
+        let reserveCount = min(max(1, parameters.targetReserves), availableDepth.count)
+        let reserveSorted = availableDepth.sorted {
+            reserveSortKey(for: $0, state: nextState) < reserveSortKey(for: $1, state: nextState)
+        }
+        let counterattackUnitIds = Array(reserveSorted.dropFirst(reserveCount))
+        let counterattackRegions = parameters.counterattackRegionIds ?? visibleEnemyRegionIds(
+            zone: zone,
+            targetZoneId: nil,
+            state: nextState
+        )
+
+        for unitId in stableUnique(frontUnitIds + counterattackUnitIds) {
+            guard let division = nextState.division(id: unitId),
+                  division.faction == zone.faction,
+                  division.canAct else {
+                continue
+            }
+
+            let command: Command
+            if frontUnitIds.contains(division.id) {
+                command = .allowRetreat(divisionId: division.id)
+            } else if isMobile(division),
+                      let target = visibleEnemyDivision(
+                        in: counterattackRegions,
+                        for: division,
+                        zone: zone,
+                        state: nextState
+                      ) {
+                command = .attack(attackerId: division.id, targetId: target.id)
+            } else if let destination = defensiveDestination(
+                for: division,
+                zone: zone,
+                parameters: parameters,
+                state: nextState
+            ) {
+                command = .move(divisionId: division.id, destination: destination)
+            } else {
+                command = .hold(divisionId: division.id)
+            }
+
+            run(
+                command,
+                fallback: .allowRetreat(divisionId: division.id),
+                commands: &commands,
+                results: &results,
+                state: &nextState,
+                relatedRecordId: relatedRecordId
+            )
+        }
+
+        return WarCommandExecutionResult(
+            directive: directive,
+            generatedCommands: commands,
+            commandResults: results,
+            finalState: nextState
+        )
+    }
+
+    private func attackTacticProfile(
+        for tactic: TacticName,
+        parameters: AttackParameters,
+        zone: FrontZone
+    ) -> AttackTacticProfile {
+        let explicitLimit = attackCommitmentLimit(
+            explicitLimit: parameters.maxCommittedUnits,
+            defaultLimit: nil,
+            intensity: parameters.intensity,
+            zone: zone
+        )
+        switch tactic {
+        case .blitzkrieg:
+            return AttackTacticProfile(
+                includeDepthUnits: true,
+                mobileOnlyWhenAvailable: true,
+                artilleryFirst: false,
+                attackOnly: false,
+                weakPointFocus: true,
+                allowDeepTarget: true,
+                holdNonCommittedFront: true,
+                committedUnitLimit: explicitLimit
+            )
+        case .breakthrough:
+            return AttackTacticProfile(
+                includeDepthUnits: true,
+                mobileOnlyWhenAvailable: false,
+                artilleryFirst: false,
+                attackOnly: false,
+                weakPointFocus: true,
+                allowDeepTarget: (parameters.exploitDepth ?? 0) > 0,
+                holdNonCommittedFront: false,
+                committedUnitLimit: explicitLimit
+            )
+        case .spearhead:
+            return AttackTacticProfile(
+                includeDepthUnits: true,
+                mobileOnlyWhenAvailable: true,
+                artilleryFirst: false,
+                attackOnly: false,
+                weakPointFocus: true,
+                allowDeepTarget: true,
+                holdNonCommittedFront: true,
+                committedUnitLimit: explicitLimit
+            )
+        case .pincerMovement:
+            return AttackTacticProfile(
+                includeDepthUnits: true,
+                mobileOnlyWhenAvailable: true,
+                artilleryFirst: false,
+                attackOnly: false,
+                weakPointFocus: true,
+                allowDeepTarget: true,
+                holdNonCommittedFront: false,
+                committedUnitLimit: explicitLimit
+            )
+        case .fireCoverage:
+            return AttackTacticProfile(
+                includeDepthUnits: true,
+                mobileOnlyWhenAvailable: false,
+                artilleryFirst: true,
+                attackOnly: true,
+                weakPointFocus: false,
+                allowDeepTarget: false,
+                holdNonCommittedFront: false,
+                committedUnitLimit: explicitLimit
+            )
+        case .feint:
+            let defaultLimit = max(1, max(zone.unitsFront.count, 1) / 3)
+            return AttackTacticProfile(
+                includeDepthUnits: false,
+                mobileOnlyWhenAvailable: false,
+                artilleryFirst: false,
+                attackOnly: false,
+                weakPointFocus: false,
+                allowDeepTarget: false,
+                holdNonCommittedFront: false,
+                committedUnitLimit: attackCommitmentLimit(
+                    explicitLimit: parameters.maxCommittedUnits,
+                    defaultLimit: defaultLimit,
+                    intensity: parameters.intensity,
+                    zone: zone
+                )
+            )
+        case .guerrillaWarfare:
+            let defaultLimit = max(1, max(zone.unitsFront.count + zone.unitsDepth.count, 1) / 2)
+            return AttackTacticProfile(
+                includeDepthUnits: true,
+                mobileOnlyWhenAvailable: true,
+                artilleryFirst: false,
+                attackOnly: false,
+                weakPointFocus: true,
+                allowDeepTarget: true,
+                holdNonCommittedFront: false,
+                committedUnitLimit: attackCommitmentLimit(
+                    explicitLimit: parameters.maxCommittedUnits,
+                    defaultLimit: defaultLimit,
+                    intensity: parameters.intensity,
+                    zone: zone
+                )
+            )
+        case .standardAttack,
+             .holdPosition,
+             .elasticDefense,
+             .defenseInDepth,
+             .lastStand:
+            return AttackTacticProfile(
+                includeDepthUnits: false,
+                mobileOnlyWhenAvailable: false,
+                artilleryFirst: false,
+                attackOnly: false,
+                weakPointFocus: false,
+                allowDeepTarget: false,
+                holdNonCommittedFront: false,
+                committedUnitLimit: explicitLimit
+            )
+        }
+    }
+
+    private func attackCommitmentLimit(
+        explicitLimit: Int?,
+        defaultLimit: Int?,
+        intensity: AttackIntensity,
+        zone: FrontZone
+    ) -> Int? {
+        if let explicitLimit {
+            return explicitLimit
+        }
+
+        if let defaultLimit {
+            return defaultLimit
+        }
+
+        switch intensity {
+        case .allOut,
+             .limitedCounter:
+            return nil
+        case .infiltration:
+            let candidateCount = max(zone.unitsFront.count + zone.unitsDepth.count, 1)
+            return max(1, candidateCount / 2)
+        }
+    }
+
+    private func attackingUnitIds(
+        for zone: FrontZone,
+        profile: AttackTacticProfile,
+        state: GameState,
+        excluding excludedDivisionIds: Set<String>
+    ) -> [String] {
+        let fallbackDepth = zone.unitsFront.isEmpty ? zone.unitsDepth : []
+        let baseIds = stableUnique(zone.unitsFront + (profile.includeDepthUnits ? zone.unitsDepth : fallbackDepth))
+            .filter { !excludedDivisionIds.contains($0) }
+        let activeIds = baseIds.filter { unitId in
+            guard let division = state.division(id: unitId) else {
+                return false
+            }
+            return division.faction == zone.faction && division.canAct
+        }
+        let mobileIds = activeIds.filter { unitId in
+            state.division(id: unitId).map { isMobile($0) } == true
+        }
+        let candidateIds = profile.mobileOnlyWhenAvailable && !mobileIds.isEmpty ? mobileIds : activeIds
+        let sortedIds = candidateIds.sorted {
+            attackSortKey(for: $0, profile: profile, state: state) <
+                attackSortKey(for: $1, profile: profile, state: state)
+        }
+
+        if let limit = profile.committedUnitLimit, limit > 0 {
+            return Array(sortedIds.prefix(limit))
+        }
+        return sortedIds
+    }
+
     private func targetEnemyRegion(
         for division: Division,
         zone: FrontZone,
         targetZoneId: FrontZoneId,
         segments: [FrontZoneSegment],
-        weightedRegions: [RegionId],
+        parameters: AttackParameters,
+        commandTargetRegionId: RegionId?,
+        tactic: TacticName,
+        profile: AttackTacticProfile,
         state: GameState
     ) -> RegionId? {
         let adjacentEnemyRegions = enemyRegions(
@@ -227,8 +660,26 @@ struct WarCommandExecutor {
             zone: zone,
             state: state
         )
-        let weighted = weightedRegions.filter { adjacentEnemyRegions.contains($0) }
-        let candidates = stableUnique(weighted + adjacentEnemyRegions)
+        let priorityRegions = orderedUnique(
+            [parameters.focusRegionId, commandTargetRegionId, parameters.convergenceRegionId].compactMap { $0 }
+            + parameters.weightedRegions
+            + (parameters.supportRegionIds ?? [])
+        )
+        let priorityCandidates = priorityRegions.filter {
+            adjacentEnemyRegions.contains($0)
+                || (profile.allowDeepTarget && state.map.region(id: $0) != nil)
+        }
+        var candidates = orderedUnique(priorityCandidates + adjacentEnemyRegions)
+
+        if profile.weakPointFocus,
+           let weakPoint = bestBreakthroughRegion(
+            candidates: candidates,
+            zone: zone,
+            tactic: tactic,
+            state: state
+           ) {
+            candidates = orderedUnique([weakPoint] + candidates)
+        }
 
         if let target = visibleEnemyDivision(
             in: candidates,
@@ -240,6 +691,177 @@ struct WarCommandExecutor {
         }
 
         return candidates.first
+    }
+
+    private func limitedFrontUnits(_ unitIds: [String], maxCommitment: Int?) -> [String] {
+        guard let maxCommitment, maxCommitment > 0 else {
+            return unitIds
+        }
+        return Array(unitIds.prefix(maxCommitment))
+    }
+
+    private func visibleEnemyRegionIds(
+        zone: FrontZone,
+        targetZoneId: FrontZoneId?,
+        state: GameState
+    ) -> [RegionId] {
+        let targetZoneIds = targetZoneId.map { [$0] }
+            ?? stableUnique(zone.frontSegments.map(\.neighborEnemyZone))
+        return orderedUnique(targetZoneIds.flatMap { enemyZoneId in
+            let segments = zone.frontSegments.filter { $0.neighborEnemyZone == enemyZoneId }
+            return enemyRegions(for: segments, targetZoneId: enemyZoneId, zone: zone, state: state)
+        })
+    }
+
+    private func attackSortKey(
+        for unitId: String,
+        profile: AttackTacticProfile,
+        state: GameState
+    ) -> AttackUnitSortKey {
+        guard let division = state.division(id: unitId) else {
+            return AttackUnitSortKey(
+                artilleryPriority: 0,
+                mobilePriority: 0,
+                attackPower: 0,
+                movement: 0,
+                strength: 0,
+                id: unitId
+            )
+        }
+
+        return AttackUnitSortKey(
+            artilleryPriority: profile.artilleryFirst && division.isArtillery ? 1 : 0,
+            mobilePriority: isMobile(division) ? 1 : 0,
+            attackPower: division.attack,
+            movement: division.movement,
+            strength: division.strength,
+            id: division.id
+        )
+    }
+
+    private func reserveSortKey(for unitId: String, state: GameState) -> ReserveSortKey {
+        guard let division = state.division(id: unitId) else {
+            return ReserveSortKey(mobilePriority: 0, defensePower: 0, strength: 0, id: unitId)
+        }
+
+        return ReserveSortKey(
+            mobilePriority: isMobile(division) ? 1 : 0,
+            defensePower: division.defense,
+            strength: division.strength,
+            id: division.id
+        )
+    }
+
+    private func bestBreakthroughRegion(
+        candidates: [RegionId],
+        zone: FrontZone,
+        tactic: TacticName,
+        state: GameState
+    ) -> RegionId? {
+        candidates
+            .filter { state.map.region(id: $0) != nil }
+            .sorted {
+                breakthroughSortKey(for: $0, zone: zone, tactic: tactic, state: state) <
+                    breakthroughSortKey(for: $1, zone: zone, tactic: tactic, state: state)
+            }
+            .first
+    }
+
+    private func breakthroughSortKey(
+        for regionId: RegionId,
+        zone: FrontZone,
+        tactic: TacticName,
+        state: GameState
+    ) -> BreakthroughRegionSortKey {
+        guard let region = state.map.region(id: regionId) else {
+            return BreakthroughRegionSortKey(
+                enemyStrength: Int.max,
+                terrainCost: Int.max,
+                roadPenalty: 1,
+                valueScore: 0,
+                id: regionId.rawValue
+            )
+        }
+
+        let enemyStrength = enemyStrength(in: regionId, against: zone.faction, state: state)
+        let roadPenalty = region.displayHexes.contains { state.map.tile(at: $0)?.hasRoad == true } ? 0 : 1
+        var valueScore = (region.city?.victoryPoints ?? 0) + region.supplyValue + region.factories
+        if tactic == .guerrillaWarfare {
+            valueScore += region.infrastructure
+        }
+
+        return BreakthroughRegionSortKey(
+            enemyStrength: enemyStrength,
+            terrainCost: region.terrain.movementCost,
+            roadPenalty: roadPenalty,
+            valueScore: valueScore,
+            id: regionId.rawValue
+        )
+    }
+
+    private func enemyStrength(
+        in regionId: RegionId,
+        against faction: Faction,
+        state: GameState
+    ) -> Int {
+        state.divisions
+            .filter { division in
+                guard division.faction != faction,
+                      !division.isDestroyed else {
+                    return false
+                }
+                return division.location(in: state.map) == regionId
+            }
+            .reduce(0) { $0 + max(1, $1.strength) + max(1, $1.defense) }
+    }
+
+    private func defensiveDestination(
+        for division: Division,
+        zone: FrontZone,
+        parameters: DefenseParameters,
+        state: GameState
+    ) -> HexCoord? {
+        let preferredRegionIds = orderedUnique(
+            (parameters.strongpointRegionIds ?? [])
+            + (parameters.fallbackRegionIds ?? [])
+            + zone.frontSegments.map(\.regionId)
+        )
+        let movementRange = MovementRules().movementRange(for: division, in: state)
+        let candidateHexes = preferredRegionIds
+            .compactMap { state.map.region(id: $0) }
+            .flatMap { stableUnique([$0.representativeHex] + $0.displayHexes) }
+            .filter { $0 != division.coord }
+            .filter { movementRange.contains($0) }
+            .filter { state.map.tile(at: $0)?.isPassable == true }
+            .filter { state.division(at: $0) == nil }
+
+        return candidateHexes.sorted {
+            let lhsDefense = state.map.tile(at: $0)?.baseTerrain.defenseBonus ?? 0
+            let rhsDefense = state.map.tile(at: $1)?.baseTerrain.defenseBonus ?? 0
+            if lhsDefense != rhsDefense {
+                return lhsDefense > rhsDefense
+            }
+            let lhsFriendly = state.map.tile(at: $0)?.controller == division.faction
+            let rhsFriendly = state.map.tile(at: $1)?.controller == division.faction
+            if lhsFriendly != rhsFriendly {
+                return lhsFriendly
+            }
+            let lhsDistance = division.coord.distance(to: $0)
+            let rhsDistance = division.coord.distance(to: $1)
+            if lhsDistance == rhsDistance {
+                if $0.q == $1.q {
+                    return $0.r < $1.r
+                }
+                return $0.q < $1.q
+            }
+            return lhsDistance < rhsDistance
+        }.first
+    }
+
+    private func isMobile(_ division: Division) -> Bool {
+        division.isArmor
+            || division.movement >= 5
+            || division.components.contains { $0.type == .motorizedInfantry && $0.weight >= 0.25 }
     }
 
     private func enemyRegions(
@@ -320,6 +942,7 @@ struct WarCommandExecutor {
         return state.divisions
             .filter { target in
                 guard target.faction != zone.faction,
+                      !target.isDestroyed,
                       let targetRegion = target.location(in: state.map),
                       regionSet.contains(targetRegion) else {
                     return false
@@ -526,6 +1149,7 @@ struct WarCommandExecutor {
             )
             let deploymentEvents = syncResult.affectedRegionIds.map(WarDeploymentEvent.regionControllerChanged)
                 + (sourceZoneId.map { [WarDeploymentEvent.frontZoneChanged($0)] } ?? [])
+            let deploymentBeforeUpdate = state.warDeploymentState
             state.warDeploymentState = WarDeploymentManager().update(
                 state: state.warDeploymentState,
                 map: state.map,
@@ -533,6 +1157,7 @@ struct WarCommandExecutor {
                 turn: state.turn,
                 events: deploymentEvents
             )
+            .preservingGeneralAssignments(from: deploymentBeforeUpdate)
         }
     }
 
@@ -634,7 +1259,8 @@ struct WarCommandExecutor {
             return divisionId
         case .attack(let attackerId, _):
             return attackerId
-        case .endTurn:
+        case .queueProduction,
+             .endTurn:
             return nil
         }
     }
@@ -699,6 +1325,16 @@ struct WarCommandExecutor {
     }
 
     private func stableUnique<T: Hashable>(_ values: [T]) -> [T] {
+        var seen: Set<T> = []
+        var result: [T] = []
+        for value in values where !seen.contains(value) {
+            seen.insert(value)
+            result.append(value)
+        }
+        return result
+    }
+
+    private func orderedUnique<T: Hashable>(_ values: [T]) -> [T] {
         var seen: Set<T> = []
         var result: [T] = []
         for value in values where !seen.contains(value) {

@@ -13,6 +13,7 @@ struct FrontZone: Codable, Equatable, Identifiable {
     var pressure: Int
     var state: WarState
     var isCoreZone: Bool
+    var generalAssignment: GeneralAssignment?
 
     init(
         id: FrontZoneId,
@@ -26,7 +27,8 @@ struct FrontZone: Codable, Equatable, Identifiable {
         unitsGarrison: [String] = [],
         pressure: Int = 0,
         state: WarState = .peace,
-        isCoreZone: Bool = false
+        isCoreZone: Bool = false,
+        generalAssignment: GeneralAssignment? = nil
     ) {
         self.id = id
         self.name = name
@@ -45,5 +47,6 @@ struct FrontZone: Codable, Equatable, Identifiable {
         self.pressure = max(0, pressure)
         self.state = state
         self.isCoreZone = isCoreZone
+        self.generalAssignment = generalAssignment
     }
 }

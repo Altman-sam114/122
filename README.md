@@ -1,12 +1,12 @@
-# WWIIHexV0 — iOS 二战 AI 战略战棋游戏
+# WWIIHexV0 — iOS / macOS 二战 AI 战略战棋游戏
 
-> **当前状态：v0.37 已完成。v0.3 主链路已进入“动态 hex 战区 + 前线 + 部署 + ZoneDirective/多将领 MockAI”阶段。历史测试基线曾达到 Probe 18/0、Stage Regression 69/0、Full 226/0；当前工作流默认不跑 Xcode / XCTest / 模拟器测试，只按 `md/test/test.md` 做轻量检查。**
+> **当前状态：v0.5 元帅决策链分支 `v0.5-marshal-decision-chain`。默认战争 AI 已加入“元帅 -> 模拟 LLM JSON -> decoder -> compiler -> ZoneDirective”决策链；下游仍收口到 `WarCommandExecutor -> RuleEngine`。统治者层只作为后续上游预留，当前 v0.5 主链路不调用 `RulerAgent`，也不恢复 Cabinet / Minister。历史测试基线曾达到 v0.37 Probe 18/0、Stage Regression 69/0、Full 226/0；当前工作流默认不跑 Xcode / XCTest / 模拟器测试，只按 `md/test/test.md` 做轻量检查。**
 
 ---
 
 ## 项目定位
 
-一款 iOS 回合制二战策略游戏，目标结合战棋（六角格操作感）、大战略（省份占领、补给、前线）与角色扮演（LLM 驱动的将领 AI）。
+一款 iOS / macOS 回合制二战策略游戏，目标结合战棋（六角格操作感）、大战略（省份占领、补给、前线）与角色扮演（LLM 驱动的将领 AI）。
 
 **核心参考：**
 - 《统一指挥2》：六角格战棋、补给、攻击（战术层参照）
@@ -15,7 +15,7 @@
 - 《世界征服者4》：移动端轻量化策略体验
 
 **核心创新：本地部署 LLM 驱动游戏 AI**
-- 将领、元帅、国家统治者、部长后续均可作为独立 agent
+- 将领、元帅已进入当前指挥链；国家统治者、部长只作为后续方向预留
 - agent 根据视野、战况摘要、性格和历史背景输出结构化 JSON 命令
 - 游戏规则系统负责校验并执行，LLM 不直接绕过规则修改状态
 
@@ -59,7 +59,7 @@ ZoneDirective / WarCommandExecutor / RuleEngine
 
 | 层级 | 技术 |
 |------|------|
-| 平台 | iOS |
+| 平台 | iOS；v1.1 新增 macOS 主游戏 target `WWIIHexV0Mac` |
 | 语言 | Swift |
 | UI 框架 | SwiftUI（面板、按钮、日志、单位详情） |
 | 地图渲染 | SpriteKit（六角格地图、单位显示、移动/攻击反馈） |
@@ -74,12 +74,12 @@ WWIIHexV0/
 ├── Core/          — 核心数据模型（Division、GameState、HexTile、HexCoord、MapState 等）
 ├── Commands/      — 命令系统（Command、CommandResult、CommandValidation、GameCommandHandling）
 ├── Rules/         — 规则引擎（RuleEngine、CombatRules、SupplyRules、MovementRules、VictoryRules、CommandExecutor、CommandValidator）
-├── Agents/        — AI Agent 管线（旧 Agent D + v0.36 ZoneCommanderAgent / TheaterCommanderPool）
+├── Agents/        — AI Agent 管线（旧 Agent D + ZoneCommanderAgent / MarshalAgent）
 ├── Turn/          — 回合管理器（TurnManager，德军 AI 回合编排）
 ├── SpriteKit/     — 地图渲染（BoardScene、UnitNode、HexNode、HexLayout、TerrainStyle、BoardSceneAdapter）
 ├── UI/            — 界面组件（UnitInspectorView、EventLogView、HUDView、CommandPanelView、AgentPanelView、RootGameView）
-├── App/           — 入口（AppContainer、WWIIHexV0App）
-├── Data/          — 场景数据（DataLoader、ScenarioDefinition JSON、general_agents.json、unit_templates.json、terrain_rules.json）
+├── App/           — 入口（AppContainer、WWIIHexV0App、WWIIHexV0MacApp）
+├── Data/          — 场景数据（DataLoader、ScenarioDefinition JSON、general_agents.json、generals.json、unit_templates.json、terrain_rules.json）
 ├── Probes/        — 历史高速探针测试 target（默认不执行）
 └── Tests/         — 历史单元测试 / 集成测试 / 真实战局模拟（默认不执行）
 ```
@@ -99,7 +99,9 @@ WWIIHexV0/
 当前同时保留两条管线：
 
 - **Legacy Agent D 管线**：`AgentContextBuilder → DecisionProvider → AgentDecisionParser → AgentCommandMapper → RuleEngine`。已保留作回归参考，默认不再作为战争 AI 主路径。
-- **ZoneDirective 新管线（默认）**：`TheaterCommanderPool → ZoneCommanderAgent → ZoneDirective → WarCommandExecutor → RuleEngine → WarDirectiveRecord`。v0.37 已收口为默认战争 AI 权威路径；`WarCommandExecutor.execute(_ directive:in:)` 不依赖具体 `ZoneCommanderAgent` 实例，手写合法 `ZoneDirective` 也可执行，为 v0.4 玩家 UI 共用命令管线预留接口能力。
+- **ZoneDirective 管线（执行权威）**：`ZoneDirective → WarCommandExecutor → RuleEngine → WarDirectiveRecord`。`WarCommandExecutor.execute(_ directive:in:)` 不依赖具体 `ZoneCommanderAgent` 实例，手写合法 `ZoneDirective` 也可执行。
+- **v0.5 元帅管线（默认上游）**：`MarshalAgent → MarshalBattlefieldSummarizer → SimulatedMarshalLLMClient → TheaterDirectiveDecoder → TheaterDirectiveCompiler → DirectiveEnvelope / ZoneDirective`。它只做战略意图、JSON I/O、解码校验和 fallback，不直接修改 `GameState`。
+- **后续统治者层（未接入 v0.5 主链路）**：未来只能位于元帅上游，输出国家级姿态或约束条件；不得绕过 `ZoneDirective -> WarCommandExecutor -> RuleEngine`。
 
 | 文件 | 职责 | 关键类型/协议 |
 |------|------|--------------|
@@ -112,7 +114,7 @@ WWIIHexV0/
 | `Agents/AgentCommandMapper.swift` | order → Command | `AgentCommandMapper.map(_:agentId:) -> IssuedCommand`，缺字段抛 error |
 | `Agents/AgentDecisionRecord.swift` | 决策记录 | `AgentDecisionRecord` / `CommandResultSummary`（UI 读） |
 | `Agents/MockAIClient.swift` | v0 默认 provider | 启发式：resupply → attack → move(向 Bastogne) → hold |
-| `Agents/LLMClient.swift` | LLM 接口预留 | `protocol LLMClient` + `LLMRequest`（v0 默认不启用） |
+| `Agents/LLMClient.swift` | Legacy LLM 接口预留 | `protocol LLMClient` + `LLMRequest`（旧 Agent D 用，默认不启用） |
 | `Agents/LocalLLMDecisionProvider.swift` | 本地 LLM provider | 注入 `LLMClient` + `AgentPromptBuilder` + parser，失败由上层 fallback MockAI |
 | `Agents/AgentPromptBuilder.swift` | prompt 构造 | system + user prompt，强制 JSON 输出 |
 | `Turn/TurnManager.swift` | 德军 AI 回合编排 | `runGermanAITurn(state:) async -> AgentTurnOutcome`（含 endTurn 推进） |
@@ -123,8 +125,14 @@ WWIIHexV0/
 **MockAI 行为（guderian，装甲突破风格）：**
 跳过已行动单位 → 低补给/包围优先 resupply → 射程内低 hp 敌军优先 attack（炮兵优先打城市/要塞）→ 装甲沿道路向 Bastogne move → 否则 hold
 
-**v0.36 ZoneDirective 行为：**
-`ZoneCommanderAgent` 读取所属 `FrontZone` 的前线/部署摘要，`BinaryTacticClassifier` 在 `standardAttack` 与 `holdPosition` 之间分类；`TheaterCommanderPool` 为动态战区提供将领配置，未知新战区使用 fallback commander。`WarDirectiveRecord` 记录 `category` / `tactic` / `commanderAgentId` / `commandTarget`，便于后续接真 LLM 回放与审计。
+**v0.7 ZoneDirective 战术行为：**
+`ZoneCommanderAgent` 读取所属 `FrontZone` 的前线/部署摘要，`BinaryTacticClassifier` 会结合兵力比、机动兵力、炮兵支援、纵深预备队、压力和补给警告，在 `standardAttack`、`blitzkrieg`、`spearhead`、`breakthrough`、`pincerMovement`、`fireCoverage`、`feint`、`guerrillaWarfare`、`holdPosition`、`elasticDefense`、`defenseInDepth`、`lastStand` 之间分类；`WarCommandExecutor` 将这些战术降级为 `move / attack / hold / allowRetreat`，仍统一交给 `RuleEngine` 校验执行。`WarDirectiveRecord` 记录 `category` / `tactic` / `commanderAgentId` / `commandTarget`，便于后续接真 LLM 回放与审计。
+
+**v0.5 MarshalDirective 行为：**
+`MarshalBattlefieldSummarizer` 把 `GameState` 降维为元帅摘要，只包含 front zone、strength ratio、补给警告、目标和事件，不把全量 hex 网格喂给模型。`SimulatedMarshalLLMClient` 生成 fenced JSON 形式的 `TheaterDirectiveEnvelope`；`TheaterDirectiveDecoder` 提取并校验 JSON；`TheaterDirectiveCompiler` 把元帅意图编译成现有 `ZoneDirective`。v0.7 后 `TheaterDirective` 可携带 `convergenceRegionId` / `coordinatedZoneIds` 支持钳形会师意图；解码或编译失败时 fallback 到 `TheaterCommanderPool`，不执行半成品 LLM 输出。
+
+**后续 Ruler / Diplomacy 边界：**
+统治者层不在 v0.5 当前主链路中。后续如要加入国家、集团、外交关系或统治者 agent，必须先设计独立 schema，并保持底层战争规则仍由 `Faction.germany` / `Faction.allies`、`ZoneDirective`、`WarCommandExecutor` 和 `RuleEngine` 收口。
 
 ---
 
@@ -245,17 +253,19 @@ WWIIHexV0/
 | **v0.358** | hex 动态战区语义收口 | 动态战区改跟 `hexToTheater`，region 基础战区只作初始/生成参照；AI/部署/前线测试同步更新 |
 | **v0.36** | 命令层扩展与多将领 MockAI | `CommandCategory` / `TacticName` / `DirectiveTarget` / `ZoneCommanderAgent` / `TheaterCommanderPool` |
 | **v0.37** | 命令层统一整合 | 移除 `TurnManager` 的 `MockAICommander` fallback，默认路径收口到 `TheaterCommanderPool`；补 issuer-agnostic executor 探针 |
+| **v0.5** | 元帅层与模拟 LLM JSON | `MarshalAgent` / `TheaterDirectiveEnvelope` / decoder / compiler / marshal fallback |
+| **v0.7** | 高级战术与命令扩展 | 闪电战、定点矛头、突破、钳形攻势、火力覆盖、佯攻、游击战、弹性防御、纵深防御、死守 |
 
 ### ⏳ 后续方向
 
 | 版本 | 主题 | 关键内容 |
 |------|------|----------|
 | **v0.4** | 聊天命令与角色服从 | 玩家通过聊天框命令将领；将领根据性格/忠诚回应；命令可被质疑/拖延/抗命 |
-| **v0.5** | 国家与部长 Agent | 统治者 agent；军工/陆军/外交/情报部长 agent；高层战略目标下发 |
+| **v0.5** | 元帅决策链与模拟 LLM JSON | `MarshalAgent`、`TheaterDirectiveEnvelope`、JSON decoder、compiler、fallback；统治者只预留为后续上游，不恢复 Cabinet/Minister |
 | **v1.0** | 大战略原型 | 经济/科技/生产；空军实体化；简化海军；天气；多国家多战区；全球地图；美术资源 |
-| **v1.x** | 多回合战术行动 | 撤退命令、突破/闪电战、装甲差异化、`AttackIntensity` 分流等复杂多回合行动骨架 |
+| **v1.x** | 多回合战术行动 | 撤退命令、突破/闪电战、装甲差异化、`AttackIntensity` 深度分流等复杂多回合行动骨架 |
 
-**v0.37 决策记录：** 撤退、突破、闪电战、装甲差异化和 `AttackIntensity` 实际分流均推迟至 1.x。原因是这些机制共享“多回合追踪行动”骨架，涉及目标选择、队形重排、完成条件和防线重建，过早实现会在后续互相推倒。
+**v0.37 决策记录：** 撤退、突破、闪电战、装甲差异化和 `AttackIntensity` 深度分流推迟至 1.x。v1.0 只先把 `infiltration` 解释为默认低投入上限，不引入额外伤害、绕规则推进或多回合追踪行动。
 
 ---
 
@@ -307,9 +317,9 @@ md/
 ## 给后续 Claude Code 的提示
 
 **你接手时的代码库状态：**
-- v0.37 已完成；历史测试基线曾达到 Probe 18/0、Stage Regression 69/0、Full 226/0。当前默认不跑重测试，只做 `md/test/test.md` 允许的轻量检查。
+- v0.5 分支已引入元帅层与模拟 LLM JSON/decoder/ compiler；历史测试基线曾达到 v0.37 Probe 18/0、Stage Regression 69/0、Full 226/0。当前默认不跑重测试，只做 `md/test/test.md` 允许的轻量检查。
 - 战斗模型：兵力伤害为主，`RetreatMode`（retreatable/hold）控制撤退，无 organization。
-- 默认战争 AI 管线：`ZoneDirective` + `TheaterCommanderPool` + `ZoneCommanderAgent` + `WarCommandExecutor`。`MockAICommander` 保留兼容/测试用途，不再作为 `TurnManager` 的默认 fallback。
+- 默认战争 AI 管线：`MarshalAgent` 读取摘要并模拟输出 `TheaterDirectiveEnvelope` JSON，经 `TheaterDirectiveDecoder` 与 `TheaterDirectiveCompiler` 降级成 `ZoneDirective`，再走 `WarCommandExecutor`。`TheaterCommanderPool` / `ZoneCommanderAgent` 仍作为 fallback 和显式 `.zoneDirective` 路径。
 - Legacy Agent D 管线保留但默认不调用。
 - 地图坐标系：hex 仍是战术权威；Region 是省份规则层；动态战区看 `hexToTheater`。
 
@@ -320,6 +330,7 @@ md/
 4. `WWIIHexV0/Rules/TheaterSystem.swift` / `FrontLineManager.swift` / `WarDeploymentManager.swift`
 5. `WWIIHexV0/Commands/WarDirective.swift` / `WarCommandExecutor.swift`
 6. `WWIIHexV0/Agents/ZoneCommanderAgent.swift` / `MockAICommander.swift`
+7. `md/prompt/anti生成/v0.5/anti/0.50_v0.5_marshal_implementation_record.md`
 
 **当前必须遵守：**
 - 不删 `HexCoord`，不把运行时战区推进退回 region 粒度。
@@ -327,10 +338,11 @@ md/
 - `Dynamic Theater State` / `hexToTheater` 是游戏战区层权威。
 - 前线 UI 和 AI target 选择必须基于动态 hex 邻接；历史测试 fixture / 语义文档也必须构造真实相邻 hex，不能只声明 region 邻接。
 - `ZoneDirective` 新字段必须保持 Codable 向后兼容。
+- 元帅层和未来统治者层不得绕过 `ZoneDirective -> WarCommandExecutor -> RuleEngine`。
+- 当前 v0.5 只模拟 LLM JSON 接口，不接真实模型；真实 LLM 接入必须保留 decoder 校验与 fallback。
 
 **轻量检查**（每轮先读 [`md/test/test.md`](md/test/test.md)，默认禁止 Xcode / XCTest / 模拟器 / 性能类测试）：
 ```bash
 rg -n "[[:blank:]]+$" AGENTS.md README.md update_log.md md/test/test.md md/flow/flow.md
-rg -n "默认先跑|默认 Probe|Probe -> Smoke|Stage Regression -> Full|代码改动按 .*Probe" AGENTS.md md/flow/flow.md
 ```
-如修改 JSON / project / scheme，再按 `md/test/test.md` 追加 `jq`、`plutil` 或 `xmllint`。未获人工授权时，不跑历史 Probe / Stage / Full。
+旧测试口径残留、JSON / project / scheme 检查按 `md/test/test.md` 追加执行。未获人工授权时，不跑历史 Probe / Stage / Full。

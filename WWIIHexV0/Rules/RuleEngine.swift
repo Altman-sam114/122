@@ -5,18 +5,19 @@ struct RuleEngine {
     private let executor = CommandExecutor()
 
     func execute(_ command: Command, in state: GameState) -> CommandResult {
-        let validation = validator.validate(command, in: state)
+        let preparedState = EconomyRules().bootstrapIfNeeded(state)
+        let validation = validator.validate(command, in: preparedState)
         guard validation.isValid else {
             let errorMessage = validation.errors.map(\.rawValue).joined(separator: ", ")
             return CommandResult(
                 command: command,
                 validation: validation,
-                state: state,
+                state: preparedState,
                 message: "Command rejected: \(errorMessage)."
             )
         }
 
-        let nextState = executor.execute(command, in: state)
+        let nextState = executor.execute(command, in: preparedState)
         return CommandResult(
             command: command,
             validation: validation,

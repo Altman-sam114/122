@@ -22,6 +22,8 @@ struct CommandExecutor {
             executeAllowRetreat(divisionId: divisionId, in: &nextState)
         case .resupply(let divisionId):
             executeResupply(divisionId: divisionId, in: &nextState)
+        case .queueProduction(let kind):
+            executeQueueProduction(kind: kind, in: &nextState)
         case .endTurn:
             executeEndTurn(in: &nextState)
         }
@@ -153,11 +155,17 @@ struct CommandExecutor {
         state.divisions[index].hasActed = true
     }
 
+    private func executeQueueProduction(kind: ProductionKind, in state: inout GameState) {
+        _ = EconomyRules().queueProduction(kind: kind, faction: state.activeFaction, in: &state)
+    }
+
     private func executeEndTurn(in state: inout GameState) {
         let supplyRules = SupplyRules()
         let victoryRules = VictoryRules()
+        let economyRules = EconomyRules()
 
         supplyRules.updateSupplyStates(in: &state)
+        economyRules.resolveFactionTurn(for: state.activeFaction, in: &state)
         supplyRules.advanceRetreats(in: &state)
         supplyRules.applyEncirclementAttrition(in: &state)
         victoryRules.updateVictoryState(in: &state)
@@ -173,6 +181,7 @@ struct CommandExecutor {
         }
 
         resetActionsForActiveFaction(in: &state)
+        state = StrategicStateBootstrapper().refreshRuntimeState(state)
         state.appendEvent("Turn advanced to \(state.turn), \(state.activeFaction.displayName) active.")
     }
 

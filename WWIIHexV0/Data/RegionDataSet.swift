@@ -21,6 +21,7 @@ struct RegionNodeDefinition: Codable, Equatable {
     let owner: Faction?
     let controller: Faction?
     let theaterId: TheaterId?
+    let assignedGeneralId: String?
     let terrain: BaseTerrain
     let neighbors: [RegionId]
     let displayHexes: [HexCoord]
@@ -36,6 +37,7 @@ struct RegionNodeDefinition: Codable, Equatable {
 
     enum CodingKeys: String, CodingKey {
         case id, name, owner, controller, theaterId, terrain, neighbors, displayHexes
+        case assignedGeneralId
         case representativeHex, city, infrastructure, supplyValue, factories
         case resources, coreOf, occupationState, isPassable
     }
@@ -46,6 +48,7 @@ struct RegionNodeDefinition: Codable, Equatable {
         owner: Faction?,
         controller: Faction?,
         theaterId: TheaterId? = nil,
+        assignedGeneralId: String? = nil,
         terrain: BaseTerrain,
         neighbors: [RegionId],
         displayHexes: [HexCoord],
@@ -64,6 +67,7 @@ struct RegionNodeDefinition: Codable, Equatable {
         self.owner = owner
         self.controller = controller
         self.theaterId = theaterId
+        self.assignedGeneralId = assignedGeneralId
         self.terrain = terrain
         self.neighbors = neighbors
         self.displayHexes = displayHexes
@@ -85,6 +89,7 @@ struct RegionNodeDefinition: Codable, Equatable {
         self.owner = try c.decodeIfPresent(Faction.self, forKey: .owner)
         self.controller = try c.decodeIfPresent(Faction.self, forKey: .controller)
         self.theaterId = try c.decodeIfPresent(TheaterId.self, forKey: .theaterId)
+        self.assignedGeneralId = try c.decodeIfPresent(String.self, forKey: .assignedGeneralId)
         self.terrain = try c.decode(BaseTerrain.self, forKey: .terrain)
         self.neighbors = try c.decode([RegionId].self, forKey: .neighbors)
         self.displayHexes = try c.decode([HexCoord].self, forKey: .displayHexes)
@@ -106,6 +111,7 @@ struct RegionNodeDefinition: Codable, Equatable {
         try c.encodeIfPresent(owner, forKey: .owner)
         try c.encodeIfPresent(controller, forKey: .controller)
         try c.encodeIfPresent(theaterId, forKey: .theaterId)
+        try c.encodeIfPresent(assignedGeneralId, forKey: .assignedGeneralId)
         try c.encode(terrain, forKey: .terrain)
         try c.encode(neighbors, forKey: .neighbors)
         try c.encode(displayHexes, forKey: .displayHexes)

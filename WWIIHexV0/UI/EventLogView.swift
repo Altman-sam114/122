@@ -10,29 +10,27 @@ struct EventLogView: View {
 
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 8) {
-                    let recentEntries = Array(entries.suffix(60).reversed())
-
                     if recentEntries.isEmpty {
                         Text("No events yet.")
                             .foregroundStyle(.secondary)
                     } else {
-                        ForEach(recentEntries) { entry in
+                        ForEach(recentEntries) { item in
                             VStack(alignment: .leading, spacing: 2) {
                                 HStack(spacing: 6) {
-                                    Text(category(for: entry).displayName)
-                                        .font(.caption2.weight(.semibold))
-                                        .foregroundStyle(category(for: entry).foregroundStyle)
+                                    Text(item.category.displayName)
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(item.category.foregroundStyle)
                                         .padding(.horizontal, 6)
                                         .padding(.vertical, 2)
-                                        .background(category(for: entry).backgroundStyle)
+                                        .background(item.category.backgroundStyle)
                                         .clipShape(RoundedRectangle(cornerRadius: 4))
 
-                                    Text(metadata(for: entry))
+                                    Text(metadata(for: item.entry))
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
                                 }
 
-                                Text(entry.message)
+                                Text(item.entry.message)
                                     .font(.body)
                                     .lineLimit(nil)
                                     .fixedSize(horizontal: false, vertical: true)
@@ -45,8 +43,15 @@ struct EventLogView: View {
             .frame(minHeight: 120)
         }
         .padding(12)
-        .background(Color(.systemBackground))
+        .background(PlatformStyles.systemBackground)
         .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
+    private var recentEntries: [LogDisplayEntry] {
+        entries
+            .suffix(60)
+            .reversed()
+            .map { LogDisplayEntry(entry: $0, category: LogDisplayCategory(entry: $0)) }
     }
 
     private func metadata(for entry: GameLogEntry) -> String {
@@ -57,9 +62,14 @@ struct EventLogView: View {
         }
         return "Turn \(entry.turn) - \(faction) - \(phase)"
     }
+}
 
-    private func category(for entry: GameLogEntry) -> LogDisplayCategory {
-        LogDisplayCategory(entry: entry)
+private struct LogDisplayEntry: Identifiable {
+    let entry: GameLogEntry
+    let category: LogDisplayCategory
+
+    var id: UUID {
+        entry.id
     }
 }
 
@@ -72,6 +82,7 @@ private enum LogDisplayCategory {
     case frontChange
     case theaterChange
     case regionOwnerChange
+    case diplomacy
     case event
 
     init(entry: GameLogEntry) {
@@ -99,6 +110,9 @@ private enum LogDisplayCategory {
             return
         case .regionOwnerChange:
             self = .regionOwnerChange
+            return
+        case .diplomacy:
+            self = .diplomacy
             return
         case .event:
             break
@@ -140,6 +154,8 @@ private enum LogDisplayCategory {
             return "Theater"
         case .regionOwnerChange:
             return "Region"
+        case .diplomacy:
+            return "Diplomacy"
         case .event:
             return "Event"
         }
@@ -163,6 +179,8 @@ private enum LogDisplayCategory {
             return .indigo
         case .regionOwnerChange:
             return .mint
+        case .diplomacy:
+            return .cyan
         case .event:
             return .secondary
         }

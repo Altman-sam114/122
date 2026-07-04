@@ -10,11 +10,14 @@ struct GameState: Codable, Equatable {
     var theaterState: TheaterState
     var frontLineState: FrontLineState
     var warDeploymentState: WarDeploymentState
+    var economyState: EconomyState
+    var diplomacyState: DiplomacyState
     var divisions: [Division]
     var victoryState: VictoryState
     var selectedUnitSummary: String?
     var eventLog: [GameLogEntry]
     var warDirectiveRecords: [WarDirectiveRecord]
+    var playerCommandState: PlayerCommandState
 
     init(
         scenarioId: String,
@@ -26,11 +29,14 @@ struct GameState: Codable, Equatable {
         theaterState: TheaterState = .empty,
         frontLineState: FrontLineState = .empty,
         warDeploymentState: WarDeploymentState = .empty,
+        economyState: EconomyState = .empty,
+        diplomacyState: DiplomacyState = .empty,
         divisions: [Division],
         victoryState: VictoryState,
         selectedUnitSummary: String?,
         eventLog: [GameLogEntry],
-        warDirectiveRecords: [WarDirectiveRecord] = []
+        warDirectiveRecords: [WarDirectiveRecord] = [],
+        playerCommandState: PlayerCommandState = .empty
     ) {
         self.scenarioId = scenarioId
         self.turn = turn
@@ -41,11 +47,14 @@ struct GameState: Codable, Equatable {
         self.theaterState = theaterState
         self.frontLineState = frontLineState
         self.warDeploymentState = warDeploymentState
+        self.economyState = economyState
+        self.diplomacyState = diplomacyState
         self.divisions = divisions
         self.victoryState = victoryState
         self.selectedUnitSummary = selectedUnitSummary
         self.eventLog = eventLog
         self.warDirectiveRecords = warDirectiveRecords
+        self.playerCommandState = playerCommandState
     }
 
     static func initial() -> GameState {
@@ -61,6 +70,8 @@ struct GameState: Codable, Equatable {
             theaterState: .empty,
             frontLineState: .empty,
             warDeploymentState: .empty,
+            economyState: .empty,
+            diplomacyState: DiplomacyState.initial(for: Faction.allCases, turn: 1),
             divisions: [
                 .panzer(
                     id: "ger_panzer_1",
@@ -134,11 +145,14 @@ struct GameState: Codable, Equatable {
         case theaterState
         case frontLineState
         case warDeploymentState
+        case economyState
+        case diplomacyState
         case divisions
         case victoryState
         case selectedUnitSummary
         case eventLog
         case warDirectiveRecords
+        case playerCommandState
     }
 
     init(from decoder: Decoder) throws {
@@ -153,11 +167,14 @@ struct GameState: Codable, Equatable {
             theaterState: try container.decodeIfPresent(TheaterState.self, forKey: .theaterState) ?? .empty,
             frontLineState: try container.decodeIfPresent(FrontLineState.self, forKey: .frontLineState) ?? .empty,
             warDeploymentState: try container.decodeIfPresent(WarDeploymentState.self, forKey: .warDeploymentState) ?? .empty,
+            economyState: try container.decodeIfPresent(EconomyState.self, forKey: .economyState) ?? .empty,
+            diplomacyState: try container.decodeIfPresent(DiplomacyState.self, forKey: .diplomacyState) ?? .empty,
             divisions: try container.decode([Division].self, forKey: .divisions),
             victoryState: try container.decode(VictoryState.self, forKey: .victoryState),
             selectedUnitSummary: try container.decodeIfPresent(String.self, forKey: .selectedUnitSummary),
             eventLog: try container.decode([GameLogEntry].self, forKey: .eventLog),
-            warDirectiveRecords: try container.decodeIfPresent([WarDirectiveRecord].self, forKey: .warDirectiveRecords) ?? []
+            warDirectiveRecords: try container.decodeIfPresent([WarDirectiveRecord].self, forKey: .warDirectiveRecords) ?? [],
+            playerCommandState: try container.decodeIfPresent(PlayerCommandState.self, forKey: .playerCommandState) ?? .empty
         )
     }
 

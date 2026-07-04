@@ -196,6 +196,7 @@ enum MapEditorExporter {
                 owner: draft.owner,
                 controller: draft.controller,
                 theaterId: document.regionTheaterAssignments[draft.id],
+                assignedGeneralId: draft.assignedGeneralId,
                 terrain: terrain,
                 neighbors: (neighborMap[draft.id] ?? []).sorted { $0.rawValue < $1.rawValue },
                 displayHexes: regionHexes.map(\.coord).sortedByMapOrder(),

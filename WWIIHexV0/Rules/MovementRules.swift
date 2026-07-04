@@ -80,7 +80,9 @@ struct MovementRules {
                     continue
                 }
 
-                let nextCost = current.cost + movementCost(from: fromTile, to: toTile, direction: direction)
+                let nextCost = current.cost
+                    + movementCost(from: fromTile, to: toTile, direction: direction)
+                    + tacticalTerrainPenalty(for: division, entering: toTile)
                 guard nextCost <= movementLimit else {
                     continue
                 }
@@ -98,5 +100,13 @@ struct MovementRules {
             paths[coord] = MovementPath(coords: bestPath[coord] ?? [division.coord, coord], cost: cost)
         }
         return paths
+    }
+
+    private func tacticalTerrainPenalty(for division: Division, entering tile: HexTile) -> Int {
+        guard division.isArmor else {
+            return 0
+        }
+
+        return tile.baseTerrain.armorSlowdownCost
     }
 }
