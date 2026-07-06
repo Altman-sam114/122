@@ -204,7 +204,7 @@ final class AppContainer: ObservableObject {
             diplomacyState: DiplomacyState.initial(for: [scenario.defaultPlayerFaction], turn: 1),
             divisions: [],
             victoryConditions: [],
-            victoryState: VictoryState(),
+            victoryState: .ongoing,
             selectedUnitSummary: nil,
             eventLog: [
                 GameLogEntry(
