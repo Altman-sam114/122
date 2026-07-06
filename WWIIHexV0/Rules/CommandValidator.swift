@@ -29,6 +29,10 @@ struct CommandValidator {
             return unitValidation
         }
 
+        guard division.morale > Division.brokenMoraleThreshold else {
+            return .invalid(.moraleBroken)
+        }
+
         guard state.map.contains(destination) else {
             return .invalid(.destinationOutOfBounds)
         }
@@ -60,11 +64,15 @@ struct CommandValidator {
             return unitValidation
         }
 
+        guard attacker.morale > Division.brokenMoraleThreshold else {
+            return .invalid(.moraleBroken)
+        }
+
         guard let target = state.division(id: targetId) else {
             return .invalid(.targetNotFound)
         }
 
-        guard target.faction != attacker.faction else {
+        guard state.diplomacyState.isHostile(attacker.faction, to: target.faction) else {
             return .invalid(.invalidTargetFaction)
         }
 
@@ -136,13 +144,6 @@ struct CommandValidator {
     }
 
     private func phaseAllowsCommands(in state: GameState) -> Bool {
-        switch state.phase {
-        case .germanAI:
-            return state.activeFaction == .germany
-        case .alliedPlayer:
-            return state.activeFaction == .allies
-        case .resolution:
-            return false
-        }
+        state.phase.allowsCommands && !state.activeFaction.isNeutral
     }
 }

@@ -69,7 +69,14 @@ flowchart TD
 flowchart TD
     ME["地图编辑器<br/>MapEditor<br/>用来画格子、省份、战区、初始部队"]:::editor
     JSON["游戏数据 JSON<br/>ScenarioDefinition + RegionDataSet<br/>保存地图、单位、省份、初始战区"]:::data
-    DL["数据加载器<br/>DataLoader.loadGameState<br/>把 JSON 变成可运行 GameState"]:::loader
+    SCAT["场景目录<br/>ScenarioCatalog<br/>defaultPlayable 指向 Waterloo 1815 数据切片；Ardennes 作为 legacy 可选剧本保留；defaultPlayerFaction 为 France"]:::loader
+    SETUP["新局/继续/设置<br/>NewGameSetupView<br/>New Campaign 默认显示 Waterloo、玩家 faction、Opening Turn；Archived Campaigns 才显示 legacy 新局和旧 legacy 存档详情；AppContainer 按玩家控制权归一拿战 phase；Continue 可选 Slot 1/2/3，可编辑 slot label，坏快照/未知 scenario/将领目录失败显示原因并可 Clear Saved；继续成功后走现有 AI eligibility gate；Status 显示操作结果；Settings 调整 observer、map layer、dispatch detail、AI pace、AI control、guide notes、text size"]:::input
+    SAVE["本地试玩快照<br/>GameSaveSnapshot + GameSaveSlot + UserDefaults<br/>schemaVersion 1，保存 scenario / player faction / GameState；3 个本地 slot，Slot 1 兼容旧单槽 key；slot label 独立保存；加载区分 missing / loaded / unavailable；恢复后 Staff 模式含 observer + Staff 可续跑 AI，非 observer Manual 需由 End Orders 推进，observer Manual 只读"]:::data
+    PSET["试玩偏好<br/>PlaytestSessionSettings + UserDefaults<br/>observer / map layer / replay detail / AI pace / AI control / guide notes / reduce motion / text size；坏设置重置为标准设置并提示"]:::data
+    REPLAY["试玩回放详细度<br/>ReplayDetailLevel<br/>Concise 保留 Staff Summary / Issue Preview / Recent Dispatch Timeline；控制日志条数、directive limit、metadata、context、明细卡和 raw JSON"]:::ui
+    GUIDE["非阻塞短引导与 AI 反馈<br/>PlaytestGuideCue + playerOrdersStatus + aiNoActionFeedback + aiDiagnosticFeedback<br/>首次 formation / artillery / cavalry / end orders 写入 Staff note；玩家无可行动、AI 无有效命令、record-level issue 和 dispatch paused 给可读提示"]:::ui
+    DL["数据加载器<br/>DataLoader.loadGameState<br/>校验 initial phase / faction / terrain / victory；把 JSON 变成可运行 GameState"]:::loader
+    TERR["运行时地形规则<br/>TerrainRuleSet / GameState.terrainRules<br/>Waterloo 移动/战斗读取 napoleonic_terrain_rules；旧状态 fallback legacy"]:::rules
     GS["运行时总状态<br/>GameState<br/>一局游戏所有状态都在这里"]:::state
 
     HEX["战术权威：六角格和单位位置<br/>HexTile.controller + Division.coord<br/>谁占哪个格、单位在哪，先看这里"]:::authority
@@ -80,8 +87,11 @@ flowchart TD
     FRONT["前线层<br/>FrontLine / FrontSegment<br/>按双方动态战区的真实相邻 hex 生成"]:::derived
     DEPLOY["部署层<br/>WarDeploymentState<br/>用 hexToFrontZone 把单位分成前线/纵深/驻军"]:::derived
     ECO["经济总账<br/>EconomyState / EconomyRules<br/>收入、维护费、生产队列、自动补员"]:::economy
+    DIP["外交敌我关系<br/>DiplomacyState<br/>hostile / friendly 查询统一补给、前线、部署和 AI 口径"]:::rules
     PLAYER["玩家输入<br/>点击地图、移动、攻击、结束回合"]:::input
-    AI["AI 元帅系统<br/>MarshalAgent + TheaterDirective JSON<br/>先做大战役级规划"]:::input
+    AI["AI 战略上游<br/>RulerAgent + MarshalAgent<br/>先定国家姿态，再做大战役级规划"]:::input
+    POST["战略姿态 JSON<br/>StrategicPostureEnvelope<br/>offensive / defensive / coalition / stabilize"]:::command
+    PDEC["战略姿态解码<br/>StrategicPostureDecoder<br/>校验 schema / issuer / turn / faction / zone / region"]:::command
     DEC["元帅 JSON 解码<br/>TheaterDirectiveDecoder<br/>提取 fenced JSON、校验 id 与 schema"]:::command
     COMP["元帅意图编译<br/>TheaterDirectiveCompiler<br/>把 TheaterDirective 降级成 ZoneDirective"]:::command
     ZD["战争指令<br/>ZoneDirective<br/>战区级 attack/defend 意图"]:::command
@@ -93,7 +103,13 @@ flowchart TD
     UI["地图和面板显示<br/>SpriteKit / SwiftUI Overlay<br/>显示 hex、省份、初始战区、动态战区、前线、部署"]:::ui
     LOG["日志和复盘记录<br/>EventLog / WarDirectiveRecord / AgentDecisionRecord / RulerDecisionRecord<br/>用于 UI 展示和后续调试"]:::ui
 
-    ME --> JSON --> DL --> GS
+    ME --> JSON --> SCAT --> SETUP --> DL --> GS
+    SETUP --> SAVE --> GS
+    PSET --> SETUP
+    SETUP --> PSET
+    SETUP --> REPLAY --> UI
+    REPLAY --> LOG
+    GS -.Save Current.-> SAVE
     GS --> HEX
     HEX --> REGION
     HEX --> ECO
@@ -104,11 +120,15 @@ flowchart TD
     HEX --> H2T
     H2T --> FRONT --> DEPLOY
     GS --> ECO
+    GS --> DIP
+    GS --> TERR
 
     PLAYER --> CMD
-    AI --> DEC --> COMP --> ZD --> WCE --> CMD
+    PLAYER --> GUIDE --> LOG
+    AI --> POST --> PDEC --> DEC --> COMP --> ZD --> WCE --> CMD
     CMD --> RE --> HEX
     RE --> ECO
+    TERR --> RE
     RE --> SYNC
     SYNC --> REGION
     SYNC --> H2T
@@ -194,20 +214,22 @@ flowchart TD
 
 ## 3. v0.8 经济、生产与补员链路
 
-这张图看 v0.8 初级经济。经济总账是 faction 级资源池，但收入和部署资格仍回到真实 hex 控制和 region 聚合；生产命令仍走 `RuleEngine`，UI 不直接改 `GameState`。
+这张图看 v0.8 初级经济和 v3.5 起步的拿战后勤展示兼容层。经济总账是 faction 级资源池，但收入和部署资格仍回到真实 hex 控制和 region 聚合；生产命令仍走 `RuleEngine`，UI 不直接改 `GameState`。v3.5 还新增最小 delayed reinforcement schedule、`Division` 级 morale / fatigue / ammunition 战术消耗和 Waterloo 专用胜负节奏；仍不新增完整 ammunition / horses 经济账本字段。
 
 ```mermaid
 flowchart TD
     BOOT["经济启动补账<br/>EconomyRules.bootstrapIfNeeded<br/>旧状态缺 economyState 时从地图推导账本"]:::economy
     HEX["真实控制权<br/>HexTile.controller<br/>经济收入必须有己方控制 hex 证据"]:::authority
     REGION["战略聚合<br/>RegionNode<br/>city / factories / infrastructure / supplyValue"]:::derived
-    INCOME["收入计算<br/>EconomyRules.income<br/>manpower / industry / supplies"]:::economy
+    INCOME["收入计算<br/>EconomyRules.income<br/>manpower / industry / supplies<br/>拿战展示为 recruits / ammunition-horses / supplies"]:::economy
     LEDGER["阵营总账<br/>FactionEconomyLedger<br/>库存、上回合收入、维护费、补员消耗、队列"]:::economy
 
-    UI["经济面板<br/>EconomyPanelView<br/>展示资源和生产按钮"]:::ui
+    UI["经济/后勤面板<br/>EconomyPanelView<br/>legacy 显示 Production<br/>拿战显示 Reserves"]:::ui
     QUEUE["生产命令<br/>Command.queueProduction<br/>玩家/未来 AI 共用底层命令"]:::command
     VALIDATE["生产校验<br/>CommandValidator.validateProduction<br/>检查 phase 与资源是否足够"]:::rules
-    PAY["预付成本并入队<br/>EconomyRules.queueProduction<br/>扣 MP/IC/SUP，追加 ProductionOrder"]:::economy
+    PAY["预付成本并入队<br/>EconomyRules.queueProduction<br/>扣底层三资源<br/>按 faction 显示成本摘要"]:::economy
+    RESTCMD["休整命令<br/>Command.resupply<br/>玩家/AI 都经 RuleEngine"]:::command
+    ACTION["行动命令<br/>Command.move / attack / hold<br/>玩家/AI 都经 RuleEngine"]:::command
 
     END["结束当前阵营回合<br/>Command.endTurn<br/>CommandExecutor.executeEndTurn"]:::command
     SUPPLY["补给状态刷新<br/>SupplyRules.updateSupplyStates"]:::rules
@@ -215,23 +237,35 @@ flowchart TD
     SHORT{"补给库存够吗?"}:::decision
     LOW["战略补给短缺<br/>supplied 单位降为 lowSupply"]:::rules
     REINF["自动补员<br/>安全后方 supplied 非敌邻单位<br/>每回合最多 +2 strength"]:::rules
-    PROD["推进生产队列<br/>remainingTurns - 1<br/>ready 后部署或发补给箱"]:::economy
+    PROD["推进生产/预备队队列<br/>remainingTurns - 1<br/>legacy 部署旧单位<br/>拿战部署拿战 component formation"]:::economy
+    SCHED["延迟增援表<br/>ReinforcementState.pending<br/>按 turn / objective trigger 到期"]:::economy
+    ENTRY["安全入口检查<br/>entryCoord 2 格内<br/>己控、空置、非敌邻"]:::rules
     DEPLOY{"有合格后方部署点吗?"}:::decision
     SPAWN["部署新单位<br/>首都/城镇/工厂/高基建/高补给或 supply source<br/>必须己控、空置、非敌邻"]:::rules
+    RSPAWN["增援到场<br/>append Division<br/>mark arrived<br/>写 reinforce 日志"]:::rules
     WAIT["保留订单<br/>本回合无安全 hex，等待后续回合"]:::economy
+    RWAIT["保留增援<br/>无安全入口时等待后续回合"]:::economy
+    REST["战术休整<br/>SupplyRules.applyResupplyRest<br/>恢复 strength / morale / fatigue / ammunition"]:::rules
+    WEAR["行动消耗<br/>move / attack / counterattack / hold<br/>改变 Division morale / fatigue / ammunition"]:::rules
+    VICTORY["胜负节奏<br/>VictoryRules<br/>legacy Ardennes / Waterloo runtime JSON conditions"]:::rules
     NEXT["切换阵营并刷新运行时层<br/>StrategicStateBootstrapper.refreshRuntimeState"]:::rules
 
     BOOT --> LEDGER
     HEX --> REGION --> INCOME --> LEDGER
     UI --> QUEUE --> VALIDATE --> PAY --> LEDGER
+    UI --> RESTCMD --> REST
+    UI --> ACTION --> WEAR
     END --> SUPPLY --> RESOLVE
     LEDGER --> RESOLVE
     RESOLVE --> SHORT
     SHORT -->|不足| LOW --> REINF
     SHORT -->|足够| REINF
     REINF --> PROD --> DEPLOY
-    DEPLOY -->|有| SPAWN --> NEXT
-    DEPLOY -->|没有| WAIT --> NEXT
+    DEPLOY -->|有| SPAWN --> VICTORY
+    DEPLOY -->|没有| WAIT --> VICTORY
+    REINF --> SCHED --> ENTRY
+    ENTRY -->|安全| RSPAWN --> VICTORY --> NEXT
+    ENTRY -->|不安全| RWAIT --> VICTORY
     RESOLVE --> LEDGER
 
     WARN["边界<br/>经济系统不能直接占 hex<br/>也不能把中立/空控制 region 收入算给某阵营"]:::warn
@@ -248,20 +282,23 @@ flowchart TD
     classDef warn fill:#ffedd5,stroke:#f97316,color:#431407
 ```
 
-## 4. AI / 元帅决策链：AI 怎么下命令
+## 4. AI / 统治者-元帅决策链：AI 怎么下命令
 
-这张图看 v0.5 分支默认 AI 主路径。AI 不直接控制单位，也不直接改地图；元帅先读取降维战场摘要，模拟 LLM 输出 `TheaterDirectiveEnvelope` JSON，经 decoder 校验和 compiler 降级后，形成战区级 `DirectiveEnvelope`。`WarCommandExecutor` 再把这些战术翻译成底层 `Command`，最后交给 `RuleEngine`。
+这张图看 v0.5/v3.4 当前默认 AI 主路径。AI 不直接控制单位，也不直接改地图；统治者先生成 `StrategicPostureEnvelope`，元帅再读取降维战场摘要和 posture，模拟 LLM 输出 `TheaterDirectiveEnvelope` JSON，经 decoder 校验和 compiler 降级后，形成战区级 `DirectiveEnvelope`。`WarCommandExecutor` 再把这些战术翻译成底层 `Command`，最后交给 `RuleEngine`。
 
-当前 v0.5 的默认 AI 主线是 `MarshalAgent -> TheaterDirective JSON -> TheaterDirectiveDecoder -> TheaterDirectiveCompiler -> ZoneDirective -> WarCommandExecutor -> RuleEngine`。旧 v0.37 `TheaterCommanderPool -> ZoneCommanderAgent` 作为 fallback 和显式 `.zoneDirective` 路径保留。统治者层只作为后续上游预留，当前不在主链路调用。旧 Agent D 管线仍保留，但默认不走。
+当前默认 AI 主线是 `RulerAgent -> StrategicPostureEnvelope -> StrategicPostureDecoder -> MarshalAgent -> TheaterDirective JSON -> TheaterDirectiveDecoder -> TheaterDirectiveCompiler -> ZoneDirective -> WarCommandExecutor -> RuleEngine`。旧 v0.37 `TheaterCommanderPool -> ZoneCommanderAgent` 作为 fallback 和显式 `.zoneDirective` 路径保留。敌我摘要、攻击校验、ZOC、占领、前线邻接、部署分类和战区压力已开始读取 `DiplomacyState.isHostile/isFriendly`。统治者层只写战略姿态和审计记录，不直接执行命令。旧 Agent D 管线仍保留，但默认不走。
 
 ```mermaid
 flowchart TD
-    START["触发 AI 行动<br/>AppContainer.advanceOrRunAI / runAIIfNeeded<br/>玩家点下一回合，或命令后轮到 AI"]:::input
-    CHECK{"当前阵营该由 AI 控制吗?<br/>德军 AI 阶段一定可跑；盟军只有观察者模式才跑"}:::decision
-    STOP["不运行 AI<br/>等待玩家操作或阶段切换"]:::stop
+    START["触发 AI 行动<br/>AppContainer.advanceOrRunAI / runAIIfNeeded<br/>玩家点下一回合、命令后轮到 AI，或继续存档恢复后"]:::input
+    CHECK{"当前 activeFaction 该自动触发 AI 吗?<br/>phase.allowsCommands<br/>AI Control = Staff<br/>非 observer 下不是 playerFaction<br/>observer 可让玩家方也自动跑"}:::decision
+    STOP["不运行 AI<br/>Manual 非 observer 可用 End Orders 推进当前 activeFaction<br/>observer Manual 保持只读"]:::stop
     REFRESH["行动前刷新运行时战略层<br/>StrategicStateBootstrapper.refreshRuntimeState<br/>避免 AI 读到旧前线/旧部署"]:::rules
     TM["AI 回合编排器<br/>TurnManager.runAITurn<br/>默认 pipelineMode = marshalDirective"]:::rules
-    SUM["战场摘要<br/>MarshalBattlefieldSummarizer<br/>只给元帅 front/deploy/目标/补给摘要，不给全量 hex"]:::ai
+    DIPREL["敌我/友军关系查询<br/>DiplomacyState.isHostile / isFriendly<br/>给补给、目标、ZOC、占领和前线统一口径"]:::rules
+    RULER["统治者战略姿态<br/>RulerAgent.resolvePosture<br/>生成 StrategicPostureEnvelope 和 RulerDecisionRecord"]:::ai
+    SPDEC["姿态解码校验<br/>StrategicPostureDecoder<br/>schema / issuer / turn / faction / zone / region"]:::command
+    SUM["战场摘要<br/>MarshalBattlefieldSummarizer<br/>读取 front/deploy/目标/补给/士气/疲劳/弹药摘要<br/>敌我判断来自 DiplomacyState"]:::ai
     LLM["模拟 LLM 客户端<br/>SimulatedMarshalLLMClient<br/>输出 fenced JSON，不接真实网络或模型"]:::ai
     DEC["元帅 JSON 解码器<br/>TheaterDirectiveDecoder<br/>提取 JSON、解码、校验 schema/zone/region/tactic"]:::command
     COMP["元帅意图编译器<br/>TheaterDirectiveCompiler<br/>TheaterDirective -> ZoneDirective<br/>传递 focus/convergence/coordinated 参数"]:::command
@@ -270,12 +307,12 @@ flowchart TD
     WCE["指令执行器<br/>WarCommandExecutor.execute<br/>按战术 profile 选择单位、目标和 fallback"]:::command
     BOTTOM["具体单位命令<br/>Command<br/>attack / move / hold / allowRetreat"]:::command
     RE["统一规则校验执行<br/>RuleEngine<br/>AI 和玩家共用同一套规则"]:::rules
-    RECORD["指令复盘记录<br/>WarDirectiveRecord<br/>记录 tactic、target、结果、拒绝原因"]:::ui
+    RECORD["指令复盘记录<br/>WarDirectiveRecord<br/>记录 tactic、target、结果、diagnostics<br/>AgentPanel 拒绝原因预览来源"]:::ui
     END["AI 自动结束回合<br/>RuleEngine.execute(.endTurn)<br/>切换 activeFaction / phase"]:::rules
 
     START --> CHECK
     CHECK -->|否| STOP
-    CHECK -->|是| REFRESH --> TM --> SUM --> LLM --> DEC --> COMP --> ENV
+    CHECK -->|是| REFRESH --> TM --> DIPREL --> RULER --> SPDEC --> SUM --> LLM --> DEC --> COMP --> ENV
     ENV --> TACTIC --> WCE --> BOTTOM --> RE --> RECORD --> END
 
     FALLBACK["Fallback 将军池<br/>TheaterCommanderPool + ZoneCommanderAgent<br/>元帅 JSON 无效或某 zone 无指令时使用"]:::ai
@@ -315,8 +352,8 @@ flowchart TD
     SCEN["场景 JSON<br/>ScenarioDefinition<br/>保存 hex 地形、控制方、补给、目标、初始单位"]:::data
     REG["省份 JSON<br/>RegionDataSet<br/>保存 hexToRegion、省份、边、初始 theaterId"]:::data
     NEI["自动推导省份邻接<br/>真实 hex 邻接 -> Region.neighbors / RegionEdge<br/>避免手写邻接出错"]:::derived
-    BRIDGE["默认资源桥<br/>MapEditorGameResourceBridge<br/>读取或覆盖项目默认地图资源"]:::loader
-    FILES["项目默认数据文件<br/>WWIIHexV0/Data<br/>ardennes_v0_scenario.json + ardennes_v02_regions.json"]:::data
+    BRIDGE["Legacy 阿登资源桥<br/>MapEditorGameResourceBridge<br/>读取或覆盖 legacy Ardennes 地图资源"]:::loader
+    FILES["MapEditor legacy 默认资源<br/>WWIIHexV0/Data<br/>ardennes_v0_scenario.json + ardennes_v02_regions.json<br/>不等于当前 playable 默认入口"]:::data
     LOAD["游戏启动加载<br/>DataLoader.loadGameState<br/>DEBUG 下优先读源码 JSON"]:::loader
     MAP["地图状态<br/>MapState<br/>tiles + hexToRegion + RegionGraph"]:::state
     THEATER["战区状态<br/>TheaterState<br/>捕获 initialSnapshot，并 seed hexToTheater"]:::state
@@ -359,7 +396,7 @@ flowchart TD
 flowchart TD
     TARGET["macOS 主游戏 target<br/>WWIIHexV0Mac<br/>独立于 iOS target 和 MapEditorMac"]:::platform
     APP["macOS App 入口<br/>WWIIHexV0MacApp<br/>WindowGroup + Game 菜单"]:::platform
-    BOOT["游戏容器<br/>AppContainer.bootstrap<br/>加载默认 JSON 并初始化规则/AI"]:::state
+    BOOT["游戏容器<br/>AppContainer.bootstrap<br/>优先 Waterloo；失败时同步降级 Ardennes legacy 并提示；初始化规则/AI"]:::state
     ROOT["主游戏界面<br/>RootGameView<br/>HUD、图层、Info、棋盘"]:::ui
     BRIDGE["macOS SpriteKit 桥<br/>BoardSceneView + BoardEventSKView<br/>NSViewRepresentable 承载 SKView"]:::platform
     SCENE["棋盘场景<br/>BoardScene<br/>鼠标点击、拖拽、滚轮/触控板缩放"]:::ui
@@ -393,10 +430,10 @@ flowchart TD
 ```mermaid
 flowchart TD
     STATE["运行时状态<br/>GameState + EventLog + WarDirectiveRecord"]:::state
-    ROOT["主界面<br/>RootGameView<br/>HUD + Info tabs"]:::ui
-    LOG["日志面板<br/>EventLogView<br/>最近 60 条 LogDisplayEntry"]:::ui
-    AIUI["AI 面板<br/>AgentPanelView<br/>raw JSON + command results + zone directives"]:::ui
-    BOARD["地图场景<br/>BoardScene<br/>缓存 unit display hex 后排序绘制"]:::ui
+    ROOT["主界面<br/>RootGameView + AppContainer interactionLog + CommandPanelView<br/>HUD + map layers + Info tabs<br/>拿战 faction 显示 Sector / Formation / Corps Order / Order result / Command Dispatch<br/>lastCommandMessage 走 NapoleonicMessageSanitizer"]:::ui
+    LOG["日志面板<br/>EventLogView<br/>最近 60 条 LogDisplayEntry<br/>拿战事件显示 active wing / Contact sector / Withdrawal<br/>Standard / Concise 复用 NapoleonicMessageSanitizer 净化 raw AI、MockAI、legacy pipeline、validation rawValue 和 WWII faction 名"]:::ui
+    AIUI["AI 面板<br/>AgentPanelView<br/>Staff Summary + Issue Preview + Recent Dispatch Timeline + command results + zone directives + raw JSON<br/>拿战显示 Command Dispatch / Staff Summary / Dispatch Issues / Corps Directives<br/>Standard / Concise 复用 NapoleonicMessageSanitizer 净化 raw id / diagnostic；Full 保留 raw JSON 审计"]:::ui
+    BOARD["地图场景<br/>BoardScene + UnitNode<br/>缓存 unit display hex 后排序绘制<br/>拿战单位棋子显示 formation symbols<br/>pending 增援入口显示 RES marker<br/>目标点显示村庄/据点/道路 marker<br/>WarDirectiveRecord 显示 recent replay 线与 tactic marker"]:::ui
     MARSHAL["模拟元帅 / MockAI<br/>MarshalAgent + SimulatedMarshalLLMClient"]:::ai
     ZD["战区指令<br/>ZoneDirective<br/>tactic / focus / intensity"]:::command
     WCE["执行解释<br/>WarCommandExecutor<br/>infiltration 限制默认投入"]:::command
@@ -441,13 +478,13 @@ flowchart TD
     TAP["玩家地图点击<br/>RootGameView / BoardScene<br/>选单位、选 region、选目标"]:::input
     MICRO["全微操<br/>AppContainer.submit(Command)<br/>move / attack / hold / resupply"]:::command
     LOCK["微操锁<br/>PlayerCommandState.micromanagedDivisionIds<br/>本回合玩家亲控单位"]:::state
-    GENUI["将军面板<br/>GeneralCommandPanelView<br/>Hold Line / Attack Region"]:::ui
+    GENUI["将军面板<br/>GeneralCommandPanelView<br/>legacy Hold Line / Attack Region<br/>拿战 Corps Command / Hold Contact Line / Attack Sector"]:::ui
     ZD["玩家战区指令<br/>ZoneDirective<br/>defense holdLine 或 attack selected region"]:::command
     WCE["执行器<br/>WarCommandExecutor.execute(excluding lockedIds)<br/>跳过已微操单位"]:::command
     RE["规则权威<br/>RuleEngine<br/>校验并修改 GameState"]:::rules
     RECORD["记录<br/>WarDirectiveRecord + PlayerPlannedOperation<br/>AI 面板、日志、计划线共用"]:::ui
     BOARD["视觉反馈<br/>BoardScene<br/>进攻箭头、防御圆环、微操单位金色圈"]:::ui
-    PROFILE["将军档案<br/>GeneralProfileView<br/>履历、技能、忠诚、满意度、辖下部队"]:::ui
+    PROFILE["将军档案<br/>GeneralProfileView<br/>legacy General Profile<br/>拿战 Commander Profile / Assigned Formations"]:::ui
 
     GJSON --> DL --> DISP
     RJSON --> DISP --> FZ --> POOL

@@ -13,14 +13,31 @@ struct WWIIHexV0MacApp: App {
         .windowStyle(.titleBar)
         .defaultSize(width: 1440, height: 900)
         .commands {
-            CommandMenu("Game") {
-                Button("End Turn", action: container.advanceOrRunAI)
+            CommandMenu(commandMenuTitle) {
+                Button(endOrdersTitle, action: container.advanceOrRunAI)
                     .keyboardShortcut(.return, modifiers: [.command])
+                    .disabled(!container.canAdvanceOrders)
 
-                Button("New Game", action: container.resetGame)
+                Button(newCampaignTitle, action: container.resetGame)
                     .keyboardShortcut("n", modifiers: [.command, .shift])
             }
         }
+    }
+
+    private var usesNapoleonicVocabulary: Bool {
+        container.gameState.activeFaction.usesNapoleonicLogisticsVocabulary
+    }
+
+    private var commandMenuTitle: String {
+        usesNapoleonicVocabulary ? "Orders" : "Game"
+    }
+
+    private var endOrdersTitle: String {
+        usesNapoleonicVocabulary ? "End Orders" : "End Turn"
+    }
+
+    private var newCampaignTitle: String {
+        usesNapoleonicVocabulary ? "New Campaign" : "New Game"
     }
 }
 #endif

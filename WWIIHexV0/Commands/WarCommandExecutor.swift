@@ -792,7 +792,7 @@ struct WarCommandExecutor {
 
         return BreakthroughRegionSortKey(
             enemyStrength: enemyStrength,
-            terrainCost: region.terrain.movementCost,
+            terrainCost: state.terrainRules.movementCost(for: region.terrain),
             roadPenalty: roadPenalty,
             valueScore: valueScore,
             id: regionId.rawValue
@@ -806,7 +806,7 @@ struct WarCommandExecutor {
     ) -> Int {
         state.divisions
             .filter { division in
-                guard division.faction != faction,
+                guard state.diplomacyState.isHostile(faction, to: division.faction),
                       !division.isDestroyed else {
                     return false
                 }
@@ -845,8 +845,8 @@ struct WarCommandExecutor {
         }
 
         return candidateHexes.sorted {
-            let lhsDefense = state.map.tile(at: $0)?.baseTerrain.defenseBonus ?? 0
-            let rhsDefense = state.map.tile(at: $1)?.baseTerrain.defenseBonus ?? 0
+            let lhsDefense = state.map.tile(at: $0).map { state.terrainRules.defenseBonus(for: $0.baseTerrain) } ?? 0
+            let rhsDefense = state.map.tile(at: $1).map { state.terrainRules.defenseBonus(for: $0.baseTerrain) } ?? 0
             if lhsDefense != rhsDefense {
                 return lhsDefense > rhsDefense
             }
@@ -868,9 +868,7 @@ struct WarCommandExecutor {
     }
 
     private func isMobile(_ division: Division) -> Bool {
-        division.isArmor
-            || division.movement >= 5
-            || division.components.contains { $0.type == .motorizedInfantry && $0.weight >= 0.25 }
+        division.isMobileFormation
     }
 
     private func enemyRegions(
@@ -881,7 +879,7 @@ struct WarCommandExecutor {
     ) -> [RegionId] {
         var regionIds: [RegionId] = []
         for segment in segments.sorted(by: { $0.regionId.rawValue < $1.regionId.rawValue }) {
-            if state.map.regions[segment.regionId]?.controller != zone.faction ||
+            if regionIsHostileControlled(segment.regionId, to: zone.faction, state: state) ||
                 hasEnemyPresence(in: segment.regionId, zone: zone, state: state) {
                 regionIds.append(segment.regionId)
             }
@@ -892,7 +890,7 @@ struct WarCommandExecutor {
                     targetZoneId: targetZoneId,
                     state: state
                 ),
-                    (state.map.regions[neighborId]?.controller != zone.faction ||
+                    (regionIsHostileControlled(neighborId, to: zone.faction, state: state) ||
                      hasEnemyPresence(in: neighborId, zone: zone, state: state)) else {
                     return false
                 }
@@ -933,7 +931,7 @@ struct WarCommandExecutor {
         state: GameState
     ) -> Bool {
         state.divisions.contains { division in
-            guard division.faction != zone.faction,
+            guard state.diplomacyState.isHostile(zone.faction, to: division.faction),
                   !division.isDestroyed else {
                 return false
             }
@@ -950,7 +948,7 @@ struct WarCommandExecutor {
         let regionSet = Set(regionIds)
         return state.divisions
             .filter { target in
-                guard target.faction != zone.faction,
+                guard state.diplomacyState.isHostile(zone.faction, to: target.faction),
                       !target.isDestroyed,
                       let targetRegion = target.location(in: state.map),
                       regionSet.contains(targetRegion) else {
@@ -991,8 +989,12 @@ struct WarCommandExecutor {
                 if lhsIsCurrent != rhsIsCurrent {
                     return !lhsIsCurrent
                 }
-                let lhsEnemyControlled = state.map.tile(at: $0)?.controller == division.faction.opponent
-                let rhsEnemyControlled = state.map.tile(at: $1)?.controller == division.faction.opponent
+                let lhsEnemyControlled = state.map.tile(at: $0)?.controller.map {
+                    state.diplomacyState.isHostile(division.faction, to: $0)
+                } ?? false
+                let rhsEnemyControlled = state.map.tile(at: $1)?.controller.map {
+                    state.diplomacyState.isHostile(division.faction, to: $0)
+                } ?? false
                 if lhsEnemyControlled != rhsEnemyControlled {
                     return lhsEnemyControlled
                 }
@@ -1011,11 +1013,24 @@ struct WarCommandExecutor {
             return destination
         }
 
-        if let current = candidates.first(where: { $0 == division.coord && state.map.tile(at: $0)?.controller != division.faction }) {
+        if let current = candidates.first(where: { coord in
+            guard coord == division.coord,
+                  let controller = state.map.tile(at: coord)?.controller else {
+                return false
+            }
+            return state.diplomacyState.isHostile(division.faction, to: controller)
+        }) {
             return current
         }
 
         return approachDestination(toward: regionTargets, for: division, state: state)
+    }
+
+    private func regionIsHostileControlled(_ regionId: RegionId, to faction: Faction, state: GameState) -> Bool {
+        guard let controller = state.map.regions[regionId]?.controller else {
+            return false
+        }
+        return state.diplomacyState.isHostile(faction, to: controller)
     }
 
     private func approachDestination(
@@ -1031,8 +1046,12 @@ struct WarCommandExecutor {
                 let lhsDistance = nearestDistance(from: $0, to: targets)
                 let rhsDistance = nearestDistance(from: $1, to: targets)
                 if lhsDistance == rhsDistance {
-                    let lhsEnemyControlled = state.map.tile(at: $0)?.controller == division.faction.opponent
-                    let rhsEnemyControlled = state.map.tile(at: $1)?.controller == division.faction.opponent
+                    let lhsEnemyControlled = state.map.tile(at: $0)?.controller.map {
+                        state.diplomacyState.isHostile(division.faction, to: $0)
+                    } ?? false
+                    let rhsEnemyControlled = state.map.tile(at: $1)?.controller.map {
+                        state.diplomacyState.isHostile(division.faction, to: $0)
+                    } ?? false
                     if lhsEnemyControlled != rhsEnemyControlled {
                         return lhsEnemyControlled
                     }
@@ -1086,9 +1105,11 @@ struct WarCommandExecutor {
         results.append(result)
 
         if !result.succeeded {
-            let rejectionReasons = result.validation.errors.map(\.rawValue).joined(separator: ", ")
+            let rejectionReasons = result.validation.errors
+                .map { $0.displayName(for: state.activeFaction) }
+                .joined(separator: ", ")
             state.appendEvent(
-                "Directive command rejected: \(rejectionReasons) for \(command.displayName).",
+                "Corps directive order refused: \(rejectionReasons) for \(command.displayName(for: state.activeFaction)).",
                 category: .frontChange,
                 relatedRecordId: relatedRecordId
             )
@@ -1141,6 +1162,7 @@ struct WarCommandExecutor {
                 state: state.theaterState,
                 map: state.map,
                 divisions: state.divisions,
+                diplomacyState: state.diplomacyState,
                 turn: state.turn,
                 force: true
             )
@@ -1149,6 +1171,7 @@ struct WarCommandExecutor {
                 map: state.map,
                 theaterState: state.theaterState,
                 divisions: state.divisions,
+                diplomacyState: state.diplomacyState,
                 turn: state.turn,
                 events: syncResult.affectedRegionIds.map { regionId in
                     changedRegionIds.contains(regionId)
@@ -1163,6 +1186,7 @@ struct WarCommandExecutor {
                 state: state.warDeploymentState,
                 map: state.map,
                 divisions: state.divisions,
+                diplomacyState: state.diplomacyState,
                 turn: state.turn,
                 events: deploymentEvents
             )
@@ -1201,13 +1225,15 @@ struct WarCommandExecutor {
             return nil
         }
 
+        let advancingFaction = state.warDeploymentState.frontZones[advancingZoneId]?.faction ?? state.activeFaction
         let expansion = TheaterSystem().expandDynamicTheater(
             state: state.theaterState,
             map: state.map,
             divisions: state.divisions,
             breakthroughHex: hex,
             advancingTheaterId: advancingTheaterId,
-            faction: state.warDeploymentState.frontZones[advancingZoneId]?.faction ?? .germany
+            faction: advancingFaction,
+            diplomacyState: state.diplomacyState
         )
         state.theaterState = expansion.state
 
@@ -1220,16 +1246,17 @@ struct WarCommandExecutor {
                 state: state.warDeploymentState,
                 map: state.map,
                 divisions: state.divisions,
+                diplomacyState: state.diplomacyState,
                 turn: state.turn
             )
         }
         state.appendEvent(
-            "Hex \(hex.q),\(hex.r) reassigned to dynamic theater \(advancingTheaterId.rawValue).",
+            strategicAdvanceMessage(hex: hex, theaterId: advancingTheaterId, faction: advancingFaction),
             category: .theaterChange,
             relatedRecordId: relatedRecordId
         )
         state.appendEvent(
-            "Front changed around region \(regionId.rawValue).",
+            frontChangedMessage(regionId: regionId, faction: advancingFaction),
             category: .frontChange,
             relatedRecordId: relatedRecordId
         )
@@ -1249,14 +1276,30 @@ struct WarCommandExecutor {
         if let destinationZoneId,
            destinationZoneId != advancingZoneId,
            let destinationFaction = state.warDeploymentState.frontZones[destinationZoneId]?.faction {
-            return destinationFaction != advancingFaction
+            return !state.diplomacyState.isFriendly(advancingFaction, to: destinationFaction)
         }
 
         if let controller = state.map.tile(at: hex)?.controller {
-            return controller != advancingFaction
+            return !state.diplomacyState.isFriendly(advancingFaction, to: controller)
         }
 
         return false
+    }
+
+    private func strategicAdvanceMessage(hex: HexCoord, theaterId: TheaterId, faction: Faction) -> String {
+        if faction.usesNapoleonicLogisticsVocabulary {
+            return "Hex \(hex.q),\(hex.r) reassigned to active wing \(theaterId.rawValue)."
+        }
+
+        return "Hex \(hex.q),\(hex.r) reassigned to dynamic theater \(theaterId.rawValue)."
+    }
+
+    private func frontChangedMessage(regionId: RegionId, faction: Faction) -> String {
+        if faction.usesNapoleonicLogisticsVocabulary {
+            return "Contact changed around sector \(regionId.rawValue)."
+        }
+
+        return "Front changed around region \(regionId.rawValue)."
     }
 
     private func actingDivisionId(for command: Command) -> String? {

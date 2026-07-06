@@ -20,7 +20,7 @@ struct RegionCommandValidator {
             guard let target = state.division(id: targetDivisionId) else {
                 return .invalid(.targetNotFound)
             }
-            guard target.faction != attacker.faction else {
+            guard state.diplomacyState.isHostile(attacker.faction, to: target.faction) else {
                 return .invalid(.invalidTargetFaction)
             }
             if let targetRegionId {
@@ -61,4 +61,3 @@ struct RegionCommandValidator {
         return .valid
     }
 }
-

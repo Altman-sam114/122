@@ -13,9 +13,9 @@ struct CombatRules {
             return 0
         }
 
-        var bonus = defenderTile.baseTerrain.defenseBonus
+        var bonus = state.terrainRules.defenseBonus(for: defenderTile.baseTerrain)
         if hasRiverBetween(attacker.coord, defender.coord, in: state) {
-            bonus += 2
+            bonus += state.terrainRules.riverCrossingExtraCost
         }
         return bonus
     }
@@ -56,7 +56,7 @@ struct CombatRules {
 
     func effectiveAttack(for attacker: Division, against defender: Division, in state: GameState) -> Int {
         guard let defenderTile = state.map.tile(at: defender.coord) else {
-            return attacker.attack
+            return ammunitionAdjustedAttack(for: attacker, baseAttack: attacker.attack)
         }
 
         var multiplier = 1.0
@@ -66,8 +66,18 @@ struct CombatRules {
         if attacker.isArmor && defenderTile.baseTerrain.armorSlowdownCost > 0 {
             multiplier -= 0.1
         }
+        if attacker.isCavalry {
+            multiplier += cavalryAttackAdjustment(attackingInto: defenderTile.baseTerrain, defender: defender)
+        }
+        if attacker.isArtillery {
+            multiplier += artilleryAttackAdjustment(
+                attackingInto: defenderTile.baseTerrain,
+                distance: attacker.coord.distance(to: defender.coord)
+            )
+        }
 
-        return max(1, Int((Double(attacker.attack) * multiplier).rounded()))
+        let baseAttack = max(1, Int((Double(attacker.attack) * multiplier).rounded()))
+        return ammunitionAdjustedAttack(for: attacker, baseAttack: baseAttack)
     }
 
     func attackDamage(attacker: Division, defender: Division, in state: GameState) -> CombatDamage {
@@ -115,6 +125,54 @@ struct CombatRules {
 
     private func clamp(_ value: Int, min minValue: Int, max maxValue: Int) -> Int {
         Swift.max(minValue, Swift.min(maxValue, value))
+    }
+
+    private func ammunitionAdjustedAttack(for attacker: Division, baseAttack: Int) -> Int {
+        guard attacker.isAmmunitionSensitive else {
+            return baseAttack
+        }
+
+        if attacker.ammunition == 0 {
+            return max(1, Int((Double(baseAttack) * 0.55).rounded()))
+        }
+
+        if attacker.isLowAmmunition {
+            return max(1, Int((Double(baseAttack) * 0.80).rounded()))
+        }
+
+        return baseAttack
+    }
+
+    private func cavalryAttackAdjustment(attackingInto terrain: BaseTerrain, defender: Division) -> Double {
+        switch terrain {
+        case .plain:
+            return defender.isInfantryHeavy && defender.retreatMode == .hold ? -0.10 : 0.15
+        case .hill:
+            return -0.10
+        case .forest,
+             .mountain,
+             .city,
+             .fortress:
+            return -0.25
+        }
+    }
+
+    private func artilleryAttackAdjustment(attackingInto terrain: BaseTerrain, distance: Int) -> Double {
+        guard distance > 1 else {
+            return 0
+        }
+
+        switch terrain {
+        case .plain:
+            return 0.10
+        case .hill:
+            return 0.05
+        case .forest,
+             .mountain,
+             .city,
+             .fortress:
+            return -0.05
+        }
     }
 
     private func lossRatio(strengthDamage: Int, defender: Division) -> Double {

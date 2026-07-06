@@ -5,6 +5,7 @@ struct GeneralProfileView: View {
     let assignment: GeneralAssignment?
     let zone: FrontZone?
     let assignedDivisions: [Division]
+    let activeFaction: Faction
     let hqUnderAttack: Bool
     let onClose: () -> Void
 
@@ -27,10 +28,11 @@ struct GeneralProfileView: View {
         .background(.ultraThinMaterial)
         .safeAreaInset(edge: .top) {
             HStack {
-                Text("General Profile")
+                Text(label("General Profile"))
                     .font(.headline)
+                    .foregroundStyle(activeFaction.usesNapoleonicLogisticsVocabulary ? NapoleonicDesignTokens.imperialBlue : .primary)
                 Spacer()
-                Button("Close", systemImage: "xmark", action: onClose)
+                Button(label("Close"), systemImage: "xmark", action: onClose)
                     .buttonStyle(.bordered)
             }
             .padding(12)
@@ -64,24 +66,24 @@ struct GeneralProfileView: View {
 
     private var biographyBlock: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Biography")
+            Text(label("Biography"))
                 .font(.headline)
             Text(general.biography)
                 .font(.body)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
-            LabeledContent("Command Style") {
+            LabeledContent(label("Command Style")) {
                 Text(styleLabel(general.commandStyle))
             }
             if let zone {
-                LabeledContent("Assigned Zone") {
+                LabeledContent(label("Assigned Zone")) {
                     Text(zone.name)
                         .multilineTextAlignment(.trailing)
                 }
             }
             if hqUnderAttack {
-                Label("HQ region contested", systemImage: "exclamationmark.triangle.fill")
+                Label(label("HQ region contested"), systemImage: "exclamationmark.triangle.fill")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.orange)
             }
@@ -90,11 +92,11 @@ struct GeneralProfileView: View {
 
     private var statusBlock: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Relationship")
+            Text(label("Relationship"))
                 .font(.headline)
-            metricBar(title: "Loyalty", value: assignment?.loyalty ?? general.baseLoyalty)
-            metricBar(title: "Satisfaction", value: assignment?.satisfaction ?? general.baseSatisfaction)
-            LabeledContent("Player Interventions") {
+            metricBar(title: label("Loyalty"), value: assignment?.loyalty ?? general.baseLoyalty)
+            metricBar(title: label("Satisfaction"), value: assignment?.satisfaction ?? general.baseSatisfaction)
+            LabeledContent(label("Player Interventions")) {
                 Text("\(assignment?.interventionCount ?? 0)")
             }
         }
@@ -102,10 +104,10 @@ struct GeneralProfileView: View {
 
     private var skillsBlock: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Skills")
+            Text(label("Skills"))
                 .font(.headline)
             if general.skills.isEmpty {
-                Text("No explicit skills configured.")
+                Text(label("No explicit skills configured."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } else {
@@ -126,10 +128,10 @@ struct GeneralProfileView: View {
 
     private var assignedUnitsBlock: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Assigned Units")
+            Text(label("Assigned Units"))
                 .font(.headline)
             if assignedDivisions.isEmpty {
-                Text("No active divisions assigned.")
+                Text(label("No active divisions assigned."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } else {
@@ -152,8 +154,51 @@ struct GeneralProfileView: View {
             }
             .font(.caption)
             ProgressView(value: Double(value), total: 100)
-                .tint(value >= 65 ? .green : value >= 40 ? .orange : .red)
+                .tint(metricTint(for: value))
         }
+    }
+
+    private func label(_ legacy: String) -> String {
+        guard activeFaction.usesNapoleonicLogisticsVocabulary else {
+            return legacy
+        }
+
+        switch legacy {
+        case "General Profile":
+            return "Commander Profile"
+        case "Biography":
+            return "Service Record"
+        case "Command Style":
+            return "Command Temperament"
+        case "Assigned Zone":
+            return "Assigned Corps Sector"
+        case "HQ region contested":
+            return "Headquarters sector contested"
+        case "Relationship":
+            return "Command Relationship"
+        case "Satisfaction":
+            return "Confidence"
+        case "Player Interventions":
+            return "Command Interventions"
+        case "Skills":
+            return "Staff Qualities"
+        case "No explicit skills configured.":
+            return "No staff qualities configured."
+        case "Assigned Units":
+            return "Assigned Formations"
+        case "No active divisions assigned.":
+            return "No active formations assigned."
+        default:
+            return legacy
+        }
+    }
+
+    private func metricTint(for value: Int) -> Color {
+        if activeFaction.usesNapoleonicLogisticsVocabulary {
+            return value >= 65 ? NapoleonicDesignTokens.steady : value >= 40 ? NapoleonicDesignTokens.warning : NapoleonicDesignTokens.critical
+        }
+
+        return value >= 65 ? .green : value >= 40 ? .orange : .red
     }
 
     private var initials: String {

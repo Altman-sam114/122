@@ -110,6 +110,25 @@ enum ProductionKind: String, Codable, Equatable, CaseIterable, Identifiable {
         }
     }
 
+    func displayName(for faction: Faction) -> String {
+        guard faction.usesNapoleonicLogisticsVocabulary else {
+            return displayName
+        }
+
+        switch self {
+        case .infantryDivision:
+            return "Line Infantry Reserve"
+        case .panzerDivision:
+            return "Guard Detachment"
+        case .motorizedDivision:
+            return "Cavalry Reserve"
+        case .artilleryDivision:
+            return "Artillery Battery"
+        case .supplyStockpile:
+            return "Supply Wagon"
+        }
+    }
+
     var cost: EconomyResources {
         switch self {
         case .infantryDivision:
@@ -185,6 +204,42 @@ struct ProductionOrder: Identifiable, Codable, Equatable {
     }
 }
 
+struct ScheduledReinforcement: Identifiable, Codable, Equatable {
+    let id: String
+    let arrivalTurn: Int
+    let entryCoord: HexCoord
+    let division: Division
+    let triggerObjectiveId: String?
+    let triggerController: Faction?
+}
+
+struct ReinforcementState: Codable, Equatable {
+    var pending: [ScheduledReinforcement]
+    var arrivedIds: [String]
+
+    init(
+        pending: [ScheduledReinforcement] = [],
+        arrivedIds: [String] = []
+    ) {
+        self.pending = pending
+        self.arrivedIds = arrivedIds
+    }
+
+    static var empty: ReinforcementState {
+        ReinforcementState()
+    }
+}
+
+extension EconomyResources {
+    func summary(for faction: Faction) -> String {
+        guard faction.usesNapoleonicLogisticsVocabulary else {
+            return "MP \(manpower), IC \(industry), SUP \(supplies)"
+        }
+
+        return "Recruits \(manpower), Ammunition/Horses \(industry), Supplies \(supplies)"
+    }
+}
+
 struct FactionEconomyLedger: Codable, Equatable {
     let faction: Faction
     var stockpile: EconomyResources
@@ -240,10 +295,10 @@ struct EconomyState: Codable, Equatable {
 
 extension Division {
     var isInfantryHeavy: Bool {
-        components.contains { $0.type == .infantry && $0.weight >= 0.50 }
+        components.contains { $0.type.isInfantryLike && $0.weight >= 0.50 }
     }
 
     var isMechanizedHeavy: Bool {
-        isArmor || components.contains { $0.type == .motorizedInfantry && $0.weight >= 0.50 }
+        isArmor || components.contains { $0.type.isMobileLike && $0.weight >= 0.50 }
     }
 }

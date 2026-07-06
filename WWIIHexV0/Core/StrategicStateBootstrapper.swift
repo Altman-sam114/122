@@ -4,7 +4,7 @@ struct StrategicStateBootstrapper {
     func bootstrapIfNeeded(_ state: GameState) -> GameState {
         var next = EconomyRules().bootstrapIfNeeded(state)
         if next.diplomacyState.countries.isEmpty {
-            next.diplomacyState = DiplomacyState.initial(for: Faction.allCases, turn: next.turn)
+            next.diplomacyState = DiplomacyState.initial(for: next.participatingFactions, turn: next.turn)
             next.appendEvent("Diplomacy state bootstrapped with countries, blocs, and initial war relations.")
         }
 
@@ -16,10 +16,11 @@ struct StrategicStateBootstrapper {
             next.theaterState = TheaterSystem().makeInitialFixedTheaters(
                 map: next.map,
                 divisions: next.divisions,
+                diplomacyState: next.diplomacyState,
                 turn: next.turn
             )
             next.appendEvent(
-                "Theater state bootstrapped from region data.",
+                "Command wing state bootstrapped from region data.",
                 category: .theaterChange,
                 relatedRecordId: nil
             )
@@ -34,10 +35,11 @@ struct StrategicStateBootstrapper {
                 map: next.map,
                 theaterState: next.theaterState,
                 divisions: next.divisions,
+                diplomacyState: next.diplomacyState,
                 turn: next.turn
             )
             next.appendEvent(
-                "Front line state bootstrapped from theater data.",
+                "Contact line state bootstrapped from command wing data.",
                 category: .frontChange,
                 relatedRecordId: nil
             )
@@ -48,10 +50,11 @@ struct StrategicStateBootstrapper {
                 from: next.theaterState,
                 map: next.map,
                 divisions: next.divisions,
+                diplomacyState: next.diplomacyState,
                 turn: next.turn
             )
             next.appendEvent(
-                "FrontZone deployment state bootstrapped from theater data.",
+                "Corps sector deployment state bootstrapped from command wing data.",
                 category: .frontChange,
                 relatedRecordId: nil
             )
@@ -71,6 +74,7 @@ struct StrategicStateBootstrapper {
             state: next.theaterState,
             map: next.map,
             divisions: next.divisions,
+            diplomacyState: next.diplomacyState,
             turn: next.turn,
             force: true
         )
@@ -81,12 +85,14 @@ struct StrategicStateBootstrapper {
             map: next.map,
             theaterState: next.theaterState,
             divisions: next.divisions,
+            diplomacyState: next.diplomacyState,
             turn: next.turn
         )
         let rebuiltDeployment = WarDeploymentState.bootstrapFrontZones(
             from: next.theaterState,
             map: next.map,
             divisions: next.divisions,
+            diplomacyState: next.diplomacyState,
             turn: next.turn
         )
         next.warDeploymentState = rebuiltDeployment.preservingGeneralAssignments(from: state.warDeploymentState)

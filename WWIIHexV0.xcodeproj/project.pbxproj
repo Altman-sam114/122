@@ -9,6 +9,11 @@
 /* Begin PBXBuildFile section */
 		010000000000000000000001 /* WWIIHexV0App.swift in Sources */ = {isa = PBXBuildFile; fileRef = 020000000000000000000001 /* WWIIHexV0App.swift */; };
 		010000000000000000000002 /* AppContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 020000000000000000000002 /* AppContainer.swift */; };
+		010000000000000000000156 /* GameSaveSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 020000000000000000000155 /* GameSaveSnapshot.swift */; };
+		010000000000000000000157 /* ReplayDetailLevel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 020000000000000000000157 /* ReplayDetailLevel.swift */; };
+		010000000000000000000158 /* PlaytestGuideCue.swift in Sources */ = {isa = PBXBuildFile; fileRef = 020000000000000000000158 /* PlaytestGuideCue.swift */; };
+		010000000000000000000159 /* AICommandPace.swift in Sources */ = {isa = PBXBuildFile; fileRef = 020000000000000000000159 /* AICommandPace.swift */; };
+		01000000000000000000015A /* PlaytestSessionSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02000000000000000000015A /* PlaytestSessionSettings.swift */; };
 		010000000000000000000003 /* GameState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 020000000000000000000003 /* GameState.swift */; };
 		010000000000000000000004 /* Faction.swift in Sources */ = {isa = PBXBuildFile; fileRef = 020000000000000000000004 /* Faction.swift */; };
 		010000000000000000000005 /* GamePhase.swift in Sources */ = {isa = PBXBuildFile; fileRef = 020000000000000000000005 /* GamePhase.swift */; };
@@ -108,6 +113,12 @@
 		010000000000000000000063 /* InfoPanelToggle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 020000000000000000000065 /* InfoPanelToggle.swift */; };
 		010000000000000000000064 /* UnitTooltipView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 020000000000000000000066 /* UnitTooltipView.swift */; };
 		010000000000000000000065 /* NewGameButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 020000000000000000000067 /* NewGameButton.swift */; };
+		010000000000000000000133 /* NewGameSetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02000000000000000000009E /* NewGameSetupView.swift */; };
+		010000000000000000000151 /* napoleonic_generals.json in Resources */ = {isa = PBXBuildFile; fileRef = 020000000000000000000150 /* napoleonic_generals.json */; };
+		010000000000000000000152 /* napoleonic_terrain_rules.json in Resources */ = {isa = PBXBuildFile; fileRef = 020000000000000000000151 /* napoleonic_terrain_rules.json */; };
+		010000000000000000000153 /* napoleonic_unit_templates.json in Resources */ = {isa = PBXBuildFile; fileRef = 020000000000000000000152 /* napoleonic_unit_templates.json */; };
+		010000000000000000000154 /* waterloo_1815_regions.json in Resources */ = {isa = PBXBuildFile; fileRef = 020000000000000000000153 /* waterloo_1815_regions.json */; };
+		010000000000000000000155 /* waterloo_1815_scenario.json in Resources */ = {isa = PBXBuildFile; fileRef = 020000000000000000000154 /* waterloo_1815_scenario.json */; };
 		010000000000000000000066 /* Theater.swift in Sources */ = {isa = PBXBuildFile; fileRef = 020000000000000000000068 /* Theater.swift */; };
 		010000000000000000000067 /* TheaterSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 020000000000000000000069 /* TheaterSystem.swift */; };
 		010000000000000000000068 /* TheaterSystemTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02000000000000000000006A /* TheaterSystemTests.swift */; };
@@ -247,6 +258,11 @@
 		0C000000000000000000000B /* PlatformStyles.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C0000000000000000000009 /* PlatformStyles.swift */; };
 		0C0000000000000000000100 /* WWIIHexV0MacApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C0000000000000000000008 /* WWIIHexV0MacApp.swift */; };
 		0C0000000000000000000101 /* AppContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 020000000000000000000002 /* AppContainer.swift */; };
+		0C0000000000000000000176 /* GameSaveSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 020000000000000000000155 /* GameSaveSnapshot.swift */; };
+		0C0000000000000000000177 /* ReplayDetailLevel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 020000000000000000000157 /* ReplayDetailLevel.swift */; };
+		0C0000000000000000000178 /* PlaytestGuideCue.swift in Sources */ = {isa = PBXBuildFile; fileRef = 020000000000000000000158 /* PlaytestGuideCue.swift */; };
+		0C0000000000000000000179 /* AICommandPace.swift in Sources */ = {isa = PBXBuildFile; fileRef = 020000000000000000000159 /* AICommandPace.swift */; };
+		0C000000000000000000017A /* PlaytestSessionSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02000000000000000000015A /* PlaytestSessionSettings.swift */; };
 		0C0000000000000000000102 /* GameState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 020000000000000000000003 /* GameState.swift */; };
 		0C0000000000000000000103 /* Faction.swift in Sources */ = {isa = PBXBuildFile; fileRef = 020000000000000000000004 /* Faction.swift */; };
 		0C0000000000000000000104 /* GamePhase.swift in Sources */ = {isa = PBXBuildFile; fileRef = 020000000000000000000005 /* GamePhase.swift */; };
@@ -282,6 +298,7 @@
 		0C0000000000000000000122 /* InfoPanelToggle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 020000000000000000000065 /* InfoPanelToggle.swift */; };
 		0C0000000000000000000123 /* UnitTooltipView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 020000000000000000000066 /* UnitTooltipView.swift */; };
 		0C0000000000000000000124 /* NewGameButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 020000000000000000000067 /* NewGameButton.swift */; };
+		0C0000000000000000000170 /* NewGameSetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02000000000000000000009E /* NewGameSetupView.swift */; };
 		0C0000000000000000000125 /* EventLogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02000000000000000000000A /* EventLogView.swift */; };
 		0C0000000000000000000126 /* CommandPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 020000000000000000000030 /* CommandPanelView.swift */; };
 		0C0000000000000000000127 /* AgentPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 020000000000000000000031 /* AgentPanelView.swift */; };
@@ -349,6 +366,11 @@
 		0C0000000000000000000165 /* unit_templates.json in Resources */ = {isa = PBXBuildFile; fileRef = 020000000000000000000017 /* unit_templates.json */; };
 		0C0000000000000000000166 /* general_agents.json in Resources */ = {isa = PBXBuildFile; fileRef = 020000000000000000000018 /* general_agents.json */; };
 		0C0000000000000000000167 /* ardennes_v02_regions.json in Resources */ = {isa = PBXBuildFile; fileRef = 020000000000000000000044 /* ardennes_v02_regions.json */; };
+		0C0000000000000000000171 /* napoleonic_generals.json in Resources */ = {isa = PBXBuildFile; fileRef = 020000000000000000000150 /* napoleonic_generals.json */; };
+		0C0000000000000000000172 /* napoleonic_terrain_rules.json in Resources */ = {isa = PBXBuildFile; fileRef = 020000000000000000000151 /* napoleonic_terrain_rules.json */; };
+		0C0000000000000000000173 /* napoleonic_unit_templates.json in Resources */ = {isa = PBXBuildFile; fileRef = 020000000000000000000152 /* napoleonic_unit_templates.json */; };
+		0C0000000000000000000174 /* waterloo_1815_regions.json in Resources */ = {isa = PBXBuildFile; fileRef = 020000000000000000000153 /* waterloo_1815_regions.json */; };
+		0C0000000000000000000175 /* waterloo_1815_scenario.json in Resources */ = {isa = PBXBuildFile; fileRef = 020000000000000000000154 /* waterloo_1815_scenario.json */; };
 		0D0000000000000000000101 /* GeneralRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D0000000000000000000001 /* GeneralRegistry.swift */; };
 		0D0000000000000000000102 /* RulerAgent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D0000000000000000000002 /* RulerAgent.swift */; };
 		0D0000000000000000000103 /* DiplomacyState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D0000000000000000000003 /* DiplomacyState.swift */; };
@@ -402,6 +424,11 @@
 /* Begin PBXFileReference section */
 		020000000000000000000001 /* WWIIHexV0App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WWIIHexV0App.swift; sourceTree = "<group>"; };
 		020000000000000000000002 /* AppContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppContainer.swift; sourceTree = "<group>"; };
+		020000000000000000000155 /* GameSaveSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameSaveSnapshot.swift; sourceTree = "<group>"; };
+		020000000000000000000157 /* ReplayDetailLevel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplayDetailLevel.swift; sourceTree = "<group>"; };
+		020000000000000000000158 /* PlaytestGuideCue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaytestGuideCue.swift; sourceTree = "<group>"; };
+		020000000000000000000159 /* AICommandPace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AICommandPace.swift; sourceTree = "<group>"; };
+		02000000000000000000015A /* PlaytestSessionSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaytestSessionSettings.swift; sourceTree = "<group>"; };
 		020000000000000000000003 /* GameState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameState.swift; sourceTree = "<group>"; };
 		020000000000000000000004 /* Faction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Faction.swift; sourceTree = "<group>"; };
 		020000000000000000000005 /* GamePhase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GamePhase.swift; sourceTree = "<group>"; };
@@ -503,6 +530,7 @@
 		020000000000000000000065 /* InfoPanelToggle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InfoPanelToggle.swift; sourceTree = "<group>"; };
 		020000000000000000000066 /* UnitTooltipView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnitTooltipView.swift; sourceTree = "<group>"; };
 		020000000000000000000067 /* NewGameButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewGameButton.swift; sourceTree = "<group>"; };
+		02000000000000000000009E /* NewGameSetupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewGameSetupView.swift; sourceTree = "<group>"; };
 		020000000000000000000068 /* Theater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theater.swift; sourceTree = "<group>"; };
 		020000000000000000000069 /* TheaterSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TheaterSystem.swift; sourceTree = "<group>"; };
 		02000000000000000000006A /* TheaterSystemTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TheaterSystemTests.swift; sourceTree = "<group>"; };
@@ -573,6 +601,11 @@
 		0D0000000000000000000008 /* EconomyPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EconomyPanelView.swift; sourceTree = "<group>"; };
 		0D0000000000000000000009 /* DiplomacyPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiplomacyPanelView.swift; sourceTree = "<group>"; };
 		0D000000000000000000000A /* generals.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = generals.json; sourceTree = "<group>"; };
+		020000000000000000000150 /* napoleonic_generals.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = napoleonic_generals.json; sourceTree = "<group>"; };
+		020000000000000000000151 /* napoleonic_terrain_rules.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = napoleonic_terrain_rules.json; sourceTree = "<group>"; };
+		020000000000000000000152 /* napoleonic_unit_templates.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = napoleonic_unit_templates.json; sourceTree = "<group>"; };
+		020000000000000000000153 /* waterloo_1815_regions.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = waterloo_1815_regions.json; sourceTree = "<group>"; };
+		020000000000000000000154 /* waterloo_1815_scenario.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = waterloo_1815_scenario.json; sourceTree = "<group>"; };
 		0D000000000000000000000B /* GeneralCommandPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeneralCommandPanelView.swift; sourceTree = "<group>"; };
 		0D000000000000000000000C /* GeneralProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeneralProfileView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -649,6 +682,11 @@
 				020000000000000000000001 /* WWIIHexV0App.swift */,
 				0C0000000000000000000008 /* WWIIHexV0MacApp.swift */,
 				020000000000000000000002 /* AppContainer.swift */,
+				020000000000000000000155 /* GameSaveSnapshot.swift */,
+				020000000000000000000157 /* ReplayDetailLevel.swift */,
+				020000000000000000000158 /* PlaytestGuideCue.swift */,
+				020000000000000000000159 /* AICommandPace.swift */,
+				02000000000000000000015A /* PlaytestSessionSettings.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -705,6 +743,7 @@
 				020000000000000000000065 /* InfoPanelToggle.swift */,
 				020000000000000000000066 /* UnitTooltipView.swift */,
 				020000000000000000000067 /* NewGameButton.swift */,
+				02000000000000000000009E /* NewGameSetupView.swift */,
 				02000000000000000000000A /* EventLogView.swift */,
 				020000000000000000000030 /* CommandPanelView.swift */,
 				0D000000000000000000000B /* GeneralCommandPanelView.swift */,
@@ -809,6 +848,11 @@
 				020000000000000000000017 /* unit_templates.json */,
 				020000000000000000000018 /* general_agents.json */,
 				0D000000000000000000000A /* generals.json */,
+				020000000000000000000150 /* napoleonic_generals.json */,
+				020000000000000000000151 /* napoleonic_terrain_rules.json */,
+				020000000000000000000152 /* napoleonic_unit_templates.json */,
+				020000000000000000000153 /* waterloo_1815_regions.json */,
+				020000000000000000000154 /* waterloo_1815_scenario.json */,
 				020000000000000000000043 /* RegionDataSet.swift */,
 				020000000000000000000044 /* ardennes_v02_regions.json */,
 			);
@@ -1061,6 +1105,11 @@
 				010000000000000000000016 /* general_agents.json in Resources */,
 				0D000000000000000000010A /* generals.json in Resources */,
 				010000000000000000000042 /* ardennes_v02_regions.json in Resources */,
+				010000000000000000000151 /* napoleonic_generals.json in Resources */,
+				010000000000000000000152 /* napoleonic_terrain_rules.json in Resources */,
+				010000000000000000000153 /* napoleonic_unit_templates.json in Resources */,
+				010000000000000000000154 /* waterloo_1815_regions.json in Resources */,
+				010000000000000000000155 /* waterloo_1815_scenario.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1095,6 +1144,11 @@
 				0C0000000000000000000166 /* general_agents.json in Resources */,
 				0D000000000000000000030A /* generals.json in Resources */,
 				0C0000000000000000000167 /* ardennes_v02_regions.json in Resources */,
+				0C0000000000000000000171 /* napoleonic_generals.json in Resources */,
+				0C0000000000000000000172 /* napoleonic_terrain_rules.json in Resources */,
+				0C0000000000000000000173 /* napoleonic_unit_templates.json in Resources */,
+				0C0000000000000000000174 /* waterloo_1815_regions.json in Resources */,
+				0C0000000000000000000175 /* waterloo_1815_scenario.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1107,6 +1161,11 @@
 			files = (
 				010000000000000000000001 /* WWIIHexV0App.swift in Sources */,
 				010000000000000000000002 /* AppContainer.swift in Sources */,
+				010000000000000000000156 /* GameSaveSnapshot.swift in Sources */,
+				010000000000000000000157 /* ReplayDetailLevel.swift in Sources */,
+				010000000000000000000158 /* PlaytestGuideCue.swift in Sources */,
+				010000000000000000000159 /* AICommandPace.swift in Sources */,
+				01000000000000000000015A /* PlaytestSessionSettings.swift in Sources */,
 				010000000000000000000003 /* GameState.swift in Sources */,
 				010000000000000000000004 /* Faction.swift in Sources */,
 				010000000000000000000005 /* GamePhase.swift in Sources */,
@@ -1153,6 +1212,7 @@
 				010000000000000000000063 /* InfoPanelToggle.swift in Sources */,
 				010000000000000000000064 /* UnitTooltipView.swift in Sources */,
 				010000000000000000000065 /* NewGameButton.swift in Sources */,
+				010000000000000000000133 /* NewGameSetupView.swift in Sources */,
 				01000000000000000000000A /* EventLogView.swift in Sources */,
 				01000000000000000000002E /* CommandPanelView.swift in Sources */,
 				01000000000000000000002F /* AgentPanelView.swift in Sources */,
@@ -1386,6 +1446,11 @@
 			files = (
 				0C0000000000000000000100 /* WWIIHexV0MacApp.swift in Sources */,
 				0C0000000000000000000101 /* AppContainer.swift in Sources */,
+				0C0000000000000000000176 /* GameSaveSnapshot.swift in Sources */,
+				0C0000000000000000000177 /* ReplayDetailLevel.swift in Sources */,
+				0C0000000000000000000178 /* PlaytestGuideCue.swift in Sources */,
+				0C0000000000000000000179 /* AICommandPace.swift in Sources */,
+				0C000000000000000000017A /* PlaytestSessionSettings.swift in Sources */,
 				0C0000000000000000000102 /* GameState.swift in Sources */,
 				0C0000000000000000000103 /* Faction.swift in Sources */,
 				0C0000000000000000000104 /* GamePhase.swift in Sources */,
@@ -1432,6 +1497,7 @@
 				0C0000000000000000000122 /* InfoPanelToggle.swift in Sources */,
 				0C0000000000000000000123 /* UnitTooltipView.swift in Sources */,
 				0C0000000000000000000124 /* NewGameButton.swift in Sources */,
+				0C0000000000000000000170 /* NewGameSetupView.swift in Sources */,
 				0C0000000000000000000125 /* EventLogView.swift in Sources */,
 				0C0000000000000000000126 /* CommandPanelView.swift in Sources */,
 				0C0000000000000000000127 /* AgentPanelView.swift in Sources */,
@@ -1636,7 +1702,7 @@
 				DEVELOPMENT_TEAM = C9YV46L3GA;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "WWII Hex V0";
+					INFOPLIST_KEY_CFBundleDisplayName = "Waterloo Command";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.games";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -1667,7 +1733,7 @@
 				DEVELOPMENT_TEAM = C9YV46L3GA;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "WWII Hex V0";
+					INFOPLIST_KEY_CFBundleDisplayName = "Waterloo Command";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.games";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -1847,7 +1913,7 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "WWII Hex V1.1 Mac";
+					INFOPLIST_KEY_CFBundleDisplayName = "Waterloo Command";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.games";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -1873,7 +1939,7 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "WWII Hex V1.1 Mac";
+					INFOPLIST_KEY_CFBundleDisplayName = "Waterloo Command";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.games";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",

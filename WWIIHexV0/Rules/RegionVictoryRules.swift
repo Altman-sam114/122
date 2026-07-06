@@ -7,6 +7,10 @@ struct RegionVictoryAssessment: Equatable {
 
 struct RegionVictoryRules {
     func assessVictory(in state: GameState) -> RegionVictoryAssessment {
+        guard ScenarioCatalog.ardennesLegacy.matches(state.scenarioId) else {
+            return RegionVictoryAssessment(winner: nil, reason: nil)
+        }
+
         let bastogneController = controller(ofCityNamed: "Bastogne", in: state)
         let stVithController = controller(ofCityNamed: "St. Vith", in: state)
 
@@ -25,4 +29,3 @@ struct RegionVictoryRules {
         state.map.regions.values.first { $0.city?.name == name }?.controller
     }
 }
-

@@ -6,8 +6,9 @@ struct DiplomacyPanelView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Diplomacy")
+            Text(label("Diplomacy"))
                 .font(.headline)
+                .foregroundStyle(activeFaction.usesNapoleonicLogisticsVocabulary ? NapoleonicDesignTokens.imperialBlue : .primary)
 
             if let rulerRecord = diplomacyState.latestRulerRecord {
                 rulerSection(rulerRecord)
@@ -27,7 +28,7 @@ struct DiplomacyPanelView: View {
 
     private var countrySection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Countries")
+            Text(label("Countries"))
                 .font(.subheadline.weight(.semibold))
 
             ForEach(diplomacyState.countries) { country in
@@ -50,12 +51,12 @@ struct DiplomacyPanelView: View {
 
     private var blocSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Blocs")
+            Text(label("Blocs"))
                 .font(.subheadline.weight(.semibold))
 
             ForEach(diplomacyState.blocs) { bloc in
                 LabeledContent(bloc.name) {
-                    Text("\(bloc.memberCountryIds.count) member(s)")
+                    Text(memberCountText(bloc.memberCountryIds.count))
                         .foregroundStyle(bloc.faction == activeFaction ? .primary : .secondary)
                 }
                 .font(.caption)
@@ -65,11 +66,11 @@ struct DiplomacyPanelView: View {
 
     private var relationSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Relations")
+            Text(label("Relations"))
                 .font(.subheadline.weight(.semibold))
 
             if diplomacyState.relations.isEmpty {
-                Text("No diplomatic relations.")
+                Text(label("No diplomatic relations."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } else {
@@ -90,16 +91,16 @@ struct DiplomacyPanelView: View {
 
     private func rulerSection(_ record: RulerDecisionRecord) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("Ruler")
+            Text(label("Ruler"))
                 .font(.subheadline.weight(.semibold))
-            LabeledContent("Agent") {
+            LabeledContent(label("Agent")) {
                 Text(record.rulerAgentId)
             }
-            LabeledContent("Posture") {
+            LabeledContent(label("Posture")) {
                 Text(record.posture.displayName)
             }
             if let zoneId = record.preferredFrontZoneId {
-                LabeledContent("Focus") {
+                LabeledContent(label("Focus")) {
                     Text(zoneId.rawValue)
                 }
             }
@@ -108,5 +109,38 @@ struct DiplomacyPanelView: View {
                 .foregroundStyle(.secondary)
         }
         .font(.caption)
+    }
+
+    private func label(_ legacy: String) -> String {
+        guard activeFaction.usesNapoleonicLogisticsVocabulary else {
+            return legacy
+        }
+
+        switch legacy {
+        case "Diplomacy":
+            return "Coalition"
+        case "Countries":
+            return "Powers"
+        case "Blocs":
+            return "Coalitions"
+        case "Relations":
+            return "Coalition Relations"
+        case "No diplomatic relations.":
+            return "No coalition relations."
+        case "Ruler":
+            return "Sovereign"
+        case "Posture":
+            return "Campaign Posture"
+        case "Focus":
+            return "Focus Sector"
+        default:
+            return legacy
+        }
+    }
+
+    private func memberCountText(_ count: Int) -> String {
+        activeFaction.usesNapoleonicLogisticsVocabulary
+            ? "\(count) power(s)"
+            : "\(count) member(s)"
     }
 }

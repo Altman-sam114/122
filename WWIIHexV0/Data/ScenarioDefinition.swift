@@ -21,6 +21,7 @@ struct ScenarioDefinition: Codable, Equatable {
     let keyLocations: [KeyLocationDefinition]
     let objectives: [ObjectiveDefinition]
     let initialUnits: [InitialUnitDefinition]
+    let reinforcements: [ReinforcementDefinition]?
     let victoryConditions: [VictoryConditionDefinition]
     let dataNotes: [String]
 }
@@ -85,6 +86,22 @@ struct InitialUnitDefinition: Codable, Equatable {
     let retreatMode: String?
     let supplyState: String
     let assignedAgentId: String?
+}
+
+struct ReinforcementDefinition: Codable, Equatable {
+    let id: String
+    let name: String
+    let faction: String
+    let templateId: String
+    let arrivalTurn: Int
+    let entryCoord: HexCoordDefinition
+    let facing: String
+    let hp: Int
+    let retreatMode: String?
+    let supplyState: String
+    let assignedAgentId: String?
+    let triggerObjectiveId: String?
+    let triggerController: String?
 }
 
 struct VictoryConditionDefinition: Codable, Equatable {

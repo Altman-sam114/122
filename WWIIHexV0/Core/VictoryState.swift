@@ -7,6 +7,8 @@ enum VictoryReason: String, Codable, Equatable {
     case bastogneHeldByAlliesAtFinalTurn
     case germanUnitsDestroyed
     case germanArmorUnsupplied
+    case waterlooFrenchBreakthrough
+    case waterlooCoalitionLineHeld
 }
 
 struct VictoryState: Codable, Equatable {
@@ -34,6 +36,8 @@ struct VictoryState: Codable, Equatable {
             eliminatedGermanDivisions += 1
         case .allies:
             eliminatedAlliedDivisions += 1
+        case .france, .angloAllied, .prussia, .austria, .russia, .spain, .neutral:
+            break
         }
     }
 }

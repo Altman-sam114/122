@@ -749,7 +749,7 @@ MarshalAgent
 - 新增 `TheaterDirectiveCompiler`，把元帅意图降级为现有 `ZoneDirective`；缺失或失败时 fallback 到 `TheaterCommanderPool`。
 - `WarPipelineMode` 新增 `.marshalDirective`，`AppContainer` 和 `TurnManager` 默认使用该模式；旧 `.zoneDirective` 和 `.legacyAgentOrder` 仍保留为显式路径。
 - `TurnManager` 抽出公共 `executeDirectiveEnvelope`，确保元帅链路和旧将军池链路共享同一执行、记录和 endTurn 逻辑。
-- v0.5 收口时移除 v0.9 旁支曾插入的 `RulerAgent` 塑形调用；当前 `.marshalDirective` 与显式 `.zoneDirective` 都不写统治者记录，统治者仅作为后续上游预留。
+- v0.5 收口时移除 v0.9 旁支曾插入的 `RulerAgent` 塑形调用；当时 `.marshalDirective` 与显式 `.zoneDirective` 都不写统治者记录。v3.4 起已重新以 `StrategicPostureEnvelope` 形式接入默认元帅上游。
 - 新增实现记录文档，详细写明本分支算法、边界、fallback 和轻量验证。
 
 关键系统：
@@ -793,7 +793,7 @@ MarshalAgent
 备注：
 
 - 本轮没有恢复历史回退的 `CabinetState`、`DirectiveBoard`、`MinisterDecisionProvider`、`RulerDirectiveFactory`、`national_cabinet.json` 或部长系统。
-- 统治者层仅作为未来元帅上游预留方向，不在 v0.5 当前实现中落地。
+- 当时 v0.5 未启用统治者姿态层；v3.4 起已改为 `StrategicPostureEnvelope` 上游姿态层。
 - 当前工作树还存在不属于本 v0.5 核心目标的高级战术、外交、经济、UI 和地图编辑器方向未提交改动；v0.5 实现选择兼容现有工作树，不回滚其他改动。
 
 ## v0.8 - 初级经济、生产、城市、地形与补兵
@@ -1158,6 +1158,730 @@ guerrillaWarfare 额外参考 infrastructure
 - 未做运行时 UI 点击和 SpriteKit 视觉验证，按钮行为、sheet 展示、计划线位置仍需后续人工或授权轻量运行确认。
 - 当前工作树混有其他版本改动，合并前必须重新做文件/API/schema/project 冲突审查。
 
+## v3.0 - 拿破仑战争迁移审计与兼容合同
+
+完成日期：2026-07-04
+
+核心更新：
+
+- 完成 v3.0 文档阶段：从 `WWIIHexV0` 迁移到拿破仑战争题材前，先建立审计清单、迁移词汇表和兼容合同。
+- 扫描并记录当前运行时中的主要二战绑定点：`Faction.germany/allies`、`Faction.opponent`、`GamePhase.germanAI/alliedPlayer`、阿登默认数据、Guderian/Montgomery、Panzer/tank/motorized、Industry/Production 等。
+- 明确 v3.1 的高风险接口边界：敌我关系必须转向 `DiplomacyState` / relation helper；回合阶段必须从具体 Germany/Allies 解耦；neutral 不得 fallback 到 `.allies`。
+- 明确 v3.2-v3.6 后续拆分：滑铁卢数据、拿战单位和地形、皇帝/总司令/军团长 Agent、后勤/增援/弹药、发布级 UI。
+- 更新 README 和 `md/plan/plan.md`，说明当前仍是阿登二战运行时，拿战迁移只完成 v3.0 审计合同，不声称已有滑铁卢可玩行为。
+
+关键文件：
+
+- `md/prompt/v3.0-拿战迁移/v3.0_audit_and_contract.md`
+- `md/plan/plan.md`
+- `README.md`
+- `update_log.md`
+
+验证记录：
+
+- 本轮只做文档和只读源码审计，轻量检查记录见本轮交付。
+
+未跑：
+
+- 未跑 Xcode / XCTest / 模拟器 / app 启动 / Probe / Smoke / Stage Regression / Dynamic Theater Regression / Full / 性能测试；原因是当前规范默认禁止本机重测试，本轮也未获人工授权。
+
+遗留风险：
+
+- 运行时仍是二战/阿登主路径；拿战规则、滑铁卢数据、多势力回合、拿战 UI 均未实现。
+- 当前工作树已有未提交文档改动，本轮只追加相关文档，不回滚既有改动。
+
+## v3.1 - 国家、联军与敌我关系基础
+
+完成日期：2026-07-04
+
+核心更新：
+
+- 在 `Faction` 中新增拿战兼容 case：`.france`、`.angloAllied`、`.prussia`、`.austria`、`.russia`、`.spain`、`.neutral`，旧 `.germany/.allies` 保留兼容。
+- 在 `DiplomacyState` 中新增 `isHostile`、`isFriendly`、`hostileFactions`，作为多国家/联军迁移的统一敌我关系查询入口。
+- 新增 France / French Empire、第七次反法同盟、Neutral Powers 的初始国家/集团关系：France 与同盟默认 atWar，Anglo-Allied / Prussia / Austria / Russia / Spain 之间默认 coBelligerent，Neutral 不因缺 relation 被视为 hostile。
+- 新增 `GamePhase.aiCommand/playerCommand`、`allowsCommands` 和 legacy phase helper；`CommandValidator`、`AppContainer.shouldRunAI`、`TurnManager.isAITurn` 不再把可执行阶段写死到 Germany / Allies。
+- 新增 `GameState.participatingFactions` / `turnOrderFactions`，结束回合可从当前局面推导多势力轮转并排除 `.neutral`。
+- 修复 `RegionDataSet.toRegions()` 的 nil -> `.allies` fallback，owner/controller 双 nil 现在映射为 `.neutral`；`RegionOccupationRules` 聚合控制权时忽略 neutral hex。
+- 将更多核心运行时路径从直接 `Faction.opponent` 或 `faction != otherFaction` 改为 `DiplomacyState.isHostile/isFriendly`：
+  - hex / region 补给通路与撤退安全判断。
+  - region pressure 敌军统计。
+  - Legacy Agent D 的 enemy divisions 与敌方补给摘要。
+  - Marshal 摘要中的敌控目标、敌控 region、敌军存在和敌军强度统计。
+  - `WarCommandExecutor` 战术目标 hex 排序、敌军强度、可见敌军和敌控 region 判断。
+  - `CommandValidator` / `RegionCommandValidator` 攻击目标合法性。
+  - `MovementRules` ZOC 和路径阻挡。
+  - `OccupationRules` 和 `CommandExecutor.shouldAdvanceDynamicTheater` 的 friendly / coBelligerent 占领边界。
+  - `FrontLineManager` 动态战区邻接过滤；coBelligerent theater 不再因 faction 不同自动形成 front line。
+  - `WarDeploymentManager` 的 hostile zone、hostile presence、front/depth/garrison 分类、collapse depth zone 和 encirclement contact 判断。
+  - `TheaterSystem` 的 `frontWeight` 与 theater retirement friendly neighbor 判断。
+  - `ZoneCommanderAgent` / `GeneralRegistry` 的可见敌军、敌控 region、争夺前沿 presence 和 HQ under attack 判断。
+  - `BoardScene` / `MapLayerOverlayCalculator` / `MapDisplayAdapter` 的 deployment role 显示计算。
+- `FrontLineManager` 不再直接使用 `Faction.opponent` 填 `FrontLine.factionB`，而是从 segment 对侧 controller 推导；单字段 schema 仍保留兼容。
+- 更新 v3.1 阶段记录和核心文档，说明本轮仍不代表滑铁卢剧本、拿战 UI 或完整部署层多联军语义完成。
+
+关键文件：
+
+- `WWIIHexV0/Core/DiplomacyState.swift`
+- `WWIIHexV0/Core/Faction.swift`
+- `WWIIHexV0/Core/GamePhase.swift`
+- `WWIIHexV0/Core/GameState.swift`
+- `WWIIHexV0/Core/StrategicStateBootstrapper.swift`
+- `WWIIHexV0/Core/VictoryState.swift`
+- `WWIIHexV0/Core/WarDeploymentState.swift`
+- `WWIIHexV0/Rules/TheaterSystem.swift`
+- `WWIIHexV0/Rules/CommandValidator.swift`
+- `WWIIHexV0/Rules/CommandExecutor.swift`
+- `WWIIHexV0/Rules/MovementRules.swift`
+- `WWIIHexV0/Rules/OccupationRules.swift`
+- `WWIIHexV0/Rules/RegionCommandValidator.swift`
+- `WWIIHexV0/Rules/RegionOccupationRules.swift`
+- `WWIIHexV0/Rules/SupplyRules.swift`
+- `WWIIHexV0/Rules/RegionSupplyRules.swift`
+- `WWIIHexV0/Rules/RegionCombatRules.swift`
+- `WWIIHexV0/Rules/FrontLineManager.swift`
+- `WWIIHexV0/Rules/WarDeploymentManager.swift`
+- `WWIIHexV0/Rules/EconomyRules.swift`
+- `WWIIHexV0/Rules/StrategicStateSynchronizer.swift`
+- `WWIIHexV0/Agents/AgentContexts.swift`
+- `WWIIHexV0/Agents/GeneralRegistry.swift`
+- `WWIIHexV0/Agents/RulerAgent.swift`
+- `WWIIHexV0/Agents/ZoneCommanderAgent.swift`
+- `WWIIHexV0/Commands/WarCommandExecutor.swift`
+- `WWIIHexV0/Data/DataLoader.swift`
+- `WWIIHexV0/Data/RegionDataSet.swift`
+- `WWIIHexV0/App/AppContainer.swift`
+- `WWIIHexV0/Turn/TurnManager.swift`
+- `WWIIHexV0/UI/CommandPanelView.swift`
+- `WWIIHexV0/UI/EconomyPanelView.swift`
+- `WWIIHexV0/SpriteKit/BoardScene.swift`
+- `WWIIHexV0/SpriteKit/MapLayerOverlayCalculator.swift`
+- `WWIIHexV0/SpriteKit/MapDisplayAdapter.swift`
+- `WWIIHexV0/SpriteKit/TerrainStyle.swift`
+- `MapEditor/MapEditorView.swift`
+- `MapEditor/MapEditorExporter.swift`
+- `md/prompt/v3.0-拿战迁移/v3.1_powers_coalitions_foundation.md`
+- `md/flow/flow.md`
+- `md/flow/flowchart.md`
+- `README.md`
+- `md/plan/plan.md`
+- `update_log.md`
+
+验证记录：
+
+- `swiftc -parse` 四组改动 Swift 文件：通过，无输出。
+- 文档尾随空白检查：无命中。
+- 冲突标记扫描：无命中。
+- `git diff --check`：通过，无输出。
+- `.opponent` 残留扫描：只剩 `Core/Faction.swift` legacy helper。
+
+未跑：
+
+- 未跑 Xcode / XCTest / 模拟器 / app 启动 / Probe / Smoke / Stage Regression / Dynamic Theater Regression / Full / 性能测试；原因是当前规范默认禁止本机重测试，本轮也未获人工授权。
+
+遗留风险：
+
+- `FrontLine.factionB` 仍是单一兼容字段，不是完整多敌方 schema。
+- `FrontZone.faction` 仍是单一势力字段；联军共同防区、混编指挥区和多势力 HQ 还没有设计。
+- `ZoneCommanderAgent` / `GeneralRegistry` 仍按 exact faction 筛选可指挥单位和将军，这是指挥权边界，不是敌我关系；后续如要同盟指挥权共享，需要单独 schema。
+- 默认数据、胜利条件、主要 UI 和单位/生产语义仍是阿登/二战；滑铁卢 JSON 尚未建立。
+
+## v3.2 - 滑铁卢数据入口与场景目录起步
+
+完成日期：2026-07-05
+
+性质：v3.2 分段实现记录。本节代表场景资源选择入口已经从裸字符串硬编码抽到 `ScenarioCatalog`，并新增最小 Waterloo 1815 schema slice；不代表完整滑铁卢战役、拿战规则或拿战 UI 已完成。
+
+核心更新：
+
+- 新增 `ScenarioCatalogEntry` 与 `ScenarioCatalog`，显式记录当前可玩 legacy 场景和后续拿战目标场景。
+- `ScenarioCatalog.defaultPlayable` 仍指向 `ardennes_v0_scenario` / `ardennes_v02_regions`，保证现有启动路径不因缺少 Waterloo 资源而失败。
+- `ScenarioCatalog.napoleonicTarget` 指向 `waterloo_1815_scenario` / `waterloo_1815_regions` / `napoleonic_terrain_rules` / `napoleonic_unit_templates` / `napoleonic_generals`，作为后续 v3.2 扩展 Waterloo JSON 的统一入口。
+- 新增最小 `waterloo_1815_scenario.json`：12 个 sparse hex、France / Anglo-Allied / Prussia / Neutral 四方、La Haye Sainte / Hougoumont / Mont-Saint-Jean / Papelotte / Prussian Approach 关键点，并引用拿战模板 id。
+- 新增最小 `waterloo_1815_regions.json`：6 个 region、12 个 hexToRegion 映射、region edges、region-level supply sources 和 objectives。
+- 新增 `napoleonic_terrain_rules.json`：使用既有 `plain` / `forest` / `mountain` / `hill` / `city` / `fortress` raw value 承载 open ground、woodland、ridge、village 和 fortified farm / chateau。v3.2 当时它只作为数据合同和解析入口；后续 v3.8 已通过 `TerrainRuleSet` 接入 Waterloo 移动/战斗主路径。
+- 新增 `napoleonic_unit_templates.json`：建立 `line_infantry_brigade`、`grand_battery`、`strongpoint_guard`、`prussian_vanguard` 和 `reserve_infantry_column`。v3.3 起已改用拿战 `ComponentType` raw value，真实骑兵冲锋、队形、士气和炮兵准备规则继续后置。
+- 新增 `napoleonic_generals.json`：建立 Napoleon / Wellington / Blucher 三位 Waterloo 目标将领的专用目录。`generals.json` 中的同名条目当前作为兼容期重复存在，后续切默认和 bundle 资源稳定后再清理。
+- `generals.json` 追加 `commander_napoleon`、`commander_wellington`、`commander_blucher`，与 Waterloo region 的 `assignedGeneralId` 种子对齐，让部署层将军分配不再只是占位 id。
+- 新增 `DataLoader.loadGameState(_ scenario: ScenarioCatalogEntry)`，让后续切换默认场景或显式加载 Waterloo 不再散落资源名字符串。
+- `ScenarioCatalogEntry` 增加 `terrainRulesName`、`unitTemplateName` 和 `generalCatalogName`；`DataLoader.loadGameState(_:)` 会先解析场景地形规则，并按场景读取单位模板和部署层将领目录。阿登仍读 `terrain_rules` / `unit_templates` / `generals` 并保留旧 fallback，Waterloo 读 `napoleonic_terrain_rules` / `napoleonic_unit_templates` / `napoleonic_generals`、要求 `templateId` 命中并使用模板 `maxHP`。
+- `AppContainer.bootstrap()` 的默认 general registry 读取 `ScenarioCatalog.defaultPlayable`，为后续切换默认剧本时使用场景专属将领目录预留入口。
+- `DataLoader.loadInitialGameState()` 改为通过 `ScenarioCatalog.defaultPlayable` 加载默认场景；旧 `GameState.initial()` fallback 保持不变。
+- 更新 v3.2 阶段记录、README、flow/flowchart、plan 和总提示词，说明当前默认仍是阿登，Waterloo 只有最小数据骨架，尚不可作为默认可玩战役。
+
+关键文件：
+
+- `WWIIHexV0/Data/DataLoader.swift`
+- `WWIIHexV0/App/AppContainer.swift`
+- `WWIIHexV0/Data/generals.json`
+- `WWIIHexV0/Data/napoleonic_generals.json`
+- `WWIIHexV0/Data/napoleonic_terrain_rules.json`
+- `WWIIHexV0/Data/napoleonic_unit_templates.json`
+- `WWIIHexV0/Data/waterloo_1815_scenario.json`
+- `WWIIHexV0/Data/waterloo_1815_regions.json`
+- `md/prompt/v3.0-拿战迁移/v3.2_waterloo_data_entry.md`
+- `md/prompt/v3.0-拿战迁移/codex-v3.0-拿战aiagent迁移总提示词.md`
+- `md/flow/flow.md`
+- `md/flow/flowchart.md`
+- `README.md`
+- `md/plan/plan.md`
+- `update_log.md`
+
+验证记录：
+
+- `swiftc -parse WWIIHexV0/Data/DataLoader.swift WWIIHexV0/Data/ScenarioDefinition.swift WWIIHexV0/Data/RegionDataSet.swift`：通过，无输出。
+- `swiftc -parse WWIIHexV0/App/AppContainer.swift`：通过，无输出。
+- `jq empty WWIIHexV0/Data/waterloo_1815_scenario.json`：通过，无输出。
+- `jq empty WWIIHexV0/Data/waterloo_1815_regions.json`：通过，无输出。
+- `jq empty WWIIHexV0/Data/napoleonic_terrain_rules.json`：通过，无输出。
+- `jq empty WWIIHexV0/Data/napoleonic_unit_templates.json`：通过，无输出。
+- `jq empty WWIIHexV0/Data/napoleonic_generals.json`：通过，无输出。
+- `jq -e '(.terrain | keys | sort) == ["city","forest","fortress","hill","mountain","plain"]' WWIIHexV0/Data/napoleonic_terrain_rules.json`：通过，输出 `true`。
+- `jq -e '.map.tiles | length == 12' WWIIHexV0/Data/waterloo_1815_scenario.json`：通过，输出 `true`。
+- `jq -e '. as $root | ($root.regions | length == 6) and ($root.hexToRegion | length == 12)' WWIIHexV0/Data/waterloo_1815_regions.json`：通过，输出 `true`。
+- `jq -e '([.map.tiles[].regionId] | unique | length) == 6 and ([.initialUnits[].id] | unique | length) == (.initialUnits | length)' WWIIHexV0/Data/waterloo_1815_scenario.json`：通过，输出 `true`。
+- `jq -e '([.templates[].id] | unique | length) == (.templates | length)' WWIIHexV0/Data/napoleonic_unit_templates.json`：通过，输出 `true`。
+- `jq -e 'all(.templates[]; ([.components[].weight] | add) == 1)' WWIIHexV0/Data/napoleonic_unit_templates.json`：通过，输出 `true`。
+- `jq -s '.[0].initialUnits as $units | (.[1].templates | map(.id)) as $templates | all($units[]; .templateId as $id | $templates | index($id) != null)' WWIIHexV0/Data/waterloo_1815_scenario.json WWIIHexV0/Data/napoleonic_unit_templates.json`：通过，输出 `true`。
+- `jq -e '([.generals[].id] | unique | length) == (.generals | length)' WWIIHexV0/Data/generals.json`：通过，输出 `true`。
+- `jq -e '(["commander_napoleon","commander_wellington","commander_blucher"] - ([.generals[].id] | unique) | length) == 0' WWIIHexV0/Data/generals.json`：通过，输出 `true`。
+- `jq -e '([.generals[].id] | unique | length) == (.generals | length)' WWIIHexV0/Data/napoleonic_generals.json`：通过，输出 `true`。
+- `jq -e '(["commander_napoleon","commander_wellington","commander_blucher"] - ([.generals[].id] | unique) | length) == 0' WWIIHexV0/Data/napoleonic_generals.json`：通过，输出 `true`。
+- `swiftc -parse WWIIHexV0/Agents/GeneralRegistry.swift WWIIHexV0/Agents/ZoneCommanderAgent.swift`：通过，无输出。
+- `rg -n "germany|allies|Ardennes|Bastogne|Panzer|Guderian|Montgomery" WWIIHexV0/Data/waterloo_1815_scenario.json WWIIHexV0/Data/waterloo_1815_regions.json`：无命中。
+- `rg -n "commander_napoleon|commander_wellington|commander_blucher" WWIIHexV0/Data/generals.json WWIIHexV0/Data/napoleonic_generals.json WWIIHexV0/Data/general_agents.json WWIIHexV0/Data/waterloo_1815_scenario.json WWIIHexV0/Data/waterloo_1815_regions.json`：命中 `generals.json`、`napoleonic_generals.json` 与 Waterloo JSON，未命中 legacy `general_agents.json`。
+- 文档尾随空白检查：无命中。
+- 冲突标记扫描：无命中。
+- `git diff --check`：通过，无输出。
+- `rg -n "waterloo_1815|ScenarioCatalog|defaultPlayable|napoleonicTarget" WWIIHexV0/Data README.md update_log.md md/flow md/plan md/prompt/v3.0-拿战迁移`：确认 Waterloo 目标资源名集中在 `ScenarioCatalog` 和文档记录中。
+
+未跑：
+
+- 未跑 Xcode / XCTest / 模拟器 / app 启动 / Probe / Smoke / Stage Regression / Dynamic Theater Regression / Full / 性能测试；原因是当前规范默认禁止本机重测试，本轮也未获人工授权。
+
+遗留风险：
+
+- `waterloo_1815_scenario.json` 与 `waterloo_1815_regions.json` 只是最小 schema slice，不能把 `defaultPlayable` 切到 `napoleonicTarget`。
+- `ScenarioDefinition` 和现有 terrain / objective schema 仍是阿登时代兼容结构；拿战单位模板已有独立文件并已改用拿战 `ComponentType` raw value。v3.2 当时地形规则 JSON 尚未成为运行时权威，后续 v3.8 已接入 Waterloo 移动/战斗主路径；士气/队形/骑兵冲锋/炮兵准备、指挥官 Agent prompt 和胜利节奏仍需后续阶段继续迁移。
+- `napoleonic_generals.json` 已建立部署层将领目录，但尚未替代 legacy `general_agents.json`，真实拿战 Agent personality 仍待 v3.4。
+- 未修改 Xcode project；后续若新增 JSON 需要打包到 app bundle，必须由唯一指定改 project 的步骤处理并跑 `plutil -lint`。
+
+## v3.3 - 拿战兵种 ComponentType 基础
+
+完成日期：2026-07-05
+
+性质：v3.3 起步记录。本节代表拿战兵种 raw value 和模板数据已经开始脱离 legacy 二战 component，但不代表士气、疲劳、队形、骑兵冲锋、炮兵准备或完整拿战战斗规则已经完成。
+
+核心更新：
+
+- `ComponentType` 保留 legacy `.tank/.motorizedInfantry/.infantry/.artillery`，新增拿战兼容 case：
+  - `.lineInfantry`
+  - `.lightInfantry`
+  - `.cavalry`
+  - `.guardInfantry = "guard"`
+  - `.engineer`
+  - `.supplyTrain`
+- 为新 case 提供首版 `EffectiveStats`，继续通过现有 `attack/defense/movement/range/vision` 参与战斗和移动，不新增 morale / fatigue / formation 字段。
+- 新增 `ComponentType.isInfantryLike`、`isArtilleryLike`、`isCavalryLike`、`isMobileLike`，以及 `Division.isCavalry`、`Division.isMobileFormation`。
+- `napoleonic_unit_templates.json` 改用拿战 raw value：`lineInfantry`、`lightInfantry`、`cavalry`、`guard`、`engineer`、`artillery`；新增 `cavalry_reserve` 模板。
+- `DataLoader.makeDivisions` 不再静默丢弃未知 component raw value；模板出现未知 component type 会生成 `DataValidationError`。
+- `WarCommandExecutor`、`ZoneCommanderAgent` 的机动判断改用 `Division.isMobileFormation`。
+- `EconomyState` / `EconomyRules` 的 infantry / mobile / artillery 权重判断改为读取 helper，避免拿战组件被完全按普通 manpower-only 处理。
+- `UnitInspectorView`、`UnitTooltipView`、`UnitNode` 增加拿战 component 短码或类型标记：`LINE`、`LIGHT`、`CAV`、`GUARD`、`ENG`、`SUP`。
+- 更新 `waterloo_1815_scenario.json` 的 `dataNotes`、README、flow、plan、总提示词和 v3.3 阶段记录。
+
+关键文件：
+
+- `WWIIHexV0/Core/Division.swift`
+- `WWIIHexV0/Core/EconomyState.swift`
+- `WWIIHexV0/Data/DataLoader.swift`
+- `WWIIHexV0/Data/napoleonic_unit_templates.json`
+- `WWIIHexV0/Data/waterloo_1815_scenario.json`
+- `WWIIHexV0/Rules/EconomyRules.swift`
+- `WWIIHexV0/Commands/WarCommandExecutor.swift`
+- `WWIIHexV0/Agents/ZoneCommanderAgent.swift`
+- `WWIIHexV0/UI/UnitInspectorView.swift`
+- `WWIIHexV0/UI/UnitTooltipView.swift`
+- `WWIIHexV0/SpriteKit/UnitNode.swift`
+- `md/prompt/v3.0-拿战迁移/v3.3_component_types_foundation.md`
+- `README.md`
+- `md/flow/flow.md`
+- `md/plan/plan.md`
+- `update_log.md`
+
+验证记录：
+
+- `swiftc -parse WWIIHexV0/Core/Division.swift WWIIHexV0/Core/EconomyState.swift`：通过，无输出。
+- `swiftc -parse WWIIHexV0/Data/DataLoader.swift WWIIHexV0/Data/ScenarioDefinition.swift WWIIHexV0/Data/RegionDataSet.swift`：通过，无输出。
+- `swiftc -parse WWIIHexV0/Rules/EconomyRules.swift WWIIHexV0/Commands/WarCommandExecutor.swift WWIIHexV0/Agents/ZoneCommanderAgent.swift`：通过，无输出。
+- `swiftc -parse WWIIHexV0/UI/UnitInspectorView.swift WWIIHexV0/UI/UnitTooltipView.swift WWIIHexV0/SpriteKit/UnitNode.swift`：通过，无输出。
+- `jq empty WWIIHexV0/Data/napoleonic_unit_templates.json`：通过，无输出。
+- `jq empty WWIIHexV0/Data/waterloo_1815_scenario.json`：通过，无输出。
+- `jq -e '([.templates[].id] | unique | length) == (.templates | length)' WWIIHexV0/Data/napoleonic_unit_templates.json`：通过，输出 `true`。
+- `jq -e 'all(.templates[]; ([.components[].weight] | add) == 1)' WWIIHexV0/Data/napoleonic_unit_templates.json`：通过，输出 `true`。
+- `jq -e '([.templates[].components[].type] | unique - ["artillery","cavalry","engineer","guard","lightInfantry","lineInfantry"] | length) == 0' WWIIHexV0/Data/napoleonic_unit_templates.json`：通过，输出 `true`。
+- `jq -s '.[0].initialUnits as $units | (.[1].templates | map(.id)) as $templates | all($units[]; .templateId as $id | $templates | index($id) != null)' WWIIHexV0/Data/waterloo_1815_scenario.json WWIIHexV0/Data/napoleonic_unit_templates.json`：通过，输出 `true`。
+- `rg -n "motorizedInfantry|tank" WWIIHexV0/Data/napoleonic_unit_templates.json WWIIHexV0/Data/waterloo_1815_scenario.json`：无命中。
+- 文档尾随空白检查：无命中。
+- 冲突标记扫描：无命中。
+- `git diff --check`：通过，无输出。
+
+未跑：
+
+- 未跑 Xcode / XCTest / 模拟器 / app 启动 / Probe / Smoke / Stage Regression / Dynamic Theater Regression / Full / 性能测试；原因是当前规范默认禁止本机重测试，本轮也未获人工授权。
+
+遗留风险：
+
+- 新 `ComponentType` 只接入基础属性和轻量 helper，尚未实现拿战专属 morale / fatigue / formation / cavalry charge / artillery preparation。
+- `ProductionKind`、经济生产 UI 和自动生产单位仍是二战语义。
+- `UnitNode` 对骑兵仍复用既有单位图形结构，只改短码和机动斜线；发布级拿战军标需要后续 UI 切片。
+- 未修改 Xcode project；新增 JSON 如果要进入 app bundle，仍需唯一指定 project 步骤处理。
+
+## v3.4 - 拿战 Agent 分层基础
+
+完成日期：2026-07-05
+
+性质：v3.4 起步记录。本节代表默认 AI 上游已经从单纯元帅层扩展为“统治者战略姿态 -> 元帅战区指令”的数据合同；不代表完整 ChiefOfStaff / CorpsCommander / Diplomat Agent、真实 LLM、完整拿战 personality 或 UI 复盘都已完成。
+
+核心更新：
+
+- 新增 `StrategicPostureEnvelope`，记录 `schemaVersion`、`issuerId`、`turn`、`faction`、`countryId`、`posture`、`preferredFrontZoneId`、`targetRegionIds`、`attackThresholdAdjustment`、`reserveBias`、`strategicIntent`、`coalitionGuidance` 和 `rationale`。
+- 新增 `StrategicPostureDecoder`，支持 fenced JSON / 纯 JSON，并校验 schema、issuer、turn、faction、front zone 归属和 region 存在性。
+- `RulerAgent.resolvePosture(in:)` 生成 deterministic fenced JSON 后再经 decoder 校验；失败时只使用内部 deterministic fallback，不执行半成品外部输出。
+- `TurnManager.runMarshalDirectiveTurn` 在默认 `.marshalDirective` 路径先调用 `RulerAgent.automatic(for:in:)`，把 `RulerDecisionRecord` 写入 `diplomacyState.rulerRecords`，再把姿态传给 `MarshalAgent`。
+- `SimulatedMarshalLLMClient` 读取 `StrategicPostureEnvelope`，用 defensive / coalitionMaintenance / stabilizeFront / offensive 姿态调整攻守阈值、reserveBias、战略意图和 rationale。
+- `AgentDecisionRecord.rawJSON` 现在串联展示 StrategicPosture JSON、TheaterDirective JSON 和编译后的 ZoneDirective JSON，便于审计“统治者想要什么、元帅做了什么”。
+- 更新 README、flow、flowchart、plan、总提示词和 v3.4 阶段记录。
+
+关键文件：
+
+- `WWIIHexV0/Agents/RulerAgent.swift`
+- `WWIIHexV0/Agents/ZoneCommanderAgent.swift`
+- `WWIIHexV0/Turn/TurnManager.swift`
+- `md/prompt/v3.0-拿战迁移/v3.4_agent_hierarchy_foundation.md`
+- `README.md`
+- `md/flow/flow.md`
+- `md/flow/flowchart.md`
+- `md/flow/03_ai_zone_directive_pipeline.mermaid`
+- `md/plan/plan.md`
+- `update_log.md`
+
+验证记录：
+
+- `swiftuipro` 相关 Swift 语法检查：`swiftc -parse WWIIHexV0/Agents/RulerAgent.swift WWIIHexV0/Agents/ZoneCommanderAgent.swift WWIIHexV0/Turn/TurnManager.swift`：通过，无输出。
+- `jq empty WWIIHexV0/Data/napoleonic_unit_templates.json`：通过，无输出。
+- `jq empty WWIIHexV0/Data/waterloo_1815_scenario.json`：通过，无输出。
+- `jq empty WWIIHexV0/Data/waterloo_1815_regions.json`：通过，无输出。
+- `jq empty WWIIHexV0/Data/napoleonic_terrain_rules.json`：通过，无输出。
+- `jq empty WWIIHexV0/Data/napoleonic_generals.json`：通过，无输出。
+- `jq -e '([.templates[].id] | unique | length) == (.templates | length)' WWIIHexV0/Data/napoleonic_unit_templates.json`：通过，输出 `true`。
+- `jq -e 'all(.templates[]; ([.components[].weight] | add) == 1)' WWIIHexV0/Data/napoleonic_unit_templates.json`：通过，输出 `true`。
+- `jq -e '([.templates[].components[].type] | unique - ["artillery","cavalry","engineer","guard","lightInfantry","lineInfantry"] | length) == 0' WWIIHexV0/Data/napoleonic_unit_templates.json`：通过，输出 `true`。
+- `jq -s '.[0].initialUnits as $units | (.[1].templates | map(.id)) as $templates | all($units[]; .templateId as $id | $templates | index($id) != null)' WWIIHexV0/Data/waterloo_1815_scenario.json WWIIHexV0/Data/napoleonic_unit_templates.json`：通过，输出 `true`。
+- 旧 README / flow 统治者未接入口径扫描：无命中。
+- 旧主链路统治者未接入口径扫描：无命中。
+- 文档 / JSON 尾随空白扫描：无命中。
+- 冲突标记扫描：无命中。
+- `git diff --check`：通过，无输出。
+
+未跑：
+
+- 未跑 Xcode / XCTest / 模拟器 / app 启动 / Probe / Smoke / Stage Regression / Dynamic Theater Regression / Full / 性能测试；原因是当前规范默认禁止本机重测试，本轮也未获人工授权。
+
+遗留风险：
+
+- `StrategicPostureEnvelope` 当前来自 deterministic simulated output，尚未进入真实模型 prompt builder。
+- 独立 ChiefOfStaff / CorpsCommander / Diplomat / Coalition Agent 仍未实现。
+- `RulerDecisionRecord` 已写入状态，但 UI 复盘展示还未专门升级。
+- 拿战战术名仍复用部分旧 `TacticName`；完整 line / column / square / cavalry charge / artillery preparation 仍需后续规则切片。
+
+## v3.5 - 拿战后勤与预备队展示基础
+
+完成日期：2026-07-05
+
+性质：v3.5 起步记录。本节代表现有经济/生产兼容层已能在拿战 faction 下显示为后勤与预备队，并在完成排产时生成拿战 component formation；Waterloo 数据切片也已有最小 delayed reinforcement schedule 和 Waterloo 专用胜负节奏；`Division` 级最小 morale / fatigue / ammunition 战术消耗、恢复、UI 展示和 Marshal 前线警告已接入。不代表完整 ammunition / horses 经济账本、命令摩擦、高级士气/队形或完整滑铁卢战役规模已完成。
+
+核心更新：
+
+- 新增 `Faction.usesNapoleonicLogisticsVocabulary`，用于区分 legacy Germany / Allies 和 France / Anglo-Allied / Prussia / Austria / Russia / Spain 的后勤展示语义。
+- `ProductionKind.displayName(for:)` 为拿战 faction 提供玩家可见预备队名：
+  - `infantryDivision` -> `Line Infantry Reserve`
+  - `panzerDivision` -> `Guard Detachment`
+  - `motorizedDivision` -> `Cavalry Reserve`
+  - `artilleryDivision` -> `Artillery Battery`
+  - `supplyStockpile` -> `Supply Wagon`
+- `EconomyResources.summary(for:)` 为拿战 faction 把底层 `manpower / industry / supplies` 显示为 `Recruits / Ammunition/Horses / Supplies`；legacy 路径仍显示 `MP / IC / SUP`。
+- `EconomyRules.queueProduction`、回合结算日志、生产完成日志和无安全部署点日志改用 faction-aware 文案；拿战日志显示 `logistics` 而不是 `economy`。
+- `EconomyRules.makeProducedDivision` 在拿战 faction 下改走 `makeNapoleonicProducedFormation`，完成排产后生成 line infantry、guard、cavalry、artillery、supply train 等拿战 component 组合；legacy faction 仍走旧 `.infantry / .panzer / .motorized / .artillery` factory。
+- `EconomyPanelView` 在拿战 faction 下显示 `Reserves`、`Reserve Orders`、`Recruits`、`Ammunition/Horses`、`Supply Upkeep` 和拿战预备队按钮名；旧阿登路径保留原生产面板语义。
+- 新增 `ReinforcementState` 和 `ScheduledReinforcement`，`GameState` 保存 pending delayed reinforcement 和已到场 id；旧存档缺字段时 decode 为 empty。
+- `ScenarioDefinition` 新增可选 `reinforcements` 字段；旧阿登 JSON 不需要补字段。`DataLoader` 会解析并校验 reinforcement faction、unit template、entry hex 和可选 trigger controller。
+- `EconomyRules.resolveFactionTurn` 新增 `resolveScheduledReinforcements`：只处理当前 active faction 的到期增援；入口必须在 entry hex 2 格内、己控、空置、passable 且非敌邻；不安全时保留 pending 并记录 reinforce 日志。
+- `waterloo_1815_scenario.json` 新增 French Reserve Entry 后方入口 hex、`fr_imperial_guard_reserve` 第 5 回合到场和 `pr_bulow_iv_corps` 第 4 回合到场；`waterloo_1815_regions.json` 同步新增 French Ridge 后方入口 hex 映射。
+- `VictoryRules` 按 `scenarioId` 分流，新增 Waterloo 最小胜负节奏：France 控制 Mont-Saint-Jean 即胜；到 `maxTurns` 时 Hougoumont、Mont-Saint-Jean 和 Prussian Arrival Road 未被 France 控制，则 Anglo-Allied 获胜。
+- `Division` 新增 `morale`、`fatigue` 和 `ammunition` 字段，旧存档缺字段时分别按 component 默认值、0 和按 component 自动给满；低士气会降低 attack / defense 并可触发 retreatable 单位撤退，疲劳会降低 attack / defense / movement，低弹药或无弹药会降低弹药敏感单位火力。
+- `CombatRules.effectiveAttack` 新增最小拿战战术地形修正：cavalry 在 plain 有轻量加成，攻击 hill / forest / mountain / city / fortress 受限；HOLD 重步兵可在 plain 压制 cavalry 冲击；ranged artillery 对 plain / hill 目标略有优势，对复杂/据点地形略受限。
+- `CommandExecutor` 已把 move / attack / counterattack / hold 转成 morale / fatigue / ammunition 增减；`CommandValidator` 会用 `.moraleBroken` 拒绝 morale <= `Division.brokenMoraleThreshold` 的 move / attack，hold / allowRetreat / resupply 仍允许走各自校验；`SupplyRules.applyResupplyRest` 已按 supplied / lowSupply / encircled 分支恢复 strength、morale、fatigue 和 ammunition，撤退失败与包围损耗也会降低 morale。
+- `HUDView`、`UnitInspectorView` 和 `UnitTooltipView` 已显示 pending reinforcements、平均 morale、平均 fatigue、readiness、单位 morale / fatigue / ammunition 和 shaken / broken / low ammunition 状态。
+- `AgentContextBuilder` / `AgentPromptBuilder` 已把 morale / fatigue / ammunition 放入 legacy Agent D 摘要；`MarshalBattlefieldSummarizer` 已把 morale / fatigue / ammunition warning count 放入 `MarshalFrontSummary`，summary schema 升到 6，并用于防御优先级和状态说明。
+- 新增 v3.5 阶段记录，并更新 README、flow、flowchart、plan 和总提示词。
+
+关键文件：
+
+- `WWIIHexV0/Core/Faction.swift`
+- `WWIIHexV0/Core/Division.swift`
+- `WWIIHexV0/Core/EconomyState.swift`
+- `WWIIHexV0/Core/GameState.swift`
+- `WWIIHexV0/Core/VictoryState.swift`
+- `WWIIHexV0/Agents/AgentContexts.swift`
+- `WWIIHexV0/Agents/AgentPromptBuilder.swift`
+- `WWIIHexV0/Agents/ZoneCommanderAgent.swift`
+- `WWIIHexV0/Commands/CommandValidation.swift`
+- `WWIIHexV0/Data/ScenarioDefinition.swift`
+- `WWIIHexV0/Data/DataLoader.swift`
+- `WWIIHexV0/Data/waterloo_1815_scenario.json`
+- `WWIIHexV0/Data/waterloo_1815_regions.json`
+- `WWIIHexV0/Rules/CombatRules.swift`
+- `WWIIHexV0/Rules/CommandExecutor.swift`
+- `WWIIHexV0/Rules/CommandValidator.swift`
+- `WWIIHexV0/Rules/EconomyRules.swift`
+- `WWIIHexV0/Rules/SupplyRules.swift`
+- `WWIIHexV0/Rules/VictoryRules.swift`
+- `WWIIHexV0/UI/EconomyPanelView.swift`
+- `WWIIHexV0/UI/HUDView.swift`
+- `WWIIHexV0/UI/UnitInspectorView.swift`
+- `WWIIHexV0/UI/UnitTooltipView.swift`
+- `md/prompt/v3.0-拿战迁移/v3.5_logistics_reinforcement_foundation.md`
+- `README.md`
+- `md/flow/flow.md`
+- `md/flow/flowchart.md`
+- `md/plan/plan.md`
+- `update_log.md`
+
+验证记录：
+
+- `swiftc -parse WWIIHexV0/Core/Faction.swift WWIIHexV0/Core/Division.swift WWIIHexV0/Core/EconomyState.swift WWIIHexV0/Core/GameState.swift WWIIHexV0/Core/VictoryState.swift WWIIHexV0/Data/ScenarioDefinition.swift WWIIHexV0/Data/DataLoader.swift WWIIHexV0/Commands/CommandValidation.swift WWIIHexV0/Rules/CombatRules.swift WWIIHexV0/Rules/CommandExecutor.swift WWIIHexV0/Rules/CommandValidator.swift WWIIHexV0/Rules/EconomyRules.swift WWIIHexV0/Rules/SupplyRules.swift WWIIHexV0/Rules/VictoryRules.swift WWIIHexV0/UI/EconomyPanelView.swift WWIIHexV0/UI/HUDView.swift WWIIHexV0/UI/UnitInspectorView.swift WWIIHexV0/UI/UnitTooltipView.swift WWIIHexV0/Agents/AgentContexts.swift WWIIHexV0/Agents/AgentPromptBuilder.swift WWIIHexV0/Agents/ZoneCommanderAgent.swift`：通过，无输出。
+- `jq empty WWIIHexV0/Data/waterloo_1815_scenario.json`：通过，无输出。
+- `jq empty WWIIHexV0/Data/waterloo_1815_regions.json`：通过，无输出。
+- `jq empty WWIIHexV0/Data/napoleonic_unit_templates.json`：通过，无输出。
+- `jq -e '(.reinforcements | length) == 2 and ([.reinforcements[].id] | unique | length) == (.reinforcements | length)' WWIIHexV0/Data/waterloo_1815_scenario.json`：通过，输出 `true`。
+- `jq -s '.[0].reinforcements as $reinforcements | (.[1].templates | map(.id)) as $templates | all($reinforcements[]; .templateId as $id | $templates | index($id) != null)' WWIIHexV0/Data/waterloo_1815_scenario.json WWIIHexV0/Data/napoleonic_unit_templates.json`：通过，输出 `true`。
+- `jq -s '.[0].map.tiles as $tiles | .[1].hexToRegion as $h2r | ($tiles | length) == 13 and ($h2r | length) == 13 and all($tiles[]; "\(.q),\(.r)" as $key | $h2r[$key] != null)' WWIIHexV0/Data/waterloo_1815_scenario.json WWIIHexV0/Data/waterloo_1815_regions.json`：通过，输出 `true`。
+- `jq '(.map.tiles | map("\(.q),\(.r)")) as $tileKeys | all(.reinforcements[]; "\(.entryCoord.q),\(.entryCoord.r)" as $key | $tileKeys | index($key) != null)' WWIIHexV0/Data/waterloo_1815_scenario.json`：通过，输出 `true`。
+- `jq -e '([.templates[].components[].type] | unique - ["artillery","cavalry","engineer","guard","lightInfantry","lineInfantry"] | length) == 0' WWIIHexV0/Data/napoleonic_unit_templates.json`：通过，输出 `true`。
+- `rg -n 'Panzer Division|Motorized Division|Label\(kind\.displayName,|Text\("Production"\)|Text\("Queue"\)|resourceSummary\(kind\.cost\)' WWIIHexV0/UI/EconomyPanelView.swift WWIIHexV0/Rules/EconomyRules.swift`：无命中。
+- `rg -n 'kind\.displayName[^\(]' WWIIHexV0/UI/EconomyPanelView.swift WWIIHexV0/Rules/EconomyRules.swift`：无命中。
+- `rg -n "[[:blank:]]+$" AGENTS.md README.md update_log.md md/test/test.md md/flow/flow.md md/flow/flowchart.md md/prompt/v3.0-拿战迁移 md/plan/plan.md WWIIHexV0/Data/*.json`：无命中。
+- `rg -n "^<<<<<<<|^=======|^>>>>>>>" AGENTS.md README.md update_log.md md/flow WWIIHexV0 MapEditor md/prompt/v3.0-拿战迁移 md/plan/plan.md`：无命中。
+- `git diff --check`：通过，无输出。
+
+未跑：
+
+- 未跑 Xcode / XCTest / 模拟器 / app 启动 / Probe / Smoke / Stage Regression / Dynamic Theater Regression / Full / 性能测试；原因是当前规范默认禁止本机重测试，本轮也未获人工授权。
+
+遗留风险：
+
+- `EconomyResources.industry` 在拿战展示层暂时复用为 `Ammunition/Horses` 复合资源；后续若拆真实 ammunition / horses 经济字段，需要 schema 与存档迁移。
+- `ProductionKind.panzerDivision`、`motorizedDivision` raw case 仍保留兼容，源码枚举名尚未迁移；玩家可见层已按拿战 faction 改名。
+- 当前 delayed reinforcement schedule 只支持最小 turn / objective trigger 和安全入口部署；不支持随机迟到、道路阻塞、同盟命令摩擦、多入口优先级或完整普军来援曲线。
+- 完整炮兵准备、显式骑兵冲锋命令、方阵/队形、高级士气、概率式命令拒绝、真实 ammunition / horses 经济账本和完整滑铁卢胜负节奏仍未落地。
+- 单文件 `swiftc -parse` 只能确认语法，不等于 Xcode build、SwiftUI 预览或运行时验证。
+
+## v3.6 - 拿战 UI token 与状态面板可读性基础
+
+完成日期：2026-07-05
+
+性质：v3.6 起步记录。本节代表发布级拿战 UI 收口开始从共享视觉 token、HUD、单位详情、tooltip 和预备队面板切入；不代表完整 19 世纪地图美术、计划箭头、指挥官头像、战报回放、移动端视觉验收或默认滑铁卢启动已经完成。
+
+核心更新：
+
+- 新增 `NapoleonicDesignTokens`，集中保存面板 padding、圆角、描边、拿战蓝、红、黄铜色以及 steady / warning / critical 状态色。
+- `HUDView` 复用 token，拿战 faction 下标题使用拿战 tint；morale、fatigue 和 readiness 从纯数字改为 `Steady` / `Shaken` / `Broken`、`Fresh` / `Tired` / `Exhausted`、`Ready` / `Strained` 文案加颜色状态。
+- `HUDView` 对无单位状态做 faction-aware 显示：legacy 为 `No Units`，拿战为 `No Formations`，避免空列表平均 morale = 0 被误判为 broken；拿战路径还把顶部按钮和增援计数显示为 `End Orders`、`Reserve Arrivals`。
+- `ScenarioCatalog.displayName(for:)` 成为 HUD、RootGameView accessibility label 和 SpriteKit empty board title 的场景标题来源；移除这些玩家可见位置的 `Ardennes V0` 硬编码。
+- `GameState.initial()` fallback 日志从 `Ardennes V0 scenario initialized.` 改为中性 `Legacy scenario initialized.`，避免 fallback 路径继续暴露旧硬编码标题。
+- `MapDisplayLayer.displayName(for:)` 保留 legacy 图层名，但在拿战 faction 下把主界面 map layer picker 显示为 `Sector`、`Initial Wing`、`Active Wing`、`Contact`、`Corps`。
+- `RootGameView` compact info tabs 在拿战 faction 下显示 `Formation`、`Sector`、`Dispatches`、`Logistics`、`Coalition` 等术语；legacy faction 仍保留 Unit / Region / Log / Economy / Diplomacy。
+- `EventLogView` 在拿战 faction 下把标题显示为 `Dispatches`，并把部分日志分类从 `Reinforce` / `Theater` / `Region` / `Diplomacy` 显示为 `Reserve` / `Wing` / `Sector` / `Coalition`。
+- `AgentPanelView` 的空状态不再显示 `guderian` / `MockAI` 占位，改为 `No agent selected` / `No provider` 和中性 raw JSON placeholder。
+- `UnitInspectorView`、`RegionInspectorView`、`CommandPanelView`、`GeneralCommandPanelView` 和 `DiplomacyPanelView` 在拿战 faction 下继续收口面板内术语：Formation Details、Sector、Orders、Corps Command、Coalition、Active Wing、Corps Sector、Contact Line、Withdrawal Orders、Attack Sector 等；legacy faction 保留旧显示。
+- `GeneralProfileView` 和 `AgentPanelView` 接收 active faction，拿战 faction 下将 `General Profile` / `Assigned Units` / `AI Decision` / `Zone Directives` 等显示为 `Commander Profile` / `Assigned Formations` / `Command Dispatch` / `Corps Directives`；`EventLogView` 的 front change 分类显示为 `Contact`。
+- `AppContainer` 的 `interactionLog` 写入改为 faction-aware 显示：拿战 faction 下玩家命令、军团命令、选择反馈和 AI 回合摘要显示为 `Order`、`Formation`、`Sector`、`Corps Order`、`Reserve Order`、`Command Dispatch`、`Simulated Staff` 等术语；legacy faction 保留旧显示。
+- `RuleEngine`、`CommandExecutor` 和 `WarCommandExecutor` 的玩家可见结果/事件也切换拿战术语：`CommandResult.message` 显示 `Order executed` / `Order rejected`，校验错误显示 formation / sector / reserves 语义，HOLD / allow retreat / dynamic theater / front change 事件显示 `Hold Line`、`Withdrawal`、`active wing`、`Contact`；`WarCommandExecutor` 的动态推进判断同步使用 `DiplomacyState.isFriendly`。
+- `UnitInspectorView` 复用 token 和带 SF Symbol 的 `Label` 展示 morale、fatigue、ammunition 和 status；状态不只靠颜色，也带 `Broken`、`Shaken`、`Low`、`Empty` 等文字。
+- `UnitTooltipView` 同步 morale / fatigue / ammunition 的状态文案和 token 描边；拿战 faction 下 tooltip label / VoiceOver 使用 Formation、Formation Strength、Withdrawal、Orders，并把兵种码切到 LINE / LIGHT / CAV / ART / GUARD / ENG / SUP。
+- `UnitNode` 保留 legacy NATO/二战符号路径，但拿战 faction 下改绘拿战 formation symbol：线列步兵双线、轻步兵散点、骑兵 V、炮兵轮炮、近卫星标、工兵桥线、补给车；棋子底部状态码把 retreatable 从 legacy `R` 切为拿战 `W`。
+- `BoardScene` 从 `ReinforcementState.pending` 只读绘制增援入口 marker：非 observer 只显示当前 viewer faction 或友军 pending 增援入口，observer 显示全部非 neutral pending 入口；拿战 faction marker 显示 `RES` 和最早到达回合，不改变规则层安全入口部署。
+- `BoardScene` 从 `MapState.objectives` 只读绘制目标点 marker：按现有 `ObjectiveType` 显示村庄、据点/农庄和道路/补给目标图标；marker 读取 visibility，frontLine 图层隐藏，不改变胜利、占领或补给规则。
+- `BoardScene` 从 `WarDirectiveRecord` 只读绘制 recent directive replay：跳过玩家计划线已有的 `issuerId == "player"` 记录，非 observer 只显示 viewer faction 或友军记录，observer 显示全部非 neutral 记录；攻击记录画轻量箭头，防御/无目标记录画圆环，`fireCoverage` / breakthrough / pincer / feint 等 tactic 在终点显示瞄准圈、楔形、钳形或扰动 marker，不改变 directive 生成或执行。
+- `EconomyPanelView` 复用 token，拿战 faction 下的 reserves 面板标题、按钮 tint、资源数值和 ready 状态有统一视觉语义。
+- 新增 v3.6 阶段记录，并更新 README、flow、plan、总提示词和 update_log。
+
+关键文件：
+
+- `WWIIHexV0/Core/GameState.swift`
+- `WWIIHexV0/Core/MapDisplayLayer.swift`
+- `WWIIHexV0/Data/DataLoader.swift`
+- `WWIIHexV0/App/AppContainer.swift`
+- `WWIIHexV0/Commands/Command.swift`
+- `WWIIHexV0/Commands/CommandValidation.swift`
+- `WWIIHexV0/Commands/WarCommandExecutor.swift`
+- `WWIIHexV0/Rules/RuleEngine.swift`
+- `WWIIHexV0/Rules/CommandExecutor.swift`
+- `WWIIHexV0/SpriteKit/BoardScene.swift`
+- `WWIIHexV0/SpriteKit/UnitNode.swift`
+- `WWIIHexV0/UI/PlatformStyles.swift`
+- `WWIIHexV0/UI/HUDView.swift`
+- `WWIIHexV0/UI/RootGameView.swift`
+- `WWIIHexV0/UI/EventLogView.swift`
+- `WWIIHexV0/UI/AgentPanelView.swift`
+- `WWIIHexV0/UI/CommandPanelView.swift`
+- `WWIIHexV0/UI/EconomyPanelView.swift`
+- `WWIIHexV0/UI/RegionInspectorView.swift`
+- `WWIIHexV0/UI/UnitInspectorView.swift`
+- `WWIIHexV0/UI/UnitTooltipView.swift`
+- `WWIIHexV0/UI/GeneralCommandPanelView.swift`
+- `WWIIHexV0/UI/GeneralProfileView.swift`
+- `WWIIHexV0/UI/DiplomacyPanelView.swift`
+- `md/prompt/v3.0-拿战迁移/v3.6_napoleonic_ui_polish_foundation.md`
+- `README.md`
+- `md/flow/flow.md`
+- `md/flow/flowchart.md`
+- `md/plan/plan.md`
+- `md/prompt/v3.0-拿战迁移/codex-v3.0-拿战aiagent迁移总提示词.md`
+- `update_log.md`
+
+验证记录：
+
+- `swiftc -parse WWIIHexV0/Core/Faction.swift WWIIHexV0/Core/Division.swift WWIIHexV0/Core/EconomyState.swift WWIIHexV0/Core/GamePhase.swift WWIIHexV0/Core/GameState.swift WWIIHexV0/Core/VictoryState.swift WWIIHexV0/Core/MapDisplayLayer.swift WWIIHexV0/Core/PlayerCommandState.swift WWIIHexV0/Core/FrontZone.swift WWIIHexV0/Core/FrontZoneId.swift WWIIHexV0/Core/FrontZoneSegment.swift WWIIHexV0/Core/WarDeploymentState.swift WWIIHexV0/Core/DiplomacyState.swift WWIIHexV0/Core/WarDirectiveRecord.swift WWIIHexV0/Data/ScenarioDefinition.swift WWIIHexV0/Data/DataLoader.swift WWIIHexV0/Commands/Command.swift WWIIHexV0/Commands/CommandValidation.swift WWIIHexV0/Commands/WarDirective.swift WWIIHexV0/Commands/WarCommandExecutor.swift WWIIHexV0/Agents/GeneralRegistry.swift WWIIHexV0/Agents/ZoneCommanderAgent.swift WWIIHexV0/Agents/RulerAgent.swift WWIIHexV0/App/AppContainer.swift WWIIHexV0/Rules/RuleEngine.swift WWIIHexV0/Rules/CommandExecutor.swift WWIIHexV0/SpriteKit/MapDisplayAdapter.swift WWIIHexV0/SpriteKit/UnitNode.swift WWIIHexV0/UI/PlatformStyles.swift WWIIHexV0/UI/HUDView.swift WWIIHexV0/UI/RootGameView.swift WWIIHexV0/UI/CommandPanelView.swift WWIIHexV0/UI/EconomyPanelView.swift WWIIHexV0/UI/EventLogView.swift WWIIHexV0/UI/AgentPanelView.swift WWIIHexV0/UI/RegionInspectorView.swift WWIIHexV0/UI/UnitInspectorView.swift WWIIHexV0/UI/UnitTooltipView.swift WWIIHexV0/UI/GeneralCommandPanelView.swift WWIIHexV0/UI/GeneralProfileView.swift WWIIHexV0/UI/DiplomacyPanelView.swift WWIIHexV0/SpriteKit/BoardScene.swift`：通过，无输出。
+- `rg -n "Ardennes V0" WWIIHexV0/UI WWIIHexV0/SpriteKit WWIIHexV0/Core`：无命中。
+- `rg -n "guderian|MockAI" WWIIHexV0/UI WWIIHexV0/SpriteKit WWIIHexV0/Core`：仅命中 `AgentPanelView` 中把 raw provider `MockAI` 映射为 `Simulated Staff` 的兼容判断，不是拿战可见文案。
+- `rg -n "[[:blank:]]+$" AGENTS.md README.md update_log.md md/test/test.md md/flow/flow.md md/flow/flowchart.md md/flow/03_ai_zone_directive_pipeline.mermaid md/prompt/v3.0-拿战迁移 md/plan/plan.md WWIIHexV0/Data/*.json`：无命中。
+- `rg -n "^<<<<<<<|^=======|^>>>>>>>" AGENTS.md README.md update_log.md md/flow WWIIHexV0 MapEditor md/prompt/v3.0-拿战迁移 md/plan/plan.md`：无命中。
+- `git diff --check`：通过，无输出。
+
+未跑：
+
+- 未跑 Xcode / XCTest / 模拟器 / app 启动 / Probe / Smoke / Stage Regression / Dynamic Theater Regression / Full / 性能测试；原因是当前规范默认禁止本机重测试，本轮也未获人工授权。
+
+遗留风险：
+
+- `swiftc -parse` 只能确认语法，不等于 Xcode build、SwiftUI preview、运行时布局或真实视觉验收。
+- `NapoleonicDesignTokens` 为避免改 project 文件暂放在已入 target 的 `PlatformStyles.swift`；后续若统一 project 维护，可拆成独立文件并更新 `.pbxproj`。
+- 当前 UI 仍保留默认阿登入口、源码兼容命名和部分 legacy 英文；发布级 v3.6 还需要继续清理 RootGameView 布局、SpriteKit 图层、事件日志、AI 复盘和主界面布局。
+
+## v3.7 - 拿战试玩闭环新局基础
+
+完成日期：2026-07-05
+
+性质：v3.7 起步记录。本节代表新局配置入口、玩家阵营选择、开局顺序选项、Waterloo 资源打包路径、3 个本地试玩保存/继续 slot、Slot 1 旧单槽 key 兼容读取、最小 slot label / 槽名自定义、基础试玩设置持久化、本地坏快照/坏设置恢复提示、可关闭的非阻塞短引导、无可行动反馈、AI dispatch issue 可见诊断、诊断/拒绝原因预览和 AI 回放可读摘要 / Recent Dispatch Timeline 已经起步；不代表发布级命名存档、完整迁移器、文件导出、云同步、完整设置、完整引导、完整战斗时间线/动画回放、完整运行时错误恢复或完整滑铁卢试玩闭环已经完成。
+
+核心更新：
+
+- `AppContainer` 新增 `currentScenario`，并将 `playerFaction` 与 `generalRegistry` 改为可随新局切换的 published state；既有外部读取仍保持 `private(set)`。
+- 新增 `AppContainer.startNewGame(scenario:playerFaction:)`，按所选 `ScenarioCatalogEntry` 重载 `GameState`、对应 `GeneralRegistry` 和玩家控制阵营，清空 selection、highlight、interaction log、agent decision record 与 recent directive replay，并保留所有行动仍走既有命令管线。
+- `resetGame()` 不再固定重载 `DataLoader.loadInitialGameState()`，而是按当前 scenario 和当前玩家阵营重载。
+- `AppContainer` 新增 `startsNewGameAtPlayerFaction`；`startNewGame` 新增 `startsAtPlayerFaction` 参数，开启时在新局装配阶段把 active faction / phase 指定到玩家所选 faction，清空本回合玩家锁定，并重置该 faction 已部署 formation 的 `hasActed`。
+- `AppContainer.normalizeCommandPhase` 会在试玩 runtime refresh、继续恢复和保存 snapshot 前，把拿战 active faction 的 phase 按当前 `playerFaction` 归一：玩家控制 faction 为 `.playerCommand`，其它非 neutral 拿战 faction 为 `.aiCommand`；legacy Germany / Allies phase 仍保留旧 raw value 兼容。
+- 新增 `AppContainer.availablePlayerFactions(for:)`，从 scenario JSON 的 `factions` 派生可选非 neutral 阵营，并按 `Faction.turnOrderPriority` 排序；读取失败时 fallback 到 Waterloo 或 legacy faction 列表。
+- 新增 `GameSaveSlot` 与 `GameSaveSnapshot`，以 schemaVersion 1 保存 `scenarioId`、`playerFaction`、`startsAtPlayerFaction`、`savedAt` 和 `GameState`；当前存储为 Slot 1 / Slot 2 / Slot 3 三个 `UserDefaults` 本地试玩 slot，Slot 1 兼容读取旧单槽 key `WWIIHexV0.savedGameSnapshot.v1`；slot label 另存到独立 `UserDefaults` key，不写入 snapshot，不升级 schemaVersion。
+- `AppContainer.saveCurrentGame(to:)` 写入目标 slot snapshot 并更新 `savedGameSummaries` / `lastCommandMessage` / interaction log；`AppContainer.setSaveSlotLabel(_:for:)` 会持久化 32 字以内 slot label，保存/继续/清理消息优先显示自定义 label；`continueSavedGame(from:)` 只接受当前 schemaVersion，恢复时必须匹配当前 `ScenarioCatalog` 中存在的 snapshot scenario，找不到 scenario 时把该 slot 标为不可用并显示原因；恢复成功时重载 `GeneralRegistry`、重新 bootstrap / assign generals，清空 selection、highlight 和本地 replay state，然后调用现有 `runAIIfNeeded()` eligibility gate，使 Staff 模式（包括 observer + Staff）在恢复到 AI-eligible active faction 时可继续 simulated staff，Manual 仍不自动 dispatch，observer + Manual 仍只读。
+- `GameSaveSnapshot.load(slot:)` 区分 missing / loaded / unavailable；不可解码、schema 不兼容或引用当前构建不存在 scenario 的快照会通过 `AppContainer.savedGameRecoveryMessages` 与 `NewGameSetupView` Continue 区块按当前 slot 显示原因，并保留 `Clear Saved` 清理入口。
+- 新增 `ReplayDetailLevel`，提供 Concise / Standard / Full 三档，控制事件日志条数、metadata 粒度、AI 面板 directive 条数、Staff Summary / Issue Preview / Recent Dispatch Timeline、context summary 和 raw JSON 显示。
+- 新增 `AICommandPace`、`PlaytestAIControlMode` 与 `PlaytestSessionSettings`；`AppContainer.bootstrap()` 读取 `UserDefaults` key `WWIIHexV0.playtestSessionSettings.v1`，把 observer mode、map layer、`ReplayDetailLevel`、AI Pace、AI Control、Guide Notes、Reduce Motion 和 Text Size 作为试玩偏好持久化。AI Pace 只在 simulated staff 行动前插入短延迟，不改变 AI 输出、命令校验或规则执行；Reduce Motion 开启时跳过这段本地等待。
+- `PlaytestSessionSettings.loadResult` 区分 missing / loaded / resetToStandard；偏好数据无法解码时会删除损坏值、恢复标准设置，并通过 `AppContainer.sessionSettingsRecoveryMessage` 在 interaction log 与 Settings 区块提示。
+- 新增 `PlaytestGuideCue`，在玩家首次选择 formation、首次选择炮兵/远程单位、首次选择骑兵、首次结束命令时向 interaction log 追加一次性 `Staff note`；提示不弹 modal、不阻塞地图，也不改变规则状态。
+- `AppContainer` 新增 `replayDetailLevel`、`aiCommandPace`、`aiControlMode`、`playtestGuideCuesEnabled`、`playtestTextSize`、`reduceMotionEnabled` 和 `applySessionSettings(observerModeEnabled:mapDisplayLayer:replayDetailLevel:aiCommandPace:aiControlMode:playtestGuideCuesEnabled:playtestTextSize:reduceMotionEnabled:)`，把 observer mode、当前 map layer、回放详细度、AI 节奏、AI 自动触发模式、短引导开关、文本大小和减少动态效果作为本地试玩设置统一应用并持久化。
+- 新增 `PlaytestTextSize`，提供 Compact / Standard / Large 三档；`NewGameSetupView` 的 Text Size picker 会持久化该设置，`EventLogView` 与 `AgentPanelView` 会使用 Dynamic Type 字体样式调整标题、metadata、正文、raw JSON 和行距。
+- `NewGameSetupView` 新增 `Guide Notes` toggle；关闭后 `AppContainer.appendPlaytestCueIfNeeded` 不再写入首次 formation / artillery / cavalry / ending orders 的短 `Staff note`。
+- `AppContainer.playerOrdersStatusMessage` 会在玩家命令阶段统计本方未毁灭且未 acted 的 formation / unit；`CommandPanelView` 未选中单位时显示仍有几支可行动或全部已用完；Manual 模式且当前 active faction 是非玩家时，空态会提示用 End Orders 手动推进该 faction；observer + Staff 会提示用 End Orders 触发 staff dispatch，observer + Manual 保持 orders disabled，macOS End Turn 菜单也跟随 `canAdvanceOrders` 禁用。
+- `AppContainer.aiNoActionFeedbackMessage` 会在 AI 回合结束后检查 `AgentDecisionRecord.commandResults`，若没有非 End Turn 的已执行战场命令，则向 interaction log 追加 `Staff note` / `AI note`；record-level 诊断会先由 `aiDiagnosticFeedbackMessages` 统一写入可见的 `Command dispatch issue` / `AI issue`。
+- `AppContainer` 新增本地 `deliveredPlaytestCues`，新局或继续时清空，只用于控制短引导重复次数；不写入 `GameState` 或存档。
+- `AppContainer.clearSavedGame(slot:)` 会删除当前 slot 快照、清空对应 `savedGameSummaries` / `savedGameRecoveryMessages` 并写入 interaction log；Slot 1 清理时也会删除旧单槽 key，用于坏快照或旧试玩快照恢复；清理快照不会删除 slot label。
+- `NewGameSetupView` 会把 Start、Save Current、Continue Saved 和 Clear Saved 的回调结果显示在 sheet 内 Status 区块；开始或继续失败时 sheet 保持打开并显示 `AppContainer.lastCommandMessage`，保存或清理成功也会给出本地确认。
+- 新增 `NewGameSetupView`，从 HUD 新局按钮打开 sheet，默认显示 Waterloo 1815 数据切片并隐藏 legacy scenario，打开 `Archived Campaigns` 后才显示 `ScenarioCatalog.all` 中的阿登 legacy；玩家可选择控制阵营，并用 `Opening Turn` toggle 决定是否由玩家所选 faction 先行动；sheet 也暴露 Save Slot、Slot Name / Rename Slot、Observer Mode、Map Layer、Dispatch Detail、AI Pace、AI Control、Guide Notes、Reduce Motion、Text Size、坏设置恢复提示、坏快照 Clear Saved 和最近操作 Status，通过 `AppContainer` 调用新局、slot label 持久化、保存、继续、清理快照和 settings setter，不直接修改 `GameState`。
+- AI Control 已起步：`PlaytestAIControlMode.simulatedStaff` 为默认，保持非 observer 下玩家 faction 手动、其它非 neutral faction 自动 simulated staff；observer + Staff 可触发 staff dispatch；`runAISequence` 以当前 turn order faction 数量为有限上限，连续处理非玩家 AI faction 直到回到玩家方或 AI 资格失效；`.manualAdvance` 只停用自动 dispatch 触发，非 observer 下 HUD / CommandPanel End Orders 仍提交 `Command.endTurn` 并由 `RuleEngine` 推进当前 active faction；observer + Manual 保持只读并禁用 End Orders，`AppContainer.submit(_:)` 也会拒绝 observer 直接命令；非玩家 active faction 在 Manual 下会显示 Manual Dispatch / 手动推进提示；Manual 切回 Staff、开启 observer 或 Continue 恢复到 AI-eligible active faction 后会重新调用 `runAIIfNeeded()` gate 恢复自动触发，不改变 AI 输出、directive schema、`WarCommandExecutor` 或 `GameState`。
+- `EventLogView` 和 `AgentPanelView` 接收 `ReplayDetailLevel` 与 `PlaytestTextSize`：Concise 降低日志/复盘密度，Standard 保持默认可读性，Full 展示 raw JSON 和 record id 等审计信息；Text Size 只调整本地日志/复盘面板的动态字体层级和行距。
+- `AgentPanelView` 新增只读 Staff Summary / Dispatch Summary、Issue Preview 和 Recent Dispatch Timeline，从当前 `AgentDecisionRecord` 与最近 `WarDirectiveRecord` 聚合执行数、拒绝数、问题数、focus sector / target、最新 tactic、`AgentDecisionRecord.errors`、`CommandResultSummary.errors` 和 `WarDirectiveRecord.diagnostics`，并把最近 directive 按 turn / scope / target / tactic / status / 首要拒绝或诊断原因摘要成可读时间线；Concise 下隐藏逐条 command result / directive card，只保留短摘要、时间线与最多一条全局问题预览，Full 下可看完整明细和 raw JSON。
+- `AppContainer.runAISequence` 会聚合连续 AI faction 的 `AgentDecisionRecord.errors`，避免多 faction 自动 dispatch 时早期错误被最后一个 record 覆盖；若有限步数 guard 结束后当前 active faction 仍符合 AI 自动触发条件，会追加 dispatch paused 诊断，提示自动处理已停止以避免循环。
+- `TurnManager.executeDirectiveEnvelope` 会把默认 directive 管线的 AI end-turn 失败同步进诊断型 `WarDirectiveRecord`，让 Staff Summary / Issue Preview / Recent Dispatch Timeline 除了 `AgentDecisionRecord.errors` 外也能看到该问题。
+- `HUDView` 接收 `playerFaction`、`PlaytestAIControlMode` 和 observer 状态，phase 显示改为由 active faction、玩家阵营、AI Control 和 observer 共同推导：玩家回合显示 `Your Orders` / `Player Command`，非玩家 Staff 显示 `Staff Dispatch`，Manual 显示 `Manual Dispatch`，observer Manual 显示 `Manual Observation`，避免拿战玩家回合仍显示 `AI Command` 或手动推进阶段被误读成自动 staff。
+- `Faction` 和 `ScenarioCatalogEntry` 增加 `Identifiable`，支撑 SwiftUI picker / ForEach 的稳定 id。
+- `WWIIHexV0.xcodeproj/project.pbxproj` 将 `NewGameSetupView.swift` 加入 iOS 与 macOS target sources，并将 Waterloo 与 napoleonic JSON 加入 iOS 与 macOS bundle resources，保证 `DataLoader` 的 `Bundle.main` 加载路径可用。
+- 新增 v3.7 阶段记录，并更新 README、flow、flowchart、plan、总提示词和 update_log。
+
+关键文件：
+
+- `WWIIHexV0/App/AppContainer.swift`
+- `WWIIHexV0/App/AICommandPace.swift`
+- `WWIIHexV0/App/GameSaveSnapshot.swift`
+- `WWIIHexV0/App/PlaytestSessionSettings.swift`
+- `WWIIHexV0/App/ReplayDetailLevel.swift`
+- `WWIIHexV0/App/PlaytestGuideCue.swift`
+- `WWIIHexV0/Turn/TurnManager.swift`
+- `WWIIHexV0/UI/RootGameView.swift`
+- `WWIIHexV0/UI/NewGameSetupView.swift`
+- `WWIIHexV0/UI/HUDView.swift`
+- `WWIIHexV0/UI/EventLogView.swift`
+- `WWIIHexV0/UI/AgentPanelView.swift`
+- `WWIIHexV0/Core/Faction.swift`
+- `WWIIHexV0/Data/DataLoader.swift`
+- `WWIIHexV0.xcodeproj/project.pbxproj`
+- `WWIIHexV0/Data/waterloo_1815_scenario.json`
+- `WWIIHexV0/Data/waterloo_1815_regions.json`
+- `WWIIHexV0/Data/napoleonic_terrain_rules.json`
+- `WWIIHexV0/Data/napoleonic_unit_templates.json`
+- `WWIIHexV0/Data/napoleonic_generals.json`
+- `md/prompt/v3.0-拿战迁移/v3.7_napoleonic_playtest_loop_foundation.md`
+- `README.md`
+- `md/flow/flow.md`
+- `md/flow/flowchart.md`
+- `md/plan/plan.md`
+- `md/prompt/v3.0-拿战迁移/codex-v3.0-拿战aiagent迁移总提示词.md`
+- `update_log.md`
+
+验证记录：
+
+- `swiftc -parse WWIIHexV0/Core/Faction.swift WWIIHexV0/Core/GamePhase.swift WWIIHexV0/Core/GameState.swift WWIIHexV0/Core/PlayerCommandState.swift WWIIHexV0/Core/Division.swift WWIIHexV0/Core/MapDisplayLayer.swift WWIIHexV0/App/AICommandPace.swift WWIIHexV0/App/ReplayDetailLevel.swift WWIIHexV0/App/PlaytestSessionSettings.swift WWIIHexV0/App/PlaytestGuideCue.swift WWIIHexV0/App/GameSaveSnapshot.swift WWIIHexV0/Data/DataLoader.swift WWIIHexV0/App/AppContainer.swift WWIIHexV0/App/WWIIHexV0MacApp.swift WWIIHexV0/Turn/TurnManager.swift WWIIHexV0/UI/RootGameView.swift WWIIHexV0/UI/HUDView.swift WWIIHexV0/UI/NewGameSetupView.swift WWIIHexV0/UI/EventLogView.swift WWIIHexV0/UI/AgentPanelView.swift WWIIHexV0/UI/CommandPanelView.swift`：通过，无输出。
+- `plutil -lint WWIIHexV0.xcodeproj/project.pbxproj`：通过，输出 `WWIIHexV0.xcodeproj/project.pbxproj: OK`。
+- `jq empty WWIIHexV0/Data/waterloo_1815_scenario.json WWIIHexV0/Data/waterloo_1815_regions.json WWIIHexV0/Data/napoleonic_unit_templates.json WWIIHexV0/Data/napoleonic_generals.json WWIIHexV0/Data/napoleonic_terrain_rules.json`：通过，无输出。
+- `rg -n "Staff [/] observer|Staff[/]observer|Manual[[:space:]]仍等待|Manual[[:space:]]等待|玩家仍.{0,2}通过" README.md update_log.md md/flow/flow.md md/flow/flowchart.md md/plan/plan.md md/prompt/v3.0-拿战迁移`：无命中。
+- `rg -n "[[:blank:]]+$" AGENTS.md README.md update_log.md md/test/test.md md/flow/flow.md md/flow/flowchart.md md/flow/03_ai_zone_directive_pipeline.mermaid md/prompt/v3.0-拿战迁移 md/plan/plan.md WWIIHexV0/App/AppContainer.swift WWIIHexV0/App/WWIIHexV0MacApp.swift WWIIHexV0/UI/HUDView.swift WWIIHexV0/UI/CommandPanelView.swift WWIIHexV0/UI/RootGameView.swift`：无命中。
+- `rg -n "^<<<<<<<|^=======|^>>>>>>>" AGENTS.md README.md update_log.md md/flow WWIIHexV0 MapEditor md/prompt/v3.0-拿战迁移 md/plan/plan.md`：无命中。
+- `git diff --check`：通过，无输出。
+
+未跑：
+
+- 未跑 Xcode / XCTest / 模拟器 / app 启动 / Probe / Smoke / Stage Regression / Dynamic Theater Regression / Full / 性能测试；原因是当前规范默认禁止本机重测试，本轮也未获人工授权。
+
+遗留风险：
+
+- `swiftc -parse` 只能确认语法，不等于 Xcode build、SwiftUI sheet 行为、Bundle resource 运行时加载或 macOS/iOS 视觉验收。
+- `Opening Turn` 只处理新局开始时的 active faction；若关闭该选项，仍依赖既有 `advanceOrRunAI()` / `runAIIfNeeded()` 让 scenario 开局的非玩家 faction 走 AI。继续存档成功后也会调用同一个 AI eligibility gate，但尚未做运行时视觉/交互重测试。
+- `GamePhase.legacyCompatibleCommandPhase(for:)` 对拿战 faction 仍会返回 `.aiCommand` 作为规则层旧 helper；`AppContainer.normalizeCommandPhase` 已在试玩 runtime / save 边界按玩家控制权归一拿战 phase，但还不是全项目 schema 级 phase 迁移。
+- Waterloo 仍是小规模数据切片；可从新局加载不等于完整可玩滑铁卢战役。
+- 保存/继续仅有 schemaVersion 1 三槽本地试玩快照、Slot 1 旧 key 兼容读取、最小 slot label、坏快照/未知 scenario 快照可见提示和 Clear Saved 清理入口，没有发布级命名存档、文件导出、云同步、自动 schema 迁移器或运行时恢复验收；当前设置持久化 observer / map layer / replay detail / AI Pace / AI Control / Guide Notes / Reduce Motion / Text Size，坏设置只会重置为标准设置；AI Control 尚未跑运行时视觉/交互重测试，Manual 只停用自动 dispatch，非 observer 下依赖 End Orders 规则推进，observer + Manual 保持只读，当前仅补充 HUD / CommandPanel 可读提示和禁用状态；Text Size 尚未覆盖全 app，只覆盖日志和 AI replay 面板；Reduce Motion 只覆盖本地 AI pacing delay，尚未覆盖未来 SpriteKit timed animation；短引导只覆盖四类一次性 staff note 且可关闭；无行动反馈只覆盖本方可行动数量和 AI 无有效战场命令；AI issue 诊断只覆盖 record-level 错误、directive end-turn 失败、拒绝原因预览和 AI 连跑 guard 暂停提示；AI 回放只新增只读摘要、Issue Preview、Recent Dispatch Timeline 和明细密度控制；完整引导、完整战斗回放、完整错误恢复、完整 Waterloo 规模和运行时视觉验收仍需后续版本补齐。
+
+## v3.8 - 拿战发布候选默认入口起步
+
+完成日期：2026-07-05
+
+性质：v3.8 起步记录。本节代表默认 playable 场景已从阿登 legacy 切到 Waterloo 1815 数据切片，并同步发布候选文档口径；不代表完整滑铁卢战役、发布级 UI、Xcode build、模拟器/真机启动、长回合观察者模式或发布候选运行时验收已经完成。
+
+核心更新：
+
+- `ScenarioCatalogEntry` 新增 `defaultPlayerFaction`；阿登 legacy 默认为 `.allies`，Waterloo 1815 默认为 `.france`。
+- `ScenarioCatalog.defaultPlayable` 已切到 `waterloo1815DataSlice`，`ScenarioCatalog.napoleonicTarget` 继续指向同一 Waterloo 数据切片；`ScenarioCatalog.all` 现在把 Waterloo 放在阿登前面，阿登仍作为 legacy scenario 保留，但 `NewGameSetupView` 默认只展示非 legacy scenario，需打开 `Archived Campaigns` 才显示 legacy 新局入口。
+- `ScenarioCatalog.waterloo1815DataSlice.displayName` 从 `Waterloo 1815 Data Slice` 调整为 `Waterloo 1815`，但文档继续说明它仍是小规模数据切片，不是完整发布战役。
+- `ScenarioCatalog.entry(for:)` 新增 runtime id alias 解析；阿登 legacy 的 catalog id 仍是 `ardennes_v0`，但 MapEditor legacy JSON 的 `id/scenarioId` 是 `mapeditor_scenario`，两者现在会解析到同一个 `ScenarioCatalog.ardennesLegacy`；`DataLoader.loadGameState(ScenarioCatalogEntry)`、保存 snapshot 和继续恢复都会把 `GameState.scenarioId` 归一为 catalog id，用于存档恢复、slot summary、`ScenarioCatalog.displayName(for:)`、legacy 数据校验和未来 scenario-specific 规则判断；`DataLoader.loadInitialGameState()` 仍保留为 legacy / probe fallback，不作为主 app 默认启动入口。
+- `AppContainer.bootstrap()` 改为按 `ScenarioCatalog.defaultPlayable` 读取默认场景、默认玩家阵营和场景专用 `GeneralRegistry`；若默认 Waterloo 加载失败，不再自动打开阿登 legacy，而是保留 Waterloo 场景元数据、构造 1x1 inert 恢复地图并提示玩家打开 `New Campaign` 切换到可用 scenario，避免默认发布候选入口静默暴露 Germany / Panzer / Guderian 等 legacy 内容，也避免 0x0 map 进入 SpriteKit layout/camera 产生非有限坐标。
+- 将领目录错误改为可见：启动恢复态若场景已坏，可降为空 `GeneralRegistry` 并写入诊断；`startNewGame` 和 `continueSavedGame` 的将领目录加载失败会保留当前状态并返回失败，继续 slot 保留摘要并显示 recovery message，不再静默打开无将领分配的局面。
+- `GameSaveSnapshot.Summary` 新增非持久化 `scenarioId`，用于 UI 判断 slot 是否属于 archived scenario；默认 Waterloo sheet 下旧阿登 / Germany / Allies 存档只显示中性归档占位、`Show Archived` 和 `Clear Saved`，打开 `Archived Campaigns` 后才显示 forces 详情和 `Continue Saved`，并把 scenario / player faction picker 同步到 snapshot，不删除旧 key 或禁用恢复路径。
+- `NewGameSetupView` 不再在默认 Campaign 区块展示 raw `migrationStage`，避免 `v3.2_data_slice` / `legacy_wwii` 这类迁移字段进入玩家默认 UI。
+- `DataLoader.loadGameState` 会复用已加载并校验过的 `GeneralRegistry` 做部署层将领分配，`assignGenerals` 不再二次 `try? loadGeneralRegistry(...) ?? .empty`，避免校验通过后因第二次读取失败而静默清空部署层将领。
+- 默认 Waterloo replay 展示继续收口：`MockAI+MarshalDirective` 等 provider 在拿战 UI / interaction log 下包装为 `Simulated Staff`，Standard context summary 使用 staff display name 而不是 raw `*_mock_commander` id，EventLog phase metadata 在拿战 faction 下显示 `Orders` / `Staff Dispatch`。
+- Legacy stored Guderian `TurnManager` 兼容特例现在同时校验 `currentScenario` 和 runtime `GameState.scenarioId` 都匹配 Ardennes legacy，避免外部注入状态误触发旧德军 manager；默认 Waterloo 仍走动态 simulated staff / marshal directive 管线。
+- `DataLoader.loadGameState` 会校验 scenario 的 `initialPhase`、`playerFaction` 和 `aiFaction` 是否可解析并属于 declared factions，不再用 Germany / Allies fallback 吞掉坏 Waterloo JSON。
+- `DataLoader.loadGameState` 在构造 `GameState` 前新增 catalog-agnostic 资源校验：scenario/region id alias、tile controller、supplyFaction、riverEdges、raw `hexToRegion` key、tile region 反向映射、initial/reinforcement unit faction、坐标重叠、缺失 tile/template/objective/general 引用、victory target faction、region displayHex / representativeHex 和 unit template component 权重都会被拦截，避免默认 Waterloo 静默吞掉坏 JSON。
+- `DataLoader` 继续补齐 Waterloo 资源自校验：将领目录在构造 `GeneralRegistry` 前会检查重复 general id、空 id/name、loyalty/satisfaction 范围；场景校验会检查将领 faction、preferred region/theater、keyLocations 的重复 id / coord / faction / objective / kind、unit template maxHP / 空 components / component weight、initial unit 与 reinforcement 的 hp/facing/supplyState/retreatMode，避免重复 id trap 或构造阶段默认值掩盖坏 JSON。
+- `DataLoader.loadGameState` 会把 scenario JSON 的 `victoryConditions` 映射为 `GameState.victoryConditions`；`GameState` 旧存档 decode 缺字段时回落 `[]`；`VictoryRules` 的 Waterloo 分支按 `french_break_center` / `coalition_hold_until_prussia` 读取 objective id、target faction 和决定回合，旧存档缺 runtime condition 时补内置 fallback。
+- `DataLoader.loadGameState(ScenarioCatalogEntry)` 会把场景 terrain JSON 映射为 `GameState.terrainRules`；旧存档缺字段时回落 `.legacy`；Waterloo 主路径 `MovementRules` / `CombatRules` 读取 scenario movement / road / river / defense 值，`WarCommandExecutor` 和 `ZoneCommanderAgent` 的 breakthrough / defensive sorting 也同步读取同一 rule set。
+- `RegionVictoryRules` 加入 `ScenarioCatalog.ardennesLegacy` guard，只在阿登 legacy / MapEditor legacy runtime id 下评估 Bastogne / St. Vith region 胜负；Waterloo 或后续拿战 scenario 即使未来误接 `RegionRuleSystem.analyze`，也不会泄漏阿登胜负口径。
+- 默认入口改为不预先创建旧德军 stored `TurnManager`。AI 回合仍通过 `turnManager(for:state:)` 按当前 active faction 动态构建，并继续走 `WarCommandExecutor` / `RuleEngine`；stored Guderian manager 兼容特例只允许在 Ardennes legacy 场景内触发。
+- `AppContainer.startNewGame` 与 `NewGameSetupView.reconcileSelectedFaction()` 在当前选中 faction 不属于目标 scenario 时，优先回落到该 scenario 的 `defaultPlayerFaction`，再退到可选阵营列表首项，避免从 Waterloo 切回阿登时默认落到 Germany。
+- `AgentPanelView` 在拿战 faction 下把 raw `*_mock_commander` / `MockAI` 包装为 Command Staff / Simulated Staff 展示，避免 Standard replay 面板暴露 mock commander id；raw id 仍保留在底层记录和 Full raw JSON 中。
+- `CommandResultSummary` 的 `commandDisplayName` 改为按执行 faction 生成，拿战 replay 中的 production / end-turn 记录显示 Reserve Order / End Orders，而不是 legacy QueueProduction / End Turn。
+- `HexNode` 的供给源 marker 不再把所有非 Allies 都显示成 `SUP G`；Waterloo 下 France / Coalition / Prussia 会显示 `SUP F` / `SUP C` / `SUP P`。
+- `MapEditorGameResourceBridge` 新增 `loadLegacyArdennesDocument` / `overwriteLegacyArdennesGameResources`，MapEditor UI 和 ViewModel 改显示 `Legacy 阿登资源`；旧 `loadDefaultDocument` / `overwriteDefaultGameResources` 保留为兼容 wrapper，避免把编辑器 legacy 资源误读成当前 playable 默认入口。
+- `MapEditorExporter` 导出的 `factions`、`initialPhase`、`playerFaction` 和 `aiFaction` 会按文档中的实际 faction 派生，并保留显式 neutral-only 文档的 `.neutral` faction；MapEditor 新建单位 id 前缀也按 faction 和已有 id suffix 生成，避免 France / Prussia 等非 Germany 单位继续被压成 `all_*` 或替换单位时发生 id 碰撞。
+- `AppContainer.submitPlayerDirective` 的玩家军团指令回写改为走 `refreshGeneralAssignments(in:)`，让玩家 directive 路径也经过拿战 `normalizeCommandPhase`，避免未来该路径推进状态后绕过 AppContainer 的 phase 归一化。
+- `MockAIClient` 的 fallback 启发式不再写死 Bastogne，而是选择当前未控制 objective；拿战 faction 的 intent / reason 输出 formations、contact sector、corps deployment 口径。`AgentPromptBuilder` 的旧 LLM prompt 改为 historical hex command game / assigned formations。
+- `AppContainer.handleBoardTap`、`handleDivisionTap`、`selectedAttackTarget`、`selectedGeneralSourceZone` 和 `attackHighlights` 改用 `DiplomacyState.isHostile` / `isFriendly` 判定攻击目标、友军选择和高亮，避免 Anglo-Allied / Prussia 等 co-belligerent 被当成敌军。`GeneralCommandPanelView` 只在 `canAttackRegion` 为 true 时显示 target。
+- `SupplyRules.canSupplyPass` 的单位阻挡和敌方 ZOC 例外改用 `DiplomacyState.isHostile` / `isFriendly`；co-belligerent formation 不再阻断彼此补给。`RulerAgent` 计算 front zone 邻近敌军强度时也改用 `DiplomacyState.isHostile`，避免把友好联军计为敌军压力。
+- Xcode app display name 改为 `Waterloo Command`；地图据点 marker 从 `FORT` 改为 `SP`；RegionInspector 拿战下把 fortress terrain 包装为 Strongpoint；UnitInspector 拿战部署角色显示 Contact Line / Reserve / Strongpoint；AgentPanel 普通摘要和时间线把 tactic/category/commander raw id 包装为可读拿战命令名，Full raw JSON 仍保留 schema 审计信息。
+- UnitInspector 与 UnitTooltip 在拿战 faction 下把 Supply 标签显示为 Logistics，并把 supply state 展示为 Ready / Short / Isolated；legacy 场景仍保留 Supplied / Low Supply / Encircled。
+- 并发子 Agent 扫描默认 Waterloo 玩家可见残留后，继续收口 macOS/HUD 菜单、设置 sheet、compact tab、旧 Agent prompt 和诊断文本：拿战路径显示 Orders / End Orders / New Campaign、Staff Pace / Staff Control、Staff、formation、corps sector、command directive、command wing/contact line 和 staff step；legacy faction 仍保留 Game / End Turn / New Game、AI、Division、FrontZone、Theater 等兼容 schema 或旧场景口径。
+- 并发子 Agent 继续扫描 EventLog / AgentPanel / TurnManager / AppContainer 的 raw diagnostic 泄漏后，`EventLogView` 在拿战 faction 下对 Standard / Concise 事件正文和 metadata 做显示层净化，把 raw `AI`、`MockAI`、`legacy pipeline`、Germany / Allies 和 JSON 审计标签转成 Staff / Simulated Staff / Archived / Coalition 口径；底层 `GameLogEntry.message` 不改写。
+- `AgentPanelView` 在拿战 faction 下继续净化 Issue Preview、Recent Dispatch Timeline、Zone Directives 和 Staff Summary 中的 raw front zone / region / theater id、record error、directive diagnostic、validation rawValue 和 raw staff id；展示为 sector / wing / staff note / Simulated Staff / Command Staff，Full raw JSON 仍保留底层 schema 审计内容。
+- 新增共享 `NapoleonicMessageSanitizer`，供 EventLog、AgentPanel、CommandPanel 和 AppContainer interaction log 复用同一套拿战展示净化，避免 Standard / Concise 面板各自维护不同 raw AI / MockAI / legacy / validation rawValue 替换表。
+- `TurnManager` 默认 staff 失败、end orders 失败、空 directive、directive 拒绝和缺失 corps sector 诊断改写为 Staff / Corps / End Orders 口径，`WarCommandExecutor` 写入 event log 的 directive 拒绝原因改用 `CommandValidationError.displayName(for:)` 和 `Command.displayName(for:)`；`DataLoader` 初始日志只写 `Campaign loaded.` / `Archived campaign loaded.`，不再暴露 scenario id 或 MapEditor-compatible JSON 来源。
+- `md/flow/01_overall_core_flow.mermaid` 补充 `ScenarioCatalog`、`TerrainRuleSet / GameState.terrainRules`、`ScenarioVictoryCondition / GameState.victoryConditions`、`DiplomacyState` 与经济/增援节点；`md/flow/flow.md` 修正过期的“terrain 未注入运行时规则”描述，明确 v3.8 起 Waterloo 主路径读取运行时地形规则。
+- README、flow、flowchart、plan、v3 总提示词、v3.7 阶段记录和新增 v3.8 阶段记录已同步：当前默认入口是 Waterloo 1815，阿登仅为 legacy 可选路径。
+
+关键文件：
+
+- `WWIIHexV0/Data/DataLoader.swift`
+- `WWIIHexV0/Core/Terrain.swift`
+- `WWIIHexV0/Core/GameState.swift`
+- `WWIIHexV0/App/AppContainer.swift`
+- `WWIIHexV0/Agents/AgentPromptBuilder.swift`
+- `WWIIHexV0/Agents/GameAgent.swift`
+- `WWIIHexV0/Agents/MockAIClient.swift`
+- `WWIIHexV0/Agents/RulerAgent.swift`
+- `WWIIHexV0/Agents/AgentDecisionRecord.swift`
+- `WWIIHexV0/Rules/SupplyRules.swift`
+- `WWIIHexV0/Rules/MovementRules.swift`
+- `WWIIHexV0/Rules/CombatRules.swift`
+- `WWIIHexV0/Rules/VictoryRules.swift`
+- `WWIIHexV0/Rules/RegionVictoryRules.swift`
+- `WWIIHexV0/Commands/WarCommandExecutor.swift`
+- `WWIIHexV0/Commands/CommandIntentAdapter.swift`
+- `WWIIHexV0/Commands/WarDirective.swift`
+- `WWIIHexV0/Turn/TurnManager.swift`
+- `WWIIHexV0/Core/StrategicStateBootstrapper.swift`
+- `WWIIHexV0/SpriteKit/HexNode.swift`
+- `WWIIHexV0/UI/AgentPanelView.swift`
+- `WWIIHexV0/UI/GeneralCommandPanelView.swift`
+- `WWIIHexV0/UI/RegionInspectorView.swift`
+- `WWIIHexV0/UI/UnitInspectorView.swift`
+- `WWIIHexV0/UI/NewGameSetupView.swift`
+- `WWIIHexV0/UI/RootGameView.swift`
+- `WWIIHexV0/App/WWIIHexV0MacApp.swift`
+- `WWIIHexV0.xcodeproj/project.pbxproj`
+- `MapEditor/MapEditorGameResourceBridge.swift`
+- `MapEditor/MapEditorExporter.swift`
+- `MapEditor/MapEditorViewModel.swift`
+- `MapEditor/MapEditorView.swift`
+- `README.md`
+- `md/flow/flow.md`
+- `md/flow/flowchart.md`
+- `md/flow/01_overall_core_flow.mermaid`
+- `md/plan/plan.md`
+- `md/prompt/v3.0-拿战迁移/codex-v3.0-拿战aiagent迁移总提示词.md`
+- `md/prompt/v3.0-拿战迁移/v3.7_napoleonic_playtest_loop_foundation.md`
+- `md/prompt/v3.0-拿战迁移/v3.8_napoleonic_release_candidate_foundation.md`
+- `update_log.md`
+
+验证记录：
+
+- `swiftc -parse WWIIHexV0/Core/Faction.swift WWIIHexV0/Core/GamePhase.swift WWIIHexV0/Core/GameState.swift WWIIHexV0/Core/PlayerCommandState.swift WWIIHexV0/Core/Division.swift WWIIHexV0/Core/MapDisplayLayer.swift WWIIHexV0/Core/MapState.swift WWIIHexV0/App/AICommandPace.swift WWIIHexV0/App/ReplayDetailLevel.swift WWIIHexV0/App/PlaytestSessionSettings.swift WWIIHexV0/App/PlaytestGuideCue.swift WWIIHexV0/App/GameSaveSnapshot.swift WWIIHexV0/Data/ScenarioDefinition.swift WWIIHexV0/Data/DataLoader.swift WWIIHexV0/App/AppContainer.swift WWIIHexV0/App/WWIIHexV0MacApp.swift WWIIHexV0/Agents/AgentDecisionRecord.swift WWIIHexV0/Commands/Command.swift WWIIHexV0/Commands/WarDirective.swift WWIIHexV0/Turn/TurnManager.swift WWIIHexV0/SpriteKit/HexNode.swift WWIIHexV0/UI/RootGameView.swift WWIIHexV0/UI/HUDView.swift WWIIHexV0/UI/NewGameSetupView.swift WWIIHexV0/UI/EventLogView.swift WWIIHexV0/UI/AgentPanelView.swift WWIIHexV0/UI/CommandPanelView.swift`：通过，无输出。
+- `swiftc -parse MapEditor/MapEditorViewModel.swift MapEditor/MapEditorCanvasScene.swift MapEditor/MapEditorView.swift MapEditor/MapEditorDocument.swift MapEditor/MapEditorExporter.swift MapEditor/MapEditorHexMath.swift MapEditor/MapEditorGameResourceBridge.swift WWIIHexV0/Core/Faction.swift WWIIHexV0/Core/HexCoord.swift WWIIHexV0/Core/HexDirection.swift WWIIHexV0/Core/Terrain.swift WWIIHexV0/Core/Region.swift WWIIHexV0/Core/Theater.swift WWIIHexV0/Core/Division.swift WWIIHexV0/Core/SupplyState.swift WWIIHexV0/Core/GamePhase.swift WWIIHexV0/Data/ScenarioDefinition.swift WWIIHexV0/Data/RegionDataSet.swift`：通过，无输出。
+- `jq empty WWIIHexV0/Data/waterloo_1815_scenario.json WWIIHexV0/Data/waterloo_1815_regions.json WWIIHexV0/Data/napoleonic_unit_templates.json WWIIHexV0/Data/napoleonic_generals.json WWIIHexV0/Data/napoleonic_terrain_rules.json`：通过，无输出。
+- `jq empty WWIIHexV0/Data/waterloo_1815_scenario.json WWIIHexV0/Data/waterloo_1815_regions.json WWIIHexV0/Data/napoleonic_unit_templates.json WWIIHexV0/Data/napoleonic_generals.json WWIIHexV0/Data/napoleonic_terrain_rules.json WWIIHexV0/Data/ardennes_v0_scenario.json WWIIHexV0/Data/ardennes_v02_regions.json`：通过，无输出。
+- `plutil -lint WWIIHexV0.xcodeproj/project.pbxproj`：通过，输出 `WWIIHexV0.xcodeproj/project.pbxproj: OK`。
+- `rg -n "waterloo_1815_scenario|waterloo_1815_regions|napoleonic_terrain_rules|napoleonic_unit_templates|napoleonic_generals" WWIIHexV0.xcodeproj/project.pbxproj`：确认 Waterloo / napoleonic JSON 在 project resources / file references 中有记录。
+- `rg -n "commandDisplayName: command\.displayName,|Command\.endTurn\.displayName," WWIIHexV0/Agents/AgentDecisionRecord.swift WWIIHexV0/Turn/TurnManager.swift WWIIHexV0/App/AppContainer.swift`：无命中。
+- `rg -n "loadInitialGameState\(\)" WWIIHexV0/App/AppContainer.swift`：无命中。
+- `rg -n "ScenarioCatalog\.all\.first\(where: \{ \$0\.id ==|factions: Faction\.allCases|initialPhase: GamePhase\.alliedPlayer\.rawValue|playerFaction: Faction\.allies\.rawValue|aiFaction: Faction\.germany\.rawValue|let factionPrefix = selectedUnitFaction ==" WWIIHexV0 MapEditor`：无命中。
+- `rg -n "SUP A|SUP G|SUP F|SUP C|SUP P|SUP AU|SUP R|SUP S|SUP N" WWIIHexV0/SpriteKit/HexNode.swift`：命中预期 faction 供给源短码。
+- `rg -n "defaultPlayable[[:space:]]仍|默认启动[[:space:]]仍|默认仍保持[阿]登|默认.{0,8}[阿]登 legacy 数据|默认 Waterloo 启动仍[需]|再切[默]认|DataLoader.*默认资源.*[阿]登|Guderian [/] Germany 的 stored" README.md update_log.md md/flow/flow.md md/flow/flowchart.md md/plan/plan.md md/prompt/v3.0-拿战迁移/codex-v3.0-拿战aiagent迁移总提示词.md md/prompt/v3.0-拿战迁移/v3.7_napoleonic_playtest_loop_foundation.md md/prompt/v3.0-拿战迁移/v3.8_napoleonic_release_candidate_foundation.md WWIIHexV0`：无命中。
+- `rg -n "[[:blank:]]+$" AGENTS.md README.md update_log.md md/test/test.md md/flow/flow.md md/flow/flowchart.md md/flow/03_ai_zone_directive_pipeline.mermaid md/prompt/v3.0-拿战迁移 md/plan/plan.md WWIIHexV0/App/AppContainer.swift WWIIHexV0/App/WWIIHexV0MacApp.swift WWIIHexV0/Data/DataLoader.swift WWIIHexV0/UI/NewGameSetupView.swift WWIIHexV0/UI/HUDView.swift WWIIHexV0/UI/CommandPanelView.swift WWIIHexV0/UI/RootGameView.swift`：无命中。
+- `rg -n "^<<<<<<<|^=======|^>>>>>>>" AGENTS.md README.md update_log.md md/flow WWIIHexV0 MapEditor md/prompt/v3.0-拿战迁移 md/plan/plan.md`：无命中。
+- `git diff --check`：通过，无输出。
+- `swiftc -parse WWIIHexV0/Core/Faction.swift WWIIHexV0/Core/DiplomacyState.swift WWIIHexV0/Core/HexCoord.swift WWIIHexV0/Core/Terrain.swift WWIIHexV0/Core/MapState.swift WWIIHexV0/Core/Region.swift WWIIHexV0/Core/Theater.swift WWIIHexV0/Core/Division.swift WWIIHexV0/Core/SupplyState.swift WWIIHexV0/Core/GamePhase.swift WWIIHexV0/Core/GameState.swift WWIIHexV0/Core/MapDisplayLayer.swift WWIIHexV0/Core/VictoryState.swift WWIIHexV0/Core/EconomyState.swift WWIIHexV0/Core/WarDeploymentState.swift WWIIHexV0/Core/FrontZoneId.swift WWIIHexV0/Core/FrontZoneSegment.swift WWIIHexV0/Core/FrontZone.swift WWIIHexV0/Core/PlayerCommandState.swift WWIIHexV0/Core/GeneralAssignment.swift WWIIHexV0/App/AICommandPace.swift WWIIHexV0/App/ReplayDetailLevel.swift WWIIHexV0/App/PlaytestSessionSettings.swift WWIIHexV0/App/PlaytestGuideCue.swift WWIIHexV0/App/GameSaveSnapshot.swift WWIIHexV0/Data/ScenarioDefinition.swift WWIIHexV0/Data/DataLoader.swift WWIIHexV0/Agents/DecisionProvider.swift WWIIHexV0/Agents/AgentContexts.swift WWIIHexV0/Agents/AgentDecision.swift WWIIHexV0/Agents/AgentPromptBuilder.swift WWIIHexV0/Agents/MockAIClient.swift WWIIHexV0/Agents/AgentDecisionRecord.swift WWIIHexV0/Agents/GeneralRegistry.swift WWIIHexV0/Agents/RulerAgent.swift WWIIHexV0/Agents/ZoneCommanderAgent.swift WWIIHexV0/Commands/Command.swift WWIIHexV0/Commands/WarDirective.swift WWIIHexV0/Commands/WarCommandExecutor.swift WWIIHexV0/Commands/CommandValidation.swift WWIIHexV0/Rules/MovementRules.swift WWIIHexV0/Rules/SupplyRules.swift WWIIHexV0/Rules/CombatRules.swift WWIIHexV0/Rules/VictoryRules.swift WWIIHexV0/Rules/CommandExecutor.swift WWIIHexV0/Rules/CommandValidator.swift WWIIHexV0/Rules/RuleEngine.swift WWIIHexV0/Rules/WarDeploymentManager.swift WWIIHexV0/SpriteKit/MapDisplayAdapter.swift WWIIHexV0/UI/PlatformStyles.swift WWIIHexV0/UI/GeneralCommandPanelView.swift WWIIHexV0/App/AppContainer.swift`：通过，无输出。
+- `rg -n "\bBastogne\b|WWII hex strategy prototype|No allied front zone selected|Guderian MockAI|armor on roads" WWIIHexV0/Agents/MockAIClient.swift WWIIHexV0/Agents/AgentPromptBuilder.swift WWIIHexV0/UI/GeneralCommandPanelView.swift README.md`：无命中。
+- `plutil -lint WWIIHexV0.xcodeproj/project.pbxproj`：通过，输出 `WWIIHexV0.xcodeproj/project.pbxproj: OK`。
+- `swiftc -parse WWIIHexV0/Core/Faction.swift WWIIHexV0/Core/HexCoord.swift WWIIHexV0/Core/Terrain.swift WWIIHexV0/Core/MapState.swift WWIIHexV0/Core/Region.swift WWIIHexV0/Core/Theater.swift WWIIHexV0/Core/Division.swift WWIIHexV0/Core/SupplyState.swift WWIIHexV0/Core/GamePhase.swift WWIIHexV0/Core/WarDeploymentState.swift WWIIHexV0/Core/WarDirectiveRecord.swift WWIIHexV0/Core/FrontZoneId.swift WWIIHexV0/Core/FrontZoneSegment.swift WWIIHexV0/Core/FrontZone.swift WWIIHexV0/Core/MapDisplayLayer.swift WWIIHexV0/Commands/WarDirective.swift WWIIHexV0/Commands/Command.swift WWIIHexV0/Agents/AgentDecisionRecord.swift WWIIHexV0/App/ReplayDetailLevel.swift WWIIHexV0/App/PlaytestSessionSettings.swift WWIIHexV0/UI/PlatformStyles.swift WWIIHexV0/UI/UnitInspectorView.swift WWIIHexV0/UI/AgentPanelView.swift`：通过，无输出。
+- `swiftc -parse WWIIHexV0/Core/Faction.swift WWIIHexV0/Core/HexCoord.swift WWIIHexV0/Core/Terrain.swift WWIIHexV0/Core/MapState.swift WWIIHexV0/Core/Region.swift WWIIHexV0/Core/Division.swift WWIIHexV0/SpriteKit/TerrainStyle.swift WWIIHexV0/SpriteKit/HexNode.swift WWIIHexV0/UI/PlatformStyles.swift WWIIHexV0/UI/RegionInspectorView.swift`：通过，无输出。
+- `swiftc -parse WWIIHexV0/Core/Faction.swift WWIIHexV0/Core/DiplomacyState.swift WWIIHexV0/Core/HexCoord.swift WWIIHexV0/Core/HexDirection.swift WWIIHexV0/Core/Terrain.swift WWIIHexV0/Core/MapState.swift WWIIHexV0/Core/Region.swift WWIIHexV0/Core/Theater.swift WWIIHexV0/Core/Division.swift WWIIHexV0/Core/SupplyState.swift WWIIHexV0/Core/GamePhase.swift WWIIHexV0/Core/GameState.swift WWIIHexV0/Core/MapDisplayLayer.swift WWIIHexV0/Core/VictoryState.swift WWIIHexV0/Core/EconomyState.swift WWIIHexV0/Core/WarDeploymentState.swift WWIIHexV0/Core/FrontZoneId.swift WWIIHexV0/Core/FrontZoneSegment.swift WWIIHexV0/Core/FrontZone.swift WWIIHexV0/Core/GeneralAssignment.swift WWIIHexV0/Core/WarDirectiveRecord.swift WWIIHexV0/Data/ScenarioDefinition.swift WWIIHexV0/Data/RegionDataSet.swift WWIIHexV0/Data/DataLoader.swift WWIIHexV0/Agents/GeneralRegistry.swift WWIIHexV0/Agents/ZoneCommanderAgent.swift WWIIHexV0/Agents/RulerAgent.swift WWIIHexV0/Commands/WarDirective.swift WWIIHexV0/Commands/Command.swift WWIIHexV0/Commands/CommandValidation.swift WWIIHexV0/Commands/WarCommandExecutor.swift WWIIHexV0/Rules/MovementRules.swift WWIIHexV0/Rules/CombatRules.swift WWIIHexV0/Rules/SupplyRules.swift WWIIHexV0/Rules/OccupationRules.swift WWIIHexV0/Rules/RegionOccupationRules.swift WWIIHexV0/Rules/FrontLineManager.swift WWIIHexV0/Rules/TheaterSystem.swift WWIIHexV0/Rules/WarDeploymentManager.swift WWIIHexV0/Rules/EconomyRules.swift`：通过，无输出。
+- 未跑 Xcode / XCTest / 模拟器 / app 启动 / Probe / Smoke / Stage Regression / Dynamic Theater Regression / Full / 性能测试；原因是当前规范默认禁止本机重测试，本轮也未获人工授权。
+
+遗留风险：
+
+- Waterloo 仍是小规模 schema / data slice；默认入口切换不等于完整可玩滑铁卢战役。
+- 默认入口的真实 bundle resource 加载、SwiftUI sheet 行为、SpriteKit 视觉和多回合 AI 稳定性仍需云端 build 或人工授权运行时验证。
+- Legacy 阿登、Germany / Allies、Guderian / Montgomery 等仍保留在兼容场景、历史阶段文档、fallback 或源码兼容名中；发布候选仍需继续做玩家可见残留扫描和资源授权检查。
+- 并发只读扫描仍发现默认 Waterloo 路径的后续数据风险：terrain runtime 已接入但还不是完整 terrain DSL；SupplyRules、RegionMovementRules、RegionSupplyRules 等非主战术路径仍保留独立硬编码或 `BaseTerrain` 语义；Waterloo victory 只完成当前两类条件的 runtime 接入，尚未形成通用 victory condition DSL；Full raw JSON 仍按设计保留 schema raw value 供审计调试。
+
 ## 历史维护记录
 
 以下提交不作为正式 v 版本，但影响项目资料完整性：
@@ -1172,3 +1896,4 @@ guerrillaWarfare 额外参考 infrastructure
 - 2026-07-04：新增拿破仑战争迁移总提示词，规划 v3.0-v3.8 从 WWIIHexV0 迁移为 AI Agent 驱动拿战游戏的版本路线、最终发布效果、并发子 Agent 分工、轻量检查和风险边界。关键文件：`md/prompt/v3.0-拿战迁移/codex-v3.0-拿战aiagent迁移总提示词.md`。
 - 2026-07-04：新增明末迁移总提示词，规划 v4.0-v4.8 从 WWIIHexV0 迁移为 AI Agent 驱动明末历史策略游戏的产品目标、版本路线、最终发布效果、并发子 Agent 分工、轻量检查和风险边界。关键文件：`md/prompt/v4.0-明末迁移/codex-v4.0-明末aiagent迁移总提示词.md`。
 - 2026-07-04：云端协作制度升级，不作为业务功能版本。新增 `main` 直推、GitHub Actions 云端 build、未加密 `ci-results` artifact、Agent C 下载复核 manifest/JUnit/log/failure summary 的规则；本机仍默认只跑轻量检查。关键文件：`AGENTS.md`、`md/test/test.md`、`md/flow/flow.md`、`md/flow/flowchart.md`、`md/prompt/README.md`、`README.md`、`.github/workflows/ci-results.yml`。
+- 2026-07-04：根据拿破仑战争迁移总提示词重写项目 md 大纲，将 `md/plan/plan.md` 从旧 v0.x 后续计划更新为 v3.0-v3.8 拿战迁移路线、md 目录职责、并发分工和轻量检查索引。本轮只改文档大纲，不改源码或运行时行为。

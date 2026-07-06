@@ -1,8 +1,8 @@
 import Foundation
 
 // DEPRECATED as of v0.352 - kept for regression reference, not invoked by default. See WarPipelineMode.
-// Guderian MockAI. Heuristic: skip acted; low/encircled supply -> resupply;
-// in-range vulnerable enemy -> attack; else advance toward Bastogne on roads; else hold.
+// Heuristic staff AI: skip acted; low/encircled supply -> resupply;
+// in-range vulnerable enemy -> attack; else advance toward the nearest contested objective; else hold.
 
 struct MockAIClient: DecisionProvider {
     func decide(context: AgentContext) async throws -> AgentDecisionEnvelope {
@@ -13,7 +13,7 @@ struct MockAIClient: DecisionProvider {
 
         var orders: [AgentOrder] = []
         var reservedDestinations = Set(context.friendlyDivisions.compactMap(\.regionId) + context.enemyDivisions.compactMap(\.regionId))
-        let objective = context.objectives.first { $0.name == "Bastogne" } ?? context.objectives.first
+        let objective = preferredObjective(in: context)
 
         for division in context.friendlyDivisions.sorted(by: orderPriority) {
             guard !division.hasActed else {
@@ -27,7 +27,7 @@ struct MockAIClient: DecisionProvider {
                         divisionId: division.id,
                         toRegionId: division.regionId,
                         stance: "recover",
-                        reason: "Unit is \(division.supplyState.rawValue); recover supply before continuing the attack."
+                        reason: supplyRecoveryReason(for: division, context: context)
                     )
                 )
                 continue
@@ -64,7 +64,7 @@ struct MockAIClient: DecisionProvider {
                         divisionId: division.id,
                         toRegionId: destination,
                         stance: division.isArmor ? "roadAdvance" : "advance",
-                        reason: "Advance toward \(objective.name), preferring road movement and open routes."
+                        reason: movementReason(toward: objective, context: context)
                     )
                 )
                 continue
@@ -85,7 +85,7 @@ struct MockAIClient: DecisionProvider {
             schemaVersion: context.visibleRegions.isEmpty ? 1 : 2,
             agentId: context.agentId,
             turn: context.turn,
-            intent: "Break through toward Bastogne using armor on roads and artillery support.",
+            intent: operationalIntent(context: context, objective: objective),
             orders: orders
         )
     }
@@ -108,7 +108,7 @@ struct MockAIClient: DecisionProvider {
                         divisionId: division.id,
                         toRegionId: division.regionId,
                         stance: "frontRecovery",
-                        reason: "v0.33 deployment: unit supply is \(division.supplyState.rawValue), recover before front action."
+                        reason: deploymentSupplyReason(for: division, context: context)
                     )
                 )
                 usedDivisionIds.insert(division.id)
@@ -130,7 +130,7 @@ struct MockAIClient: DecisionProvider {
                                 divisionId: unitId,
                                 targetDivisionId: target.id,
                                 stance: segment.isEncircled ? "closePocket" : "frontAttack",
-                                reason: "v0.33 deployment: FRONT unit acts on segment \(segment.regionId.rawValue)."
+                                reason: contactAttackReason(segment: segment, context: context)
                             )
                         )
                     } else {
@@ -140,7 +140,7 @@ struct MockAIClient: DecisionProvider {
                                 divisionId: unitId,
                                 toRegionId: division.regionId,
                                 stance: segment.isEncircled ? "containPocket" : "holdFront",
-                                reason: "v0.33 deployment: FRONT unit holds assigned segment \(segment.regionId.rawValue)."
+                                reason: contactHoldReason(segment: segment, context: context)
                             )
                         )
                     }
@@ -166,7 +166,7 @@ struct MockAIClient: DecisionProvider {
                             divisionId: unitId,
                             toRegionId: targetRegion,
                             stance: "depthReinforce",
-                            reason: "v0.33 deployment: DEPTH reserve reinforces nearest FRONT segment."
+                            reason: reserveReinforceReason(context: context)
                         )
                     )
                 } else {
@@ -176,7 +176,7 @@ struct MockAIClient: DecisionProvider {
                             divisionId: unitId,
                             toRegionId: division.regionId,
                             stance: "depthReserve",
-                            reason: "v0.33 deployment: DEPTH reserve has no adjacent safe front target."
+                            reason: reserveHoldReason(context: context)
                         )
                     )
                 }
@@ -196,7 +196,7 @@ struct MockAIClient: DecisionProvider {
                     divisionId: unitId,
                     toRegionId: division.regionId,
                     stance: "garrison",
-                    reason: "v0.33 deployment: GARRISON unit does not leave core or city region."
+                    reason: garrisonHoldReason(context: context)
                 )
             )
             usedDivisionIds.insert(unitId)
@@ -215,7 +215,7 @@ struct MockAIClient: DecisionProvider {
                     divisionId: division.id,
                     toRegionId: regionId,
                     stance: stance,
-                    reason: "v0.33 deployment: unit outside deployment pool holds."
+                    reason: unassignedHoldReason(context: context)
                 )
             )
         }
@@ -225,9 +225,97 @@ struct MockAIClient: DecisionProvider {
             schemaVersion: 2,
             agentId: context.agentId,
             turn: context.turn,
-            intent: "Use v0.33 FrontZone deployment: front units hold or attack, depth reserves reinforce, garrisons hold.",
+            intent: deploymentIntent(context: context),
             orders: orders
         )
+    }
+
+    private func preferredObjective(in context: AgentContext) -> ObjectiveSummary? {
+        context.objectives.first { objective in
+            objective.controller != context.faction
+        } ?? context.objectives.first
+    }
+
+    private func operationalIntent(context: AgentContext, objective: ObjectiveSummary?) -> String {
+        guard let objective else {
+            return context.faction.usesNapoleonicLogisticsVocabulary
+                ? "Keep formations coordinated while seeking a useful local action."
+                : "Keep units coordinated while seeking a useful local action."
+        }
+        if context.faction.usesNapoleonicLogisticsVocabulary {
+            return "Press toward \(objective.name) with coordinated formations and artillery support."
+        }
+        return "Advance toward \(objective.name) with mobile units and artillery support."
+    }
+
+    private func supplyRecoveryReason(for division: DivisionSummary, context: AgentContext) -> String {
+        if context.faction.usesNapoleonicLogisticsVocabulary {
+            return "Formation is \(division.supplyState.rawValue); recover supply before renewing the attack."
+        }
+        return "Unit is \(division.supplyState.rawValue); recover supply before continuing the attack."
+    }
+
+    private func movementReason(toward objective: ObjectiveSummary, context: AgentContext) -> String {
+        if context.faction.usesNapoleonicLogisticsVocabulary {
+            return "Advance toward \(objective.name), keeping open routes and supporting formations."
+        }
+        return "Advance toward \(objective.name), preferring open routes and artillery support."
+    }
+
+    private func deploymentIntent(context: AgentContext) -> String {
+        if context.faction.usesNapoleonicLogisticsVocabulary {
+            return "Use corps deployment: contact formations hold or attack, reserves reinforce, garrisons hold."
+        }
+        return "Use front deployment: line units hold or attack, reserves reinforce, garrisons hold."
+    }
+
+    private func deploymentSupplyReason(for division: DivisionSummary, context: AgentContext) -> String {
+        if context.faction.usesNapoleonicLogisticsVocabulary {
+            return "Deployment: formation supply is \(division.supplyState.rawValue), recover before renewed contact."
+        }
+        return "Deployment: unit supply is \(division.supplyState.rawValue), recover before front action."
+    }
+
+    private func contactAttackReason(segment: AgentFrontSegmentSnapshot, context: AgentContext) -> String {
+        if context.faction.usesNapoleonicLogisticsVocabulary {
+            return "Deployment: contact formation acts on sector \(segment.regionId.rawValue)."
+        }
+        return "Deployment: line unit acts on segment \(segment.regionId.rawValue)."
+    }
+
+    private func contactHoldReason(segment: AgentFrontSegmentSnapshot, context: AgentContext) -> String {
+        if context.faction.usesNapoleonicLogisticsVocabulary {
+            return "Deployment: contact formation holds assigned sector \(segment.regionId.rawValue)."
+        }
+        return "Deployment: line unit holds assigned segment \(segment.regionId.rawValue)."
+    }
+
+    private func reserveReinforceReason(context: AgentContext) -> String {
+        if context.faction.usesNapoleonicLogisticsVocabulary {
+            return "Deployment: reserve formation reinforces the nearest contact sector."
+        }
+        return "Deployment: reserve reinforces the nearest line segment."
+    }
+
+    private func reserveHoldReason(context: AgentContext) -> String {
+        if context.faction.usesNapoleonicLogisticsVocabulary {
+            return "Deployment: reserve formation has no adjacent safe contact sector."
+        }
+        return "Deployment: reserve has no adjacent safe line target."
+    }
+
+    private func garrisonHoldReason(context: AgentContext) -> String {
+        if context.faction.usesNapoleonicLogisticsVocabulary {
+            return "Deployment: garrison formation holds its core or town sector."
+        }
+        return "Deployment: garrison unit does not leave its core or city region."
+    }
+
+    private func unassignedHoldReason(context: AgentContext) -> String {
+        if context.faction.usesNapoleonicLogisticsVocabulary {
+            return "Deployment: formation outside the current corps assignment holds."
+        }
+        return "Deployment: unit outside the current deployment pool holds."
     }
 
     private func frontAttackTarget(

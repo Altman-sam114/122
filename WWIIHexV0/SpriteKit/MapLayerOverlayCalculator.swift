@@ -59,7 +59,8 @@ struct MapLayerOverlayCalculator {
                 let role = WarDeploymentManager().deploymentRole(
                     for: division,
                     in: state.map,
-                    state: state.warDeploymentState
+                    state: state.warDeploymentState,
+                    diplomacyState: state.diplomacyState
                 )
                 bucketId = "\(division.faction.rawValue)_\(role.rawValue)"
             } else {

@@ -7,8 +7,11 @@ struct OccupationRules {
         in state: GameState
     ) -> Bool {
         guard let tile = state.map.tile(at: destination),
-              tile.isCapturable,
-              tile.controller != division.faction else {
+              tile.isCapturable else {
+            return false
+        }
+        if let controller = tile.controller,
+           controller == division.faction || state.diplomacyState.isFriendly(division.faction, to: controller) {
             return false
         }
 

@@ -8,7 +8,8 @@ struct EconomyRules {
 
     func makeInitialState(map: MapState, factions: [Faction], turn: Int) -> EconomyState {
         var state = EconomyState(lastResolvedTurn: turn)
-        let uniqueFactions = Set(factions).isEmpty ? Set(Faction.allCases) : Set(factions)
+        let nonNeutralFactions = Set(factions.filter { !$0.isNeutral })
+        let uniqueFactions = nonNeutralFactions.isEmpty ? Set(Faction.legacyWorldWarIIFactions) : nonNeutralFactions
 
         for faction in uniqueFactions {
             let income = income(for: faction, map: map)
@@ -35,7 +36,7 @@ struct EconomyRules {
         }
 
         var next = state
-        let factions = next.divisions.map(\.faction) + Faction.allCases
+        let factions = next.participatingFactions
         next.economyState = makeInitialState(map: next.map, factions: factions, turn: next.turn)
         next.appendEvent(
             "Economy state bootstrapped from controlled cities, factories, supply hubs, and regions.",
@@ -52,7 +53,7 @@ struct EconomyRules {
         var ledger = state.economyState.ledger(for: faction)
         guard ledger.stockpile.canAfford(kind.cost) else {
             state.appendEvent(
-                "\(faction.displayName) lacks resources for \(kind.displayName).",
+                "\(faction.displayName) lacks resources for \(kind.displayName(for: faction)).",
                 category: .supply
             )
             return false
@@ -69,7 +70,7 @@ struct EconomyRules {
         ledger.lastUpdatedTurn = state.turn
         state.economyState.updateLedger(ledger)
         state.appendEvent(
-            "\(faction.displayName) queued \(kind.displayName): cost \(resourceSummary(kind.cost)), \(kind.buildTurns) turn(s).",
+            "\(faction.displayName) queued \(kind.displayName(for: faction)): cost \(resourceSummary(kind.cost, for: faction)), \(kind.buildTurns) turn(s).",
             category: .supply
         )
         return true
@@ -97,12 +98,13 @@ struct EconomyRules {
         ledger.lastReinforcementSpend = reinforcementSpend
 
         advanceProduction(for: faction, ledger: &ledger, in: &state)
+        resolveScheduledReinforcements(for: faction, in: &state)
 
         ledger.lastUpdatedTurn = state.turn
         state.economyState.updateLedger(ledger)
         state.economyState.lastResolvedTurn = state.turn
         state.appendEvent(
-            "\(faction.displayName) economy: +\(resourceSummary(turnIncome)); upkeep \(resourceSummary(upkeep)); reinforcement \(resourceSummary(reinforcementSpend)); stockpile \(resourceSummary(ledger.stockpile)).",
+            "\(faction.displayName) \(ledgerLabel(for: faction)): +\(resourceSummary(turnIncome, for: faction)); upkeep \(resourceSummary(upkeep, for: faction)); reinforcement \(resourceSummary(reinforcementSpend, for: faction)); stockpile \(resourceSummary(ledger.stockpile, for: faction)).",
             category: .supply
         )
     }
@@ -268,16 +270,16 @@ struct EconomyRules {
         let armorWeight = division.components
             .filter { $0.type == .tank }
             .reduce(0.0) { $0 + $1.weight }
-        let motorizedWeight = division.components
-            .filter { $0.type == .motorizedInfantry }
+        let mobileWeight = division.components
+            .filter { $0.type.isMobileLike }
             .reduce(0.0) { $0 + $1.weight }
         let artilleryWeight = division.components
-            .filter { $0.type == .artillery }
+            .filter { $0.type.isArtilleryLike }
             .reduce(0.0) { $0 + $1.weight }
 
         return EconomyResources(
             manpower: max(4, Int((8 + 6 * (1 - armorWeight)).rounded())),
-            industry: max(1, Int((1 + armorWeight * 5 + motorizedWeight * 2 + artilleryWeight * 3).rounded())),
+            industry: max(1, Int((1 + armorWeight * 5 + mobileWeight * 2 + artilleryWeight * 3).rounded())),
             supplies: 1
         )
     }
@@ -307,7 +309,7 @@ struct EconomyRules {
             if order.kind == .supplyStockpile {
                 ledger.stockpile.add(EconomyResources(supplies: order.kind.supplyOutput))
                 state.appendEvent(
-                    "\(faction.displayName) completed \(order.kind.displayName): +\(order.kind.supplyOutput) supplies.",
+                    "\(faction.displayName) completed \(order.kind.displayName(for: faction)): +\(order.kind.supplyOutput) supplies.",
                     category: .supply
                 )
                 continue
@@ -329,13 +331,67 @@ struct EconomyRules {
             } else {
                 remainingOrders.append(order)
                 state.appendEvent(
-                    "\(order.kind.displayName) is ready, but no safe rear deployment hex is available.",
+                    "\(order.kind.displayName(for: faction)) is ready, but no safe rear deployment hex is available.",
                     category: .reinforce
                 )
             }
         }
 
         ledger.productionQueue = remainingOrders
+    }
+
+    private func resolveScheduledReinforcements(
+        for faction: Faction,
+        in state: inout GameState
+    ) {
+        guard !state.reinforcementState.pending.isEmpty else {
+            return
+        }
+
+        var remaining: [ScheduledReinforcement] = []
+
+        for reinforcement in state.reinforcementState.pending {
+            guard reinforcement.division.faction == faction else {
+                remaining.append(reinforcement)
+                continue
+            }
+
+            guard !state.reinforcementState.arrivedIds.contains(reinforcement.id) else {
+                continue
+            }
+
+            guard state.turn >= reinforcement.arrivalTurn,
+                  reinforcementTriggerSatisfied(reinforcement, in: state) else {
+                remaining.append(reinforcement)
+                continue
+            }
+
+            guard state.division(id: reinforcement.division.id) == nil else {
+                markReinforcementArrived(reinforcement.id, in: &state)
+                continue
+            }
+
+            guard let deploymentHex = reinforcementDeploymentHex(for: reinforcement, faction: faction, in: state) else {
+                remaining.append(reinforcement)
+                state.appendEvent(
+                    "\(reinforcement.division.name) is due to arrive, but no safe reinforcement entry hex is available.",
+                    category: .reinforce
+                )
+                continue
+            }
+
+            var division = reinforcement.division
+            division.coord = deploymentHex
+            division.hasActed = true
+            state.divisions.append(division)
+            markReinforcementArrived(reinforcement.id, in: &state)
+            state.appendEvent(
+                "\(division.name) arrived as scheduled reinforcement at \(deploymentHex.q),\(deploymentHex.r).",
+                category: .reinforce
+            )
+        }
+
+        state.reinforcementState.pending = remaining
     }
 
     private func deploymentHex(
@@ -399,6 +455,62 @@ struct EconomyRules {
         return nil
     }
 
+    private func reinforcementDeploymentHex(
+        for reinforcement: ScheduledReinforcement,
+        faction: Faction,
+        in state: GameState
+    ) -> HexCoord? {
+        let candidates = reinforcement.entryCoord
+            .coordsWithin(distance: 2)
+            .sorted {
+                let lhsDistance = reinforcement.entryCoord.distance(to: $0)
+                let rhsDistance = reinforcement.entryCoord.distance(to: $1)
+                if lhsDistance != rhsDistance {
+                    return lhsDistance < rhsDistance
+                }
+                if $0.q == $1.q {
+                    return $0.r < $1.r
+                }
+                return $0.q < $1.q
+            }
+
+        return candidates.first { coord in
+            guard let tile = state.map.tile(at: coord),
+                  tile.isPassable,
+                  tile.controller == faction,
+                  state.division(at: coord) == nil else {
+                return false
+            }
+
+            return !isEnemyAdjacent(to: coord, faction: faction, in: state)
+        }
+    }
+
+    private func reinforcementTriggerSatisfied(
+        _ reinforcement: ScheduledReinforcement,
+        in state: GameState
+    ) -> Bool {
+        guard let objectiveId = reinforcement.triggerObjectiveId else {
+            return true
+        }
+
+        guard let objective = state.map.objectives.first(where: { $0.id == objectiveId }),
+              let tile = state.map.tile(at: objective.coord) else {
+            return false
+        }
+
+        let requiredController = reinforcement.triggerController ?? reinforcement.division.faction
+        return tile.controller == requiredController
+    }
+
+    private func markReinforcementArrived(_ id: String, in state: inout GameState) {
+        guard !state.reinforcementState.arrivedIds.contains(id) else {
+            return
+        }
+
+        state.reinforcementState.arrivedIds.append(id)
+    }
+
     private func hasControlledHex(in region: RegionNode, faction: Faction, map: MapState) -> Bool {
         regionHexes(for: region).contains { coord in
             map.tile(at: coord)?.controller == faction
@@ -441,7 +553,17 @@ struct EconomyRules {
         index: Int
     ) -> Division {
         let id = "prod_\(faction.rawValue)_\(order.kind.rawValue)_\(order.createdTurn)_\(index)"
-        let name = "\(order.kind.displayName) \(order.createdTurn)-\(index)"
+        let name = "\(order.kind.displayName(for: faction)) \(order.createdTurn)-\(index)"
+
+        if faction.usesNapoleonicLogisticsVocabulary {
+            return makeNapoleonicProducedFormation(
+                id: id,
+                name: name,
+                kind: order.kind,
+                faction: faction,
+                coord: coord
+            )
+        }
 
         switch order.kind {
         case .infantryDivision:
@@ -463,7 +585,9 @@ struct EconomyRules {
 
     private func isEnemyAdjacent(to coord: HexCoord, faction: Faction, in state: GameState) -> Bool {
         state.divisions.contains { other in
-            other.faction != faction && !other.isDestroyed && other.coord.distance(to: coord) <= 1
+            state.diplomacyState.isHostile(faction, to: other.faction) &&
+                !other.isDestroyed &&
+                other.coord.distance(to: coord) <= 1
         }
     }
 
@@ -471,7 +595,61 @@ struct EconomyRules {
         "order_\(faction.rawValue)_\(kind.rawValue)_\(turn)_\(index)"
     }
 
-    private func resourceSummary(_ resources: EconomyResources) -> String {
-        "MP \(resources.manpower), IC \(resources.industry), SUP \(resources.supplies)"
+    private func makeNapoleonicProducedFormation(
+        id: String,
+        name: String,
+        kind: ProductionKind,
+        faction: Faction,
+        coord: HexCoord
+    ) -> Division {
+        let components: [DivisionComponent]
+
+        switch kind {
+        case .infantryDivision:
+            components = [
+                DivisionComponent(type: .lineInfantry, weight: 0.75),
+                DivisionComponent(type: .lightInfantry, weight: 0.10),
+                DivisionComponent(type: .artillery, weight: 0.15)
+            ]
+        case .panzerDivision:
+            components = [
+                DivisionComponent(type: .guardInfantry, weight: 0.65),
+                DivisionComponent(type: .cavalry, weight: 0.15),
+                DivisionComponent(type: .artillery, weight: 0.20)
+            ]
+        case .motorizedDivision:
+            components = [
+                DivisionComponent(type: .cavalry, weight: 0.75),
+                DivisionComponent(type: .lightInfantry, weight: 0.15),
+                DivisionComponent(type: .artillery, weight: 0.10)
+            ]
+        case .artilleryDivision:
+            components = [
+                DivisionComponent(type: .artillery, weight: 0.70),
+                DivisionComponent(type: .lineInfantry, weight: 0.30)
+            ]
+        case .supplyStockpile:
+            components = [
+                DivisionComponent(type: .supplyTrain, weight: 0.70),
+                DivisionComponent(type: .lineInfantry, weight: 0.30)
+            ]
+        }
+
+        return Division(
+            id: id,
+            name: name,
+            faction: faction,
+            coord: coord,
+            facing: faction == .france ? .west : .east,
+            components: components
+        )
+    }
+
+    private func ledgerLabel(for faction: Faction) -> String {
+        faction.usesNapoleonicLogisticsVocabulary ? "logistics" : "economy"
+    }
+
+    private func resourceSummary(_ resources: EconomyResources, for faction: Faction) -> String {
+        resources.summary(for: faction)
     }
 }

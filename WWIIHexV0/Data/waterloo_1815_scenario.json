@@ -1,0 +1,482 @@
+{
+  "schemaVersion": 1,
+  "id": "waterloo_1815",
+  "displayName": "Waterloo 1815 Data Slice",
+  "factions": [
+    "france",
+    "angloAllied",
+    "prussia",
+    "neutral"
+  ],
+  "maxTurns": 16,
+  "initialTurn": 1,
+  "initialPhase": "playerCommand",
+  "playerFaction": "france",
+  "aiFaction": "angloAllied",
+  "map": {
+    "width": 5,
+    "height": 3,
+    "coordinateSystem": "axial",
+    "isSparse": true,
+    "tiles": [
+      {
+        "q": 0,
+        "r": 0,
+        "terrain": "hill",
+        "hasRoad": true,
+        "riverEdges": [],
+        "controller": "france",
+        "cityName": null,
+        "fortressName": null,
+        "isSupplySource": false,
+        "supplyFaction": null,
+        "objectiveId": null,
+        "regionId": "region_french_ridge"
+      },
+      {
+        "q": 0,
+        "r": 1,
+        "terrain": "plain",
+        "hasRoad": true,
+        "riverEdges": [],
+        "controller": "france",
+        "cityName": null,
+        "fortressName": null,
+        "isSupplySource": true,
+        "supplyFaction": "france",
+        "objectiveId": null,
+        "regionId": "region_french_ridge"
+      },
+      {
+        "q": 0,
+        "r": 2,
+        "terrain": "plain",
+        "hasRoad": true,
+        "riverEdges": [],
+        "controller": "france",
+        "cityName": null,
+        "fortressName": null,
+        "isSupplySource": false,
+        "supplyFaction": null,
+        "objectiveId": null,
+        "regionId": "region_french_ridge"
+      },
+      {
+        "q": 1,
+        "r": 0,
+        "terrain": "fortress",
+        "hasRoad": true,
+        "riverEdges": [],
+        "controller": "neutral",
+        "cityName": null,
+        "fortressName": "La Haye Sainte",
+        "isSupplySource": false,
+        "supplyFaction": null,
+        "objectiveId": "objective_la_haye_sainte",
+        "regionId": "region_la_haye_sainte"
+      },
+      {
+        "q": 1,
+        "r": 1,
+        "terrain": "plain",
+        "hasRoad": true,
+        "riverEdges": [],
+        "controller": "neutral",
+        "cityName": null,
+        "fortressName": null,
+        "isSupplySource": false,
+        "supplyFaction": null,
+        "objectiveId": null,
+        "regionId": "region_la_haye_sainte"
+      },
+      {
+        "q": 1,
+        "r": 2,
+        "terrain": "fortress",
+        "hasRoad": true,
+        "riverEdges": [],
+        "controller": "angloAllied",
+        "cityName": null,
+        "fortressName": "Hougoumont",
+        "isSupplySource": false,
+        "supplyFaction": null,
+        "objectiveId": "objective_hougoumont",
+        "regionId": "region_hougoumont"
+      },
+      {
+        "q": 2,
+        "r": 0,
+        "terrain": "hill",
+        "hasRoad": true,
+        "riverEdges": [],
+        "controller": "angloAllied",
+        "cityName": "Mont-Saint-Jean",
+        "fortressName": null,
+        "isSupplySource": false,
+        "supplyFaction": null,
+        "objectiveId": "objective_mont_saint_jean",
+        "regionId": "region_mont_saint_jean"
+      },
+      {
+        "q": 2,
+        "r": 1,
+        "terrain": "plain",
+        "hasRoad": true,
+        "riverEdges": [],
+        "controller": "angloAllied",
+        "cityName": null,
+        "fortressName": null,
+        "isSupplySource": true,
+        "supplyFaction": "angloAllied",
+        "objectiveId": null,
+        "regionId": "region_mont_saint_jean"
+      },
+      {
+        "q": 2,
+        "r": 2,
+        "terrain": "forest",
+        "hasRoad": false,
+        "riverEdges": [],
+        "controller": "angloAllied",
+        "cityName": null,
+        "fortressName": null,
+        "isSupplySource": false,
+        "supplyFaction": null,
+        "objectiveId": null,
+        "regionId": "region_hougoumont"
+      },
+      {
+        "q": 3,
+        "r": 0,
+        "terrain": "plain",
+        "hasRoad": true,
+        "riverEdges": [],
+        "controller": "angloAllied",
+        "cityName": null,
+        "fortressName": null,
+        "isSupplySource": false,
+        "supplyFaction": null,
+        "objectiveId": null,
+        "regionId": "region_papelotte"
+      },
+      {
+        "q": 3,
+        "r": 1,
+        "terrain": "city",
+        "hasRoad": true,
+        "riverEdges": [],
+        "controller": "angloAllied",
+        "cityName": "Papelotte",
+        "fortressName": null,
+        "isSupplySource": false,
+        "supplyFaction": null,
+        "objectiveId": "objective_papelotte",
+        "regionId": "region_papelotte"
+      },
+      {
+        "q": 4,
+        "r": 0,
+        "terrain": "plain",
+        "hasRoad": true,
+        "riverEdges": [],
+        "controller": "prussia",
+        "cityName": null,
+        "fortressName": null,
+        "isSupplySource": false,
+        "supplyFaction": null,
+        "objectiveId": null,
+        "regionId": "region_prussian_approach"
+      },
+      {
+        "q": 4,
+        "r": 1,
+        "terrain": "hill",
+        "hasRoad": true,
+        "riverEdges": [],
+        "controller": "prussia",
+        "cityName": null,
+        "fortressName": null,
+        "isSupplySource": true,
+        "supplyFaction": "prussia",
+        "objectiveId": "objective_prussian_arrival",
+        "regionId": "region_prussian_approach"
+      }
+    ]
+  },
+  "keyLocations": [
+    {
+      "id": "key_french_ridge",
+      "name": "French Ridge",
+      "kind": "ridge",
+      "coord": {
+        "q": 0,
+        "r": 0
+      },
+      "faction": "france",
+      "objectiveId": null
+    },
+    {
+      "id": "key_french_reserve_entry",
+      "name": "French Reserve Entry",
+      "kind": "reinforcement_entry",
+      "coord": {
+        "q": 0,
+        "r": 2
+      },
+      "faction": "france",
+      "objectiveId": null
+    },
+    {
+      "id": "key_la_haye_sainte",
+      "name": "La Haye Sainte",
+      "kind": "strongpoint",
+      "coord": {
+        "q": 1,
+        "r": 0
+      },
+      "faction": "neutral",
+      "objectiveId": "objective_la_haye_sainte"
+    },
+    {
+      "id": "key_hougoumont",
+      "name": "Hougoumont",
+      "kind": "strongpoint",
+      "coord": {
+        "q": 1,
+        "r": 2
+      },
+      "faction": "angloAllied",
+      "objectiveId": "objective_hougoumont"
+    },
+    {
+      "id": "key_mont_saint_jean",
+      "name": "Mont-Saint-Jean",
+      "kind": "ridge",
+      "coord": {
+        "q": 2,
+        "r": 0
+      },
+      "faction": "angloAllied",
+      "objectiveId": "objective_mont_saint_jean"
+    },
+    {
+      "id": "key_prussian_approach",
+      "name": "Prussian Approach",
+      "kind": "reinforcement_entry",
+      "coord": {
+        "q": 4,
+        "r": 1
+      },
+      "faction": "prussia",
+      "objectiveId": "objective_prussian_arrival"
+    }
+  ],
+  "objectives": [
+    {
+      "id": "objective_la_haye_sainte",
+      "name": "La Haye Sainte",
+      "kind": "fortress",
+      "coord": {
+        "q": 1,
+        "r": 0
+      },
+      "points": 4
+    },
+    {
+      "id": "objective_hougoumont",
+      "name": "Hougoumont",
+      "kind": "fortress",
+      "coord": {
+        "q": 1,
+        "r": 2
+      },
+      "points": 3
+    },
+    {
+      "id": "objective_mont_saint_jean",
+      "name": "Mont-Saint-Jean",
+      "kind": "city",
+      "coord": {
+        "q": 2,
+        "r": 0
+      },
+      "points": 5
+    },
+    {
+      "id": "objective_papelotte",
+      "name": "Papelotte",
+      "kind": "city",
+      "coord": {
+        "q": 3,
+        "r": 1
+      },
+      "points": 2
+    },
+    {
+      "id": "objective_prussian_arrival",
+      "name": "Prussian Arrival Road",
+      "kind": "supply",
+      "coord": {
+        "q": 4,
+        "r": 1
+      },
+      "points": 3
+    }
+  ],
+  "initialUnits": [
+    {
+      "id": "fr_napoleon_center",
+      "name": "French I Corps",
+      "faction": "france",
+      "templateId": "line_infantry_brigade",
+      "coord": {
+        "q": 0,
+        "r": 0
+      },
+      "facing": "east",
+      "hp": 10,
+      "retreatMode": "retreatable",
+      "supplyState": "supplied",
+      "assignedAgentId": "commander_napoleon"
+    },
+    {
+      "id": "fr_grand_battery",
+      "name": "French Grand Battery",
+      "faction": "france",
+      "templateId": "grand_battery",
+      "coord": {
+        "q": 0,
+        "r": 1
+      },
+      "facing": "east",
+      "hp": 8,
+      "retreatMode": "hold",
+      "supplyState": "supplied",
+      "assignedAgentId": "commander_napoleon"
+    },
+    {
+      "id": "aa_wellington_center",
+      "name": "Anglo-Allied Center",
+      "faction": "angloAllied",
+      "templateId": "line_infantry_brigade",
+      "coord": {
+        "q": 2,
+        "r": 0
+      },
+      "facing": "west",
+      "hp": 10,
+      "retreatMode": "hold",
+      "supplyState": "supplied",
+      "assignedAgentId": "commander_wellington"
+    },
+    {
+      "id": "aa_hougoumont_guard",
+      "name": "Hougoumont Guard",
+      "faction": "angloAllied",
+      "templateId": "strongpoint_guard",
+      "coord": {
+        "q": 1,
+        "r": 2
+      },
+      "facing": "west",
+      "hp": 9,
+      "retreatMode": "hold",
+      "supplyState": "supplied",
+      "assignedAgentId": "commander_wellington"
+    },
+    {
+      "id": "pr_blucher_vanguard",
+      "name": "Prussian Vanguard",
+      "faction": "prussia",
+      "templateId": "prussian_vanguard",
+      "coord": {
+        "q": 4,
+        "r": 1
+      },
+      "facing": "west",
+      "hp": 10,
+      "retreatMode": "retreatable",
+      "supplyState": "supplied",
+      "assignedAgentId": "commander_blucher"
+    }
+  ],
+  "reinforcements": [
+    {
+      "id": "fr_imperial_guard_reserve",
+      "name": "Imperial Guard Reserve",
+      "faction": "france",
+      "templateId": "reserve_infantry_column",
+      "arrivalTurn": 5,
+      "entryCoord": {
+        "q": 0,
+        "r": 2
+      },
+      "facing": "east",
+      "hp": 10,
+      "retreatMode": "hold",
+      "supplyState": "supplied",
+      "assignedAgentId": "commander_napoleon",
+      "triggerObjectiveId": null,
+      "triggerController": null
+    },
+    {
+      "id": "pr_bulow_iv_corps",
+      "name": "Prussian IV Corps",
+      "faction": "prussia",
+      "templateId": "prussian_vanguard",
+      "arrivalTurn": 4,
+      "entryCoord": {
+        "q": 4,
+        "r": 1
+      },
+      "facing": "west",
+      "hp": 10,
+      "retreatMode": "retreatable",
+      "supplyState": "supplied",
+      "assignedAgentId": "commander_blucher",
+      "triggerObjectiveId": null,
+      "triggerController": null
+    }
+  ],
+  "victoryConditions": [
+    {
+      "id": "french_break_center",
+      "type": "holdObjective",
+      "faction": "france",
+      "objectiveId": "objective_mont_saint_jean",
+      "objectiveIds": null,
+      "targetFaction": null,
+      "targetTemplateIds": null,
+      "turns": null,
+      "turn": null,
+      "count": null,
+      "status": "active",
+      "description": "France wins by taking Mont-Saint-Jean before the coalition line stabilizes."
+    },
+    {
+      "id": "coalition_hold_until_prussia",
+      "type": "holdObjectives",
+      "faction": "angloAllied",
+      "objectiveId": null,
+      "objectiveIds": [
+        "objective_hougoumont",
+        "objective_mont_saint_jean",
+        "objective_prussian_arrival"
+      ],
+      "targetFaction": "france",
+      "targetTemplateIds": null,
+      "turns": null,
+      "turn": 16,
+      "count": null,
+      "status": "active",
+      "description": "Coalition wins by holding the ridge and keeping the Prussian arrival road open."
+    }
+  ],
+  "dataNotes": [
+    "v3.2 minimal Waterloo data slice for JSON/schema integration.",
+    "Uses napoleonic_unit_templates.json through ScenarioCatalog.unitTemplateName.",
+    "Napoleonic templates use v3.3 ComponentType cases; morale now has a minimal Division-level model, while formation, cavalry charge, and artillery preparation rules remain future work.",
+    "v3.5 adds delayed French and Prussian reinforcement schedule entries; runtime deployment waits for safe controlled entry hexes.",
+    "Not the final 80-160 hex Waterloo campaign map."
+  ]
+}

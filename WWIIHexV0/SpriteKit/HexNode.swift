@@ -91,7 +91,7 @@ final class HexNode: SKNode {
                 zPosition: 6
             )
             addLabel(
-                text: "FORT",
+                text: "SP",
                 y: -layout.hexSize * 0.22,
                 fontSize: max(7, layout.hexSize * 0.14),
                 color: TerrainStyle.textColor(for: displayState.terrain),
@@ -112,12 +112,35 @@ final class HexNode: SKNode {
 
         if let supplySourceFaction {
             addLabel(
-                text: supplySourceFaction == .allies ? "SUP A" : "SUP G",
+                text: supplyLabel(for: supplySourceFaction),
                 y: layout.hexSize * 0.36,
                 fontSize: max(6, layout.hexSize * 0.13),
                 color: TerrainStyle.textColor(for: displayState.terrain),
                 zPosition: 7
             )
+        }
+    }
+
+    private func supplyLabel(for faction: Faction) -> String {
+        switch faction {
+        case .germany:
+            return "SUP G"
+        case .allies:
+            return "SUP A"
+        case .france:
+            return "SUP F"
+        case .angloAllied:
+            return "SUP C"
+        case .prussia:
+            return "SUP P"
+        case .austria:
+            return "SUP AU"
+        case .russia:
+            return "SUP R"
+        case .spain:
+            return "SUP S"
+        case .neutral:
+            return "SUP N"
         }
     }
 

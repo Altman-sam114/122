@@ -22,7 +22,7 @@ struct AgentPromptBuilder {
 
     private func systemPrompt(context: AgentContext) -> String {
         """
-        You are the local LLM decision layer for a turn-based WWII hex strategy prototype.
+        You are the local LLM decision layer for a turn-based historical hex command game.
         Agent: \(context.agentId)
         Faction: \(context.faction.rawValue)
         Personality: \(context.personality)
@@ -37,7 +37,7 @@ struct AgentPromptBuilder {
             .map { "\($0.name) region:\($0.regionId?.rawValue ?? "unknown"), controller: \($0.controller?.rawValue ?? "neutral")" }
             .joined(separator: "\n")
         let friendly = context.friendlyDivisions
-            .map { "\($0.id) \($0.name) str:\($0.strength)/\($0.maxStrength) region:\($0.regionId?.rawValue ?? "unknown") supply:\($0.supplyState.rawValue) acted:\($0.hasActed)" }
+            .map { "\($0.id) \($0.name) str:\($0.strength)/\($0.maxStrength) morale:\($0.morale) fatigue:\($0.fatigue) ammo:\($0.ammunition) region:\($0.regionId?.rawValue ?? "unknown") supply:\($0.supplyState.rawValue) acted:\($0.hasActed)" }
             .joined(separator: "\n")
         let enemies = context.enemyDivisions
             .map { "\($0.id) \($0.name) str:\($0.strength)/\($0.maxStrength) region:\($0.regionId?.rawValue ?? "unknown")" }
@@ -50,19 +50,19 @@ struct AgentPromptBuilder {
 
         return """
         Current task:
-        Issue operational orders for this agent's assigned divisions on turn \(context.turn), phase \(context.phase.rawValue).
+        Issue operational orders for this agent's assigned formations on turn \(context.turn), phase \(context.phase.rawValue).
 
         Available commands:
-        - move: requires divisionId and toRegionId
-        - attack: requires divisionId and targetDivisionId
-        - hold: requires divisionId
-        - resupply: requires divisionId
+        - move: requires formation divisionId and toRegionId
+        - attack: requires formation divisionId and targetDivisionId
+        - hold: requires formation divisionId
+        - resupply: requires formation divisionId
 
         Battlefield summary:
-        Friendly divisions:
+        Friendly formations:
         \(friendly)
 
-        Known enemy divisions:
+        Known enemy formations:
         \(enemies)
 
         Objectives:

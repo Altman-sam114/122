@@ -488,27 +488,27 @@ enum TheaterDirectiveDecoderError: Error, Equatable, LocalizedError {
     var errorDescription: String? {
         switch self {
         case .invalidUTF8:
-            return "Theater directive JSON is not valid UTF-8."
+            return "Command directive JSON is not valid UTF-8."
         case .malformedJSON(let detail):
-            return "Malformed theater directive JSON: \(detail)"
+            return "Malformed command directive JSON: \(detail)"
         case .unsupportedSchemaVersion(let version):
-            return "Unsupported theater directive schemaVersion \(version)."
+            return "Unsupported command directive schemaVersion \(version)."
         case .issuerMismatch(let expected, let actual):
-            return "Theater directive issuer mismatch. Expected \(expected), got \(actual)."
+            return "Command directive issuer mismatch. Expected \(expected), got \(actual)."
         case .turnMismatch(let expected, let actual):
-            return "Theater directive turn mismatch. Expected \(expected), got \(actual)."
+            return "Command directive turn mismatch. Expected \(expected), got \(actual)."
         case .factionMismatch(let expected, let actual):
-            return "Theater directive faction mismatch. Expected \(expected.displayName), got \(actual.displayName)."
+            return "Command directive faction mismatch. Expected \(expected.displayName), got \(actual.displayName)."
         case .missingZone(let zoneId):
-            return "Theater directive references missing FrontZone \(zoneId.rawValue)."
+            return "Command directive references missing corps sector \(zoneId.rawValue)."
         case .zoneFactionMismatch(let zoneId, let expected, let actual):
-            return "Theater directive zone \(zoneId.rawValue) belongs to \(actual.displayName), expected \(expected.displayName)."
+            return "Command directive sector \(zoneId.rawValue) belongs to \(actual.displayName), expected \(expected.displayName)."
         case .missingTargetTheater(let theaterId):
-            return "Theater directive references missing target theater \(theaterId.rawValue)."
+            return "Command directive references missing target wing \(theaterId.rawValue)."
         case .missingRegion(let regionId):
-            return "Theater directive references missing region \(regionId.rawValue)."
+            return "Command directive references missing region \(regionId.rawValue)."
         case .tacticCategoryMismatch(let directiveId, let tactic, let category):
-            return "Theater directive \(directiveId) uses tactic \(tactic.rawValue) outside category \(category.rawValue)."
+            return "Command directive \(directiveId) uses tactic \(tactic.rawValue) outside category \(category.rawValue)."
         }
     }
 }

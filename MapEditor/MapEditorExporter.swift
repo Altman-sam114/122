@@ -70,6 +70,51 @@ enum MapEditorExporter {
         )
     }
 
+    private static func exportedFactions(from document: MapEditorDocument) -> [Faction] {
+        var factions: [Faction] = []
+        factions.append(contentsOf: document.sortedHexes.compactMap(\.controller))
+        factions.append(contentsOf: document.sortedHexes.compactMap(\.supplyFaction))
+        factions.append(contentsOf: document.initialUnits.map(\.faction))
+        factions.append(contentsOf: document.regions.values.compactMap(\.owner))
+        factions.append(contentsOf: document.regions.values.compactMap(\.controller))
+        factions.append(contentsOf: document.regions.values.flatMap(\.coreOf))
+
+        let hasNeutralData = document.sortedHexes.contains { $0.controller == nil } ||
+            document.regions.values.contains { $0.owner == nil || $0.controller == nil }
+        if hasNeutralData {
+            factions.append(.neutral)
+        }
+
+        let unique = Array(Set(factions)).sorted {
+            if $0.turnOrderPriority == $1.turnOrderPriority {
+                return $0.rawValue < $1.rawValue
+            }
+            return $0.turnOrderPriority < $1.turnOrderPriority
+        }
+        if unique.filter({ !$0.isNeutral }).isEmpty {
+            let includesNeutral = hasNeutralData || unique.contains(.neutral)
+            return includesNeutral
+                ? Faction.legacyWorldWarIIFactions + [.neutral]
+                : Faction.legacyWorldWarIIFactions
+        }
+        return unique.isEmpty ? Faction.legacyWorldWarIIFactions : unique
+    }
+
+    private static func initialRuntimeFields(
+        for factions: [Faction]
+    ) -> (phase: GamePhase, playerFaction: Faction, aiFaction: Faction) {
+        let commandFactions = factions.filter { !$0.isNeutral }
+        let playerFaction = commandFactions.first { $0 == .allies }
+            ?? commandFactions.first { $0 == .france }
+            ?? commandFactions.first
+            ?? .allies
+        let aiFaction = commandFactions.first { $0 != playerFaction } ?? playerFaction
+        let initialPhase = playerFaction.usesNapoleonicLogisticsVocabulary
+            ? GamePhase.playerCommand
+            : GamePhase.legacyCompatibleCommandPhase(for: playerFaction)
+        return (initialPhase, playerFaction, aiFaction)
+    }
+
     private static func validateAssignable(_ document: MapEditorDocument) throws {
         for hex in document.sortedHexes where hex.regionId == nil {
             throw MapEditorExportError.unassignedHex(hex.coord)
@@ -81,6 +126,8 @@ enum MapEditorExporter {
     }
 
     private static func makeScenarioDefinition(from document: MapEditorDocument) -> ScenarioDefinition {
+        let factions = exportedFactions(from: document)
+        let runtimeFields = initialRuntimeFields(for: factions)
         let objectives = document.sortedHexes.compactMap { hex -> ObjectiveDefinition? in
             guard let objectiveId = hex.objectiveId else { return nil }
             return ObjectiveDefinition(
@@ -131,12 +178,12 @@ enum MapEditorExporter {
                     )
                 }
             ),
-            factions: Faction.allCases.map(\.rawValue),
+            factions: factions.map(\.rawValue),
             maxTurns: 12,
             initialTurn: 1,
-            initialPhase: GamePhase.alliedPlayer.rawValue,
-            playerFaction: Faction.allies.rawValue,
-            aiFaction: Faction.germany.rawValue,
+            initialPhase: runtimeFields.phase.rawValue,
+            playerFaction: runtimeFields.playerFaction.rawValue,
+            aiFaction: runtimeFields.aiFaction.rawValue,
             keyLocations: keyLocations,
             objectives: objectives,
             initialUnits: document.initialUnits.map { unit in

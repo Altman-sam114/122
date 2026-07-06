@@ -10,8 +10,8 @@ flowchart TD
     SCEN["ScenarioDefinition<br/>tiles / objectives / initialUnits"]:::data
     REG["RegionDataSet<br/>hexToRegion / regions / edges / theaterId"]:::data
     NEI["从真实 hex 邻接推导<br/>region neighbors / RegionEdge"]:::derived
-    BRIDGE["MapEditorGameResourceBridge<br/>overwriteDefaultGameResources"]:::loader
-    FILES["WWIIHexV0/Data<br/>ardennes_v0_scenario.json<br/>ardennes_v02_regions.json"]:::data
+    BRIDGE["MapEditorGameResourceBridge<br/>overwriteLegacyArdennesGameResources"]:::loader
+    FILES["MapEditor legacy Ardennes files<br/>ardennes_v0_scenario.json<br/>ardennes_v02_regions.json<br/>not current playable default"]:::data
     LOAD["DataLoader.loadGameState"]:::loader
     MAP["MapState<br/>tiles + hexToRegion + RegionGraph"]:::state
     THEATER["TheaterState<br/>initialSnapshot + regionToTheater + hexToTheater seed"]:::state

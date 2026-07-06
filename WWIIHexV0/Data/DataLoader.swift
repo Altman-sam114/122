@@ -1,5 +1,75 @@
 import Foundation
 
+struct ScenarioCatalogEntry: Equatable, Hashable, Identifiable {
+    let id: String
+    let runtimeScenarioIds: Set<String>
+    let displayName: String
+    let scenarioName: String
+    let regionName: String
+    let terrainRulesName: String
+    let unitTemplateName: String
+    let generalCatalogName: String
+    let defaultPlayerFaction: Faction
+    let migrationStage: String
+}
+
+enum ScenarioCatalog {
+    static let ardennesLegacy = ScenarioCatalogEntry(
+        id: "ardennes_v0",
+        runtimeScenarioIds: ["mapeditor_scenario"],
+        displayName: "Ardennes Legacy",
+        scenarioName: "ardennes_v0_scenario",
+        regionName: "ardennes_v02_regions",
+        terrainRulesName: "terrain_rules",
+        unitTemplateName: "unit_templates",
+        generalCatalogName: "generals",
+        defaultPlayerFaction: .allies,
+        migrationStage: "legacy_wwii"
+    )
+
+    static let waterloo1815DataSlice = ScenarioCatalogEntry(
+        id: "waterloo_1815",
+        runtimeScenarioIds: [],
+        displayName: "Waterloo 1815",
+        scenarioName: "waterloo_1815_scenario",
+        regionName: "waterloo_1815_regions",
+        terrainRulesName: "napoleonic_terrain_rules",
+        unitTemplateName: "napoleonic_unit_templates",
+        generalCatalogName: "napoleonic_generals",
+        defaultPlayerFaction: .france,
+        migrationStage: "v3.2_data_slice"
+    )
+
+    static let defaultPlayable = waterloo1815DataSlice
+    static let napoleonicTarget = waterloo1815DataSlice
+
+    static let all: [ScenarioCatalogEntry] = [
+        waterloo1815DataSlice,
+        ardennesLegacy
+    ]
+
+    static func entry(for scenarioId: String) -> ScenarioCatalogEntry? {
+        all.first { $0.matches(scenarioId) }
+    }
+
+    static func displayName(for scenarioId: String) -> String {
+        if let entry = entry(for: scenarioId) {
+            return entry.displayName
+        }
+
+        return scenarioId
+            .split(separator: "_")
+            .map { String($0).capitalized }
+            .joined(separator: " ")
+    }
+}
+
+extension ScenarioCatalogEntry {
+    func matches(_ scenarioId: String) -> Bool {
+        id == scenarioId || runtimeScenarioIds.contains(scenarioId)
+    }
+}
+
 struct DataLoader {
     private let bundle: Bundle
     private let resourceDirectory: URL?
@@ -16,10 +86,7 @@ struct DataLoader {
     }
 
     func loadInitialGameState() -> GameState {
-        if let state = try? loadGameState(
-            scenarioName: "ardennes_v0_scenario",
-            regionName: "ardennes_v02_regions"
-        ) {
+        if let state = try? loadGameState(ScenarioCatalog.ardennesLegacy) {
             return state
         }
 
@@ -43,24 +110,29 @@ struct DataLoader {
                 map: state.map,
                 regionData: regionData,
                 divisions: state.divisions,
+                diplomacyState: state.diplomacyState,
                 turn: state.turn
             )
             state.frontLineState = FrontLineManager().makeInitialState(
                 map: state.map,
                 theaterState: state.theaterState,
                 divisions: state.divisions,
+                diplomacyState: state.diplomacyState,
                 turn: state.turn
             )
             let deploymentState = WarDeploymentManager().makeInitialState(
                 map: state.map,
                 theaterState: state.theaterState,
                 divisions: state.divisions,
+                diplomacyState: state.diplomacyState,
                 turn: state.turn
             )
+            let generalRegistry = (try? loadGeneralRegistry()) ?? .empty
             state.warDeploymentState = assignGenerals(
                 to: deploymentState,
                 map: state.map,
-                regionData: regionData
+                regionData: regionData,
+                registry: generalRegistry
             )
         }
 
@@ -90,84 +162,275 @@ struct DataLoader {
         try loadJSON(RegionDataSet.self, named: resourceName)
     }
 
+    func loadGameState(_ scenario: ScenarioCatalogEntry) throws -> GameState {
+        var state = try loadGameState(
+            scenarioName: scenario.scenarioName,
+            regionName: scenario.regionName,
+            unitTemplateName: scenario.unitTemplateName,
+            generalCatalogName: scenario.generalCatalogName,
+            terrainRulesName: scenario.terrainRulesName
+        )
+        state.scenarioId = scenario.id
+        return state
+    }
+
     /// v0.34: 加载 MapEditor 直接导出的 ScenarioDefinition + RegionDataSet。
     /// 这是编辑器输出的主验收路径，不要求走旧 Ardennes 数据集的 agent/胜利条件强校验。
-    func loadGameState(scenarioName: String, regionName: String) throws -> GameState {
+    func loadGameState(
+        scenarioName: String,
+        regionName: String,
+        unitTemplateName: String = "unit_templates",
+        generalCatalogName: String = "generals",
+        terrainRulesName: String? = nil
+    ) throws -> GameState {
         let scenario = try loadScenarioDefinition(named: scenarioName)
+        let initialRuntimeFields = try initialRuntimeFields(for: scenario)
         let regionData = try loadRegionDataSet(named: regionName)
+        let unitTemplates = try loadUnitTemplates(named: unitTemplateName)
+        let generalRegistry = try loadGeneralRegistry(named: generalCatalogName)
+        let resolvedTerrainRulesName = terrainRulesName ?? inferredCatalogEntry(
+            scenarioName: scenarioName,
+            regionName: regionName
+        )?.terrainRulesName
+        let terrainRules = try resolvedTerrainRulesName
+            .map { try makeTerrainRuleSet(from: loadTerrainRules(named: $0)) } ?? .legacy
+        try validateScenarioResources(
+            scenario: scenario,
+            regionData: regionData,
+            unitTemplates: unitTemplates,
+            generalRegistry: generalRegistry
+        )
         var map = try makeMapState(from: scenario)
         try apply(regionData, to: &map)
         map = RegionOccupationRules().mapByAggregatingControllers(in: map)
-        let divisions = try makeDivisions(from: scenario.initialUnits)
+        let divisions = try makeDivisions(
+            from: scenario.initialUnits,
+            unitTemplateName: unitTemplateName
+        )
+        let reinforcementState = try makeReinforcements(
+            from: scenario.reinforcements ?? [],
+            unitTemplateName: unitTemplateName,
+            map: map
+        )
         let turn = scenario.initialTurn
+        let diplomacyState = DiplomacyState.initial(from: scenario.factions, turn: turn)
 
         let theaterState = makeTheaterState(
             map: map,
             regionData: regionData,
             divisions: divisions,
+            diplomacyState: diplomacyState,
             turn: turn
         )
         let frontLineState = FrontLineManager().makeInitialState(
             map: map,
             theaterState: theaterState,
             divisions: divisions,
+            diplomacyState: diplomacyState,
             turn: turn
         )
         let deploymentState = WarDeploymentManager().makeInitialState(
             map: map,
             theaterState: theaterState,
             divisions: divisions,
+            diplomacyState: diplomacyState,
             turn: turn
         )
         let warDeploymentState = assignGenerals(
             to: deploymentState,
             map: map,
-            regionData: regionData
+            regionData: regionData,
+            registry: generalRegistry
         )
+
+        let initialPhase = initialRuntimeFields.phase
+        let activeFaction = initialRuntimeFields.activeFaction
+        let victoryConditions = try makeVictoryConditions(from: scenario.victoryConditions)
 
         return GameState(
             scenarioId: scenario.id,
             turn: turn,
             maxTurns: scenario.maxTurns,
-            activeFaction: initialActiveFaction(for: scenario),
-            phase: GamePhase(rawValue: scenario.initialPhase) ?? .germanAI,
+            activeFaction: activeFaction,
+            phase: initialPhase,
             map: map,
+            terrainRules: terrainRules,
             theaterState: theaterState,
             frontLineState: frontLineState,
             warDeploymentState: warDeploymentState,
-            diplomacyState: DiplomacyState.initial(from: scenario.factions, turn: turn),
+            reinforcementState: reinforcementState,
+            diplomacyState: diplomacyState,
             divisions: divisions,
+            victoryConditions: victoryConditions,
             victoryState: .ongoing,
             selectedUnitSummary: nil,
             eventLog: [
                 GameLogEntry(
                     turn: turn,
-                    faction: initialActiveFaction(for: scenario),
-                    phase: GamePhase(rawValue: scenario.initialPhase) ?? .germanAI,
-                    message: "Loaded \(scenario.id) from MapEditor-compatible JSON."
+                    faction: activeFaction,
+                    phase: initialPhase,
+                    message: ScenarioCatalog.ardennesLegacy.matches(scenario.id)
+                        ? "Archived campaign loaded."
+                        : "Campaign loaded."
                 )
             ]
         )
     }
 
-    private func initialActiveFaction(for scenario: ScenarioDefinition) -> Faction {
-        let phase = GamePhase(rawValue: scenario.initialPhase) ?? .alliedPlayer
+    private func makeVictoryConditions(
+        from definitions: [VictoryConditionDefinition]
+    ) throws -> [ScenarioVictoryCondition] {
+        var conditions: [ScenarioVictoryCondition] = []
+        var errors: [DataValidationError] = []
+
+        for definition in definitions {
+            guard let faction = Faction(rawValue: definition.faction) else {
+                errors.append(DataValidationError(message: "Victory condition \(definition.id) has unknown faction \(definition.faction)."))
+                continue
+            }
+
+            var targetFaction: Faction?
+            if let targetFactionId = definition.targetFaction {
+                guard let parsedTargetFaction = Faction(rawValue: targetFactionId) else {
+                    errors.append(DataValidationError(message: "Victory condition \(definition.id) has unknown targetFaction \(targetFactionId)."))
+                    continue
+                }
+                targetFaction = parsedTargetFaction
+            }
+
+            conditions.append(
+                ScenarioVictoryCondition(
+                    id: definition.id,
+                    type: definition.type,
+                    faction: faction,
+                    objectiveId: definition.objectiveId,
+                    objectiveIds: definition.objectiveIds ?? [],
+                    targetFaction: targetFaction,
+                    turn: definition.turn,
+                    status: definition.status,
+                    description: definition.description
+                )
+            )
+        }
+
+        if !errors.isEmpty {
+            throw DataLoaderError.validationFailed(errors)
+        }
+
+        return conditions
+    }
+
+    private func inferredCatalogEntry(
+        scenarioName: String,
+        regionName: String
+    ) -> ScenarioCatalogEntry? {
+        ScenarioCatalog.all.first {
+            $0.scenarioName == scenarioName && $0.regionName == regionName
+        }
+    }
+
+    private func makeTerrainRuleSet(from definition: TerrainRuleDefinition) throws -> TerrainRuleSet {
+        var errors: [DataValidationError] = []
+        var terrainEntries: [String: TerrainRuleEntry] = [:]
+
+        for (terrainId, entry) in definition.terrain {
+            guard BaseTerrain(rawValue: terrainId) != nil else {
+                errors.append(DataValidationError(message: "Terrain rules contain unknown terrain \(terrainId)."))
+                continue
+            }
+            if entry.movementCost < 1 {
+                errors.append(DataValidationError(message: "Terrain \(terrainId) movementCost must be at least 1."))
+            }
+            if entry.defenseBonus < 0 {
+                errors.append(DataValidationError(message: "Terrain \(terrainId) defenseBonus must not be negative."))
+            }
+            terrainEntries[terrainId] = TerrainRuleEntry(
+                movementCost: entry.movementCost,
+                defenseBonus: entry.defenseBonus
+            )
+        }
+
+        for terrain in BaseTerrain.allCases where terrainEntries[terrain.rawValue] == nil {
+            errors.append(DataValidationError(message: "Terrain rules are missing \(terrain.rawValue)."))
+        }
+
+        if definition.roadMovementCost < 1 {
+            errors.append(DataValidationError(message: "roadMovementCost must be at least 1."))
+        }
+        if definition.riverCrossingExtraCost < 0 {
+            errors.append(DataValidationError(message: "riverCrossingExtraCost must not be negative."))
+        }
+
+        if !errors.isEmpty {
+            throw DataLoaderError.validationFailed(errors)
+        }
+
+        return TerrainRuleSet(
+            terrain: terrainEntries,
+            roadMovementCost: definition.roadMovementCost,
+            riverCrossingExtraCost: definition.riverCrossingExtraCost
+        )
+    }
+
+    private func initialRuntimeFields(for scenario: ScenarioDefinition) throws -> (phase: GamePhase, activeFaction: Faction) {
+        var errors: [DataValidationError] = []
+        let declaredFactionIds = Set(scenario.factions)
+
+        for factionId in scenario.factions where Faction(rawValue: factionId) == nil {
+            errors.append(DataValidationError(message: "Scenario \(scenario.id) declares unknown faction \(factionId)."))
+        }
+
+        guard let phase = GamePhase(rawValue: scenario.initialPhase) else {
+            errors.append(DataValidationError(message: "Scenario \(scenario.id) has unknown initialPhase \(scenario.initialPhase)."))
+            throw DataLoaderError.validationFailed(errors)
+        }
+
+        let playerFaction = Faction(rawValue: scenario.playerFaction)
+        if playerFaction == nil {
+            errors.append(DataValidationError(message: "Scenario \(scenario.id) has unknown playerFaction \(scenario.playerFaction)."))
+        } else if !declaredFactionIds.contains(scenario.playerFaction) {
+            errors.append(DataValidationError(message: "Scenario \(scenario.id) playerFaction \(scenario.playerFaction) is not declared in factions."))
+        }
+
+        let aiFaction = Faction(rawValue: scenario.aiFaction)
+        if aiFaction == nil {
+            errors.append(DataValidationError(message: "Scenario \(scenario.id) has unknown aiFaction \(scenario.aiFaction)."))
+        } else if !declaredFactionIds.contains(scenario.aiFaction) {
+            errors.append(DataValidationError(message: "Scenario \(scenario.id) aiFaction \(scenario.aiFaction) is not declared in factions."))
+        }
+
+        if !errors.isEmpty {
+            throw DataLoaderError.validationFailed(errors)
+        }
+
         switch phase {
-        case .alliedPlayer:
-            return Faction(rawValue: scenario.playerFaction) ?? .allies
-        case .germanAI:
-            return Faction(rawValue: scenario.aiFaction) ?? .germany
+        case .alliedPlayer, .playerCommand:
+            return (phase, playerFaction!)
+        case .germanAI, .aiCommand:
+            return (phase, aiFaction!)
         case .resolution:
-            return Faction(rawValue: scenario.playerFaction) ?? .allies
+            return (phase, playerFaction!)
         }
     }
 
     func loadTerrainRules() throws -> TerrainRuleDefinition {
-        try loadJSON(TerrainRuleDefinition.self, named: "terrain_rules")
+        try loadTerrainRules(named: "terrain_rules")
+    }
+
+    func loadTerrainRules(_ scenario: ScenarioCatalogEntry) throws -> TerrainRuleDefinition {
+        try loadTerrainRules(named: scenario.terrainRulesName)
+    }
+
+    func loadTerrainRules(named resourceName: String) throws -> TerrainRuleDefinition {
+        try loadJSON(TerrainRuleDefinition.self, named: resourceName)
     }
 
     func loadUnitTemplates() throws -> [UnitTemplateDefinition] {
-        try loadJSON(UnitTemplateCatalogDefinition.self, named: "unit_templates").templates
+        try loadUnitTemplates(named: "unit_templates")
+    }
+
+    func loadUnitTemplates(named resourceName: String) throws -> [UnitTemplateDefinition] {
+        try loadJSON(UnitTemplateCatalogDefinition.self, named: resourceName).templates
     }
 
     func loadGeneralAgents() throws -> [GeneralAgentDefinition] {
@@ -175,7 +438,16 @@ struct DataLoader {
     }
 
     func loadGeneralRegistry() throws -> GeneralRegistry {
-        let catalog = try loadJSON(GeneralCatalogDefinition.self, named: "generals")
+        try loadGeneralRegistry(named: "generals")
+    }
+
+    func loadGeneralRegistry(_ scenario: ScenarioCatalogEntry) throws -> GeneralRegistry {
+        try loadGeneralRegistry(named: scenario.generalCatalogName)
+    }
+
+    func loadGeneralRegistry(named resourceName: String) throws -> GeneralRegistry {
+        let catalog = try loadJSON(GeneralCatalogDefinition.self, named: resourceName)
+        try validateGeneralCatalog(catalog)
         return GeneralRegistry(generals: catalog.generals)
     }
 
@@ -224,7 +496,7 @@ struct DataLoader {
             }
         }
 
-        let tileCoords = Set(scenario.map.tiles.map(\.coord))
+        let tileCoords = Set(scenario.map.tiles.map { HexCoord(q: $0.q, r: $0.r) })
         if tileCoords.count != scenario.map.tiles.count {
             errors.append(DataValidationError(message: "Map contains duplicate tile coordinates."))
         }
@@ -294,6 +566,16 @@ struct DataLoader {
         }
 
         for condition in scenario.victoryConditions {
+            validateVictoryConditionShape(condition, errors: &errors)
+
+            if let targetFaction = condition.targetFaction, !scenario.factions.contains(targetFaction) {
+                errors.append(
+                    DataValidationError(
+                        message: "Victory condition \(condition.id) targetFaction \(targetFaction) is not declared in scenario factions."
+                    )
+                )
+            }
+
             if let objectiveId = condition.objectiveId, !objectiveIdSet.contains(objectiveId) {
                 errors.append(
                     DataValidationError(
@@ -314,7 +596,7 @@ struct DataLoader {
         let agentIds = dataSet.generalAgents.map(\.id)
         appendDuplicateErrors(agentIds, label: "general agent id", to: &errors)
 
-        if scenario.id == "ardennes_v0" {
+        if ScenarioCatalog.ardennesLegacy.matches(scenario.id) {
             let unitIdSet = Set(unitIds)
             for agent in dataSet.generalAgents {
                 for divisionId in agent.assignedDivisionIds where !unitIdSet.contains(divisionId) {
@@ -344,6 +626,555 @@ struct DataLoader {
         if !errors.isEmpty {
             throw DataLoaderError.validationFailed(errors)
         }
+    }
+
+    private func validateScenarioResources(
+        scenario: ScenarioDefinition,
+        regionData: RegionDataSet,
+        unitTemplates: [UnitTemplateDefinition],
+        generalRegistry: GeneralRegistry
+    ) throws {
+        var errors: [DataValidationError] = []
+        let declaredFactionIds = Set(scenario.factions)
+        let declaredFactions = Set(scenario.factions.compactMap(Faction.init(rawValue:)))
+        let tileCoords = Set(scenario.map.tiles.map(\.coord))
+        let regionIds = Set(regionData.regions.map(\.id))
+        let regionHexToRegion = regionData.toHexToRegion()
+        var parsedRegionCoords: Set<HexCoord> = []
+
+        for (key, regionId) in regionData.hexToRegion {
+            guard let coord = Self.parseHexToRegionKey(key) else {
+                errors.append(
+                    DataValidationError(
+                        message: "Region data hexToRegion key \(key) is not a valid q,r coordinate."
+                    )
+                )
+                continue
+            }
+
+            if !parsedRegionCoords.insert(coord).inserted {
+                errors.append(
+                    DataValidationError(
+                        message: "Region data hexToRegion contains duplicate coordinate \(coord.q),\(coord.r)."
+                    )
+                )
+            }
+
+            if !regionIds.contains(regionId) {
+                errors.append(
+                    DataValidationError(
+                        message: "Region data maps \(coord.q),\(coord.r) to unknown region \(regionId.rawValue)."
+                    )
+                )
+            }
+        }
+
+        if !scenarioIdsMatch(scenario.id, regionData.scenarioId) {
+            errors.append(
+                DataValidationError(
+                    message: "Region data scenarioId \(regionData.scenarioId) does not match scenario \(scenario.id)."
+                )
+            )
+        }
+
+        if !scenario.map.isSparse {
+            let expectedTileCount = scenario.map.width * scenario.map.height
+            if scenario.map.tiles.count != expectedTileCount {
+                errors.append(
+                    DataValidationError(
+                        message: "Map tile count \(scenario.map.tiles.count) does not match width * height \(expectedTileCount)."
+                    )
+                )
+            }
+        }
+
+        if tileCoords.count != scenario.map.tiles.count {
+            errors.append(DataValidationError(message: "Map contains duplicate tile coordinates."))
+        }
+
+        for tile in scenario.map.tiles {
+            guard let controller = Faction(rawValue: tile.controller) else {
+                errors.append(DataValidationError(message: "Tile \(tile.q),\(tile.r) has unknown controller \(tile.controller)."))
+                continue
+            }
+            if !declaredFactions.contains(controller) {
+                errors.append(DataValidationError(message: "Tile \(tile.q),\(tile.r) controller \(controller.rawValue) is not declared in scenario factions."))
+            }
+
+            if tile.isSupplySource {
+                guard let supplyFactionId = tile.supplyFaction else {
+                    errors.append(DataValidationError(message: "Supply tile \(tile.q),\(tile.r) is missing supplyFaction."))
+                    continue
+                }
+                guard let supplyFaction = Faction(rawValue: supplyFactionId) else {
+                    errors.append(DataValidationError(message: "Supply tile \(tile.q),\(tile.r) has unknown supplyFaction \(supplyFactionId)."))
+                    continue
+                }
+                if !declaredFactions.contains(supplyFaction) {
+                    errors.append(DataValidationError(message: "Supply tile \(tile.q),\(tile.r) supplyFaction \(supplyFaction.rawValue) is not declared in scenario factions."))
+                }
+            }
+
+            for riverEdge in tile.riverEdges where HexDirection(rawValue: riverEdge) == nil {
+                errors.append(
+                    DataValidationError(
+                        message: "Tile \(tile.q),\(tile.r) has unknown river edge \(riverEdge)."
+                    )
+                )
+            }
+
+            let coord = HexCoord(q: tile.q, r: tile.r)
+            if let regionId = tile.regionId.map(RegionId.init) {
+                if !regionIds.contains(regionId) {
+                    errors.append(
+                        DataValidationError(
+                            message: "Tile \(tile.q),\(tile.r) references unknown regionId \(regionId.rawValue)."
+                        )
+                    )
+                }
+
+                guard let mappedRegionId = regionHexToRegion[coord] else {
+                    errors.append(
+                        DataValidationError(
+                            message: "Tile \(tile.q),\(tile.r) regionId \(regionId.rawValue) is missing from region data hexToRegion."
+                        )
+                    )
+                    continue
+                }
+
+                if mappedRegionId != regionId {
+                    errors.append(
+                        DataValidationError(
+                            message: "Tile \(tile.q),\(tile.r) regionId \(regionId.rawValue) does not match region data \(mappedRegionId.rawValue)."
+                        )
+                    )
+                }
+            }
+        }
+
+        for (coord, regionId) in regionHexToRegion where !tileCoords.contains(coord) {
+            errors.append(
+                DataValidationError(
+                    message: "Region data maps missing tile \(coord.q),\(coord.r) to region \(regionId.rawValue)."
+                )
+            )
+        }
+
+        for region in regionData.regions {
+            for coord in region.displayHexes where !tileCoords.contains(coord) {
+                errors.append(
+                    DataValidationError(
+                        message: "Region \(region.id.rawValue) displayHexes references missing tile \(coord.q),\(coord.r)."
+                    )
+                )
+            }
+            if !tileCoords.contains(region.representativeHex) {
+                errors.append(
+                    DataValidationError(
+                        message: "Region \(region.id.rawValue) representativeHex references missing tile \(region.representativeHex.q),\(region.representativeHex.r)."
+                    )
+                )
+            }
+            if let assignedGeneralId = region.assignedGeneralId,
+               generalRegistry.general(id: assignedGeneralId) == nil {
+                errors.append(
+                    DataValidationError(
+                        message: "Region \(region.id.rawValue) references unknown assignedGeneralId \(assignedGeneralId)."
+                    )
+                )
+            }
+        }
+
+        let theaterIds = Set(regionData.regions.compactMap(\.theaterId))
+        validateGeneralRegistry(
+            generalRegistry,
+            declaredFactionIds: declaredFactionIds,
+            regionIds: regionIds,
+            theaterIds: theaterIds,
+            errors: &errors
+        )
+
+        var templatesById: [String: UnitTemplateDefinition] = [:]
+        for template in unitTemplates where templatesById[template.id] == nil {
+            templatesById[template.id] = template
+        }
+        let templateIds = Set(templatesById.keys)
+        appendDuplicateErrors(unitTemplates.map(\.id), label: "unit template id", to: &errors)
+        for template in unitTemplates {
+            if template.maxHP <= 0 {
+                errors.append(DataValidationError(message: "Unit template \(template.id) maxHP must be positive."))
+            }
+            if template.components.isEmpty {
+                errors.append(DataValidationError(message: "Unit template \(template.id) must contain at least one component."))
+            }
+            let componentWeight = template.components.reduce(0.0) { $0 + $1.weight }
+            if abs(componentWeight - 1.0) > 0.0001 {
+                errors.append(
+                    DataValidationError(
+                        message: "Unit template \(template.id) component weights sum to \(componentWeight), expected 1.0."
+                    )
+                )
+            }
+            for component in template.components {
+                if component.weight <= 0 {
+                    errors.append(
+                        DataValidationError(
+                            message: "Unit template \(template.id) component \(component.type) weight must be positive."
+                        )
+                    )
+                }
+                if ComponentType(rawValue: component.type) == nil {
+                    errors.append(
+                        DataValidationError(
+                            message: "Unit template \(template.id) contains unknown component type \(component.type)."
+                        )
+                    )
+                }
+            }
+        }
+
+        validateKeyLocations(
+            scenario.keyLocations,
+            declaredFactionIds: declaredFactionIds,
+            tileCoords: tileCoords,
+            objectiveIds: Set(scenario.objectives.map(\.id)),
+            errors: &errors
+        )
+
+        validateUnits(
+            scenario.initialUnits,
+            declaredFactionIds: declaredFactionIds,
+            tileCoords: tileCoords,
+            templatesById: templatesById,
+            generalRegistry: generalRegistry,
+            errors: &errors
+        )
+
+        let reinforcementIds = scenario.reinforcements?.map(\.id) ?? []
+        appendDuplicateErrors(reinforcementIds, label: "reinforcement id", to: &errors)
+
+        let objectiveIds = scenario.objectives.map(\.id)
+        appendDuplicateErrors(objectiveIds, label: "objective id", to: &errors)
+        let objectiveIdSet = Set(objectiveIds)
+
+        let tileObjectiveIds = scenario.map.tiles.compactMap(\.objectiveId)
+        appendDuplicateErrors(tileObjectiveIds, label: "tile objective id", to: &errors)
+        for objectiveId in tileObjectiveIds where !objectiveIdSet.contains(objectiveId) {
+            errors.append(
+                DataValidationError(
+                    message: "Tile objective \(objectiveId) is not declared in scenario objectives."
+                )
+            )
+        }
+
+        for objective in scenario.objectives {
+            let coord = HexCoord(q: objective.coord.q, r: objective.coord.r)
+            if !tileCoords.contains(coord) {
+                errors.append(
+                    DataValidationError(
+                        message: "Objective \(objective.id) references missing tile \(coord.q),\(coord.r)."
+                    )
+                )
+            }
+            if ObjectiveType(rawValue: objective.kind) == nil {
+                errors.append(DataValidationError(message: "Objective \(objective.id) has unknown kind \(objective.kind)."))
+            }
+        }
+
+        for condition in scenario.victoryConditions {
+            validateVictoryConditionShape(condition, errors: &errors)
+
+            if !declaredFactionIds.contains(condition.faction) {
+                errors.append(DataValidationError(message: "Victory condition \(condition.id) faction \(condition.faction) is not declared in scenario factions."))
+            }
+            if let targetFaction = condition.targetFaction, !declaredFactionIds.contains(targetFaction) {
+                errors.append(DataValidationError(message: "Victory condition \(condition.id) targetFaction \(targetFaction) is not declared in scenario factions."))
+            }
+            if let objectiveId = condition.objectiveId, !objectiveIdSet.contains(objectiveId) {
+                errors.append(
+                    DataValidationError(
+                        message: "Victory condition \(condition.id) references unknown objective \(objectiveId)."
+                    )
+                )
+            }
+            for objectiveId in condition.objectiveIds ?? [] where !objectiveIdSet.contains(objectiveId) {
+                errors.append(
+                    DataValidationError(
+                        message: "Victory condition \(condition.id) references unknown objective \(objectiveId)."
+                    )
+                )
+            }
+        }
+
+        for reinforcement in scenario.reinforcements ?? [] {
+            validateReinforcement(
+                reinforcement,
+                declaredFactionIds: declaredFactionIds,
+                tileCoords: tileCoords,
+                templatesById: templatesById,
+                objectiveIds: objectiveIdSet,
+                generalRegistry: generalRegistry,
+                errors: &errors
+            )
+        }
+
+        if !errors.isEmpty {
+            throw DataLoaderError.validationFailed(errors)
+        }
+    }
+
+    private func validateVictoryConditionShape(
+        _ condition: VictoryConditionDefinition,
+        errors: inout [DataValidationError]
+    ) {
+        switch condition.type {
+        case "holdObjective":
+            if condition.objectiveId == nil {
+                errors.append(DataValidationError(message: "Victory condition \(condition.id) type holdObjective requires objectiveId."))
+            }
+        case "holdObjectives":
+            if condition.objectiveIds?.isEmpty != false {
+                errors.append(DataValidationError(message: "Victory condition \(condition.id) type holdObjectives requires non-empty objectiveIds."))
+            }
+        default:
+            errors.append(DataValidationError(message: "Victory condition \(condition.id) has unsupported type \(condition.type)."))
+        }
+
+        switch condition.id {
+        case "french_break_center":
+            if condition.type != "holdObjective" {
+                errors.append(DataValidationError(message: "Victory condition french_break_center must use type holdObjective."))
+            }
+            if condition.targetFaction != nil {
+                errors.append(DataValidationError(message: "Victory condition french_break_center must not set targetFaction."))
+            }
+        case "coalition_hold_until_prussia":
+            if condition.type != "holdObjectives" {
+                errors.append(DataValidationError(message: "Victory condition coalition_hold_until_prussia must use type holdObjectives."))
+            }
+            if condition.turn == nil {
+                errors.append(DataValidationError(message: "Victory condition coalition_hold_until_prussia requires turn."))
+            }
+            if condition.targetFaction == nil {
+                errors.append(DataValidationError(message: "Victory condition coalition_hold_until_prussia requires targetFaction."))
+            }
+        default:
+            break
+        }
+    }
+
+    private func validateGeneralCatalog(_ catalog: GeneralCatalogDefinition) throws {
+        var errors: [DataValidationError] = []
+        appendDuplicateErrors(catalog.generals.map(\.id), label: "general id", to: &errors)
+        for general in catalog.generals {
+            if general.id.isEmpty {
+                errors.append(DataValidationError(message: "General id must not be empty."))
+            }
+            if general.name.isEmpty {
+                errors.append(DataValidationError(message: "General \(general.id) name must not be empty."))
+            }
+            if general.baseLoyalty < 0 || general.baseLoyalty > 100 {
+                errors.append(DataValidationError(message: "General \(general.id) baseLoyalty must be between 0 and 100."))
+            }
+            if general.baseSatisfaction < 0 || general.baseSatisfaction > 100 {
+                errors.append(DataValidationError(message: "General \(general.id) baseSatisfaction must be between 0 and 100."))
+            }
+        }
+        if !errors.isEmpty {
+            throw DataLoaderError.validationFailed(errors)
+        }
+    }
+
+    private func validateGeneralRegistry(
+        _ registry: GeneralRegistry,
+        declaredFactionIds: Set<String>,
+        regionIds: Set<RegionId>,
+        theaterIds: Set<TheaterId>,
+        errors: inout [DataValidationError]
+    ) {
+        for general in registry.allGenerals {
+            if !declaredFactionIds.contains(general.faction.rawValue) {
+                errors.append(DataValidationError(message: "General \(general.id) faction \(general.faction.rawValue) is not declared in scenario factions."))
+            }
+            for regionId in general.preferredRegionIds where !regionIds.contains(regionId) {
+                errors.append(DataValidationError(message: "General \(general.id) preferredRegionIds references unknown region \(regionId.rawValue)."))
+            }
+            for theaterId in general.preferredTheaterIds where !theaterIds.contains(theaterId) {
+                errors.append(DataValidationError(message: "General \(general.id) preferredTheaterIds references unknown theater \(theaterId.rawValue)."))
+            }
+        }
+    }
+
+    private func validateKeyLocations(
+        _ keyLocations: [KeyLocationDefinition],
+        declaredFactionIds: Set<String>,
+        tileCoords: Set<HexCoord>,
+        objectiveIds: Set<String>,
+        errors: inout [DataValidationError]
+    ) {
+        let allowedKinds: Set<String> = [
+            "bridge",
+            "farm",
+            "reinforcement_entry",
+            "ridge",
+            "road",
+            "strongpoint",
+            "town",
+            "village",
+            "wood"
+        ]
+        appendDuplicateErrors(keyLocations.map(\.id), label: "key location id", to: &errors)
+        for location in keyLocations {
+            if !allowedKinds.contains(location.kind) {
+                errors.append(DataValidationError(message: "Key location \(location.id) has unsupported kind \(location.kind)."))
+            }
+            let coord = HexCoord(q: location.coord.q, r: location.coord.r)
+            if !tileCoords.contains(coord) {
+                errors.append(DataValidationError(message: "Key location \(location.id) references missing tile \(coord.q),\(coord.r)."))
+            }
+            if let faction = location.faction {
+                if Faction(rawValue: faction) == nil {
+                    errors.append(DataValidationError(message: "Key location \(location.id) has unknown faction \(faction)."))
+                } else if !declaredFactionIds.contains(faction) {
+                    errors.append(DataValidationError(message: "Key location \(location.id) faction \(faction) is not declared in scenario factions."))
+                }
+            }
+            if let objectiveId = location.objectiveId, !objectiveIds.contains(objectiveId) {
+                errors.append(DataValidationError(message: "Key location \(location.id) references unknown objectiveId \(objectiveId)."))
+            }
+        }
+    }
+
+    private func validateUnits(
+        _ units: [InitialUnitDefinition],
+        declaredFactionIds: Set<String>,
+        tileCoords: Set<HexCoord>,
+        templatesById: [String: UnitTemplateDefinition],
+        generalRegistry: GeneralRegistry,
+        errors: inout [DataValidationError]
+    ) {
+        appendDuplicateErrors(units.map(\.id), label: "initial unit id", to: &errors)
+
+        let occupiedCoords = units.map { HexCoord(q: $0.coord.q, r: $0.coord.r) }
+        if Set(occupiedCoords).count != occupiedCoords.count {
+            errors.append(DataValidationError(message: "Initial units contain overlapping coordinates."))
+        }
+
+        for unit in units {
+            if Faction(rawValue: unit.faction) == nil {
+                errors.append(DataValidationError(message: "Initial unit \(unit.id) has unknown faction \(unit.faction)."))
+            } else if !declaredFactionIds.contains(unit.faction) {
+                errors.append(DataValidationError(message: "Initial unit \(unit.id) faction \(unit.faction) is not declared in scenario factions."))
+            }
+
+            if let template = templatesById[unit.templateId] {
+                if unit.hp <= 0 || unit.hp > template.maxHP {
+                    errors.append(DataValidationError(message: "Initial unit \(unit.id) hp \(unit.hp) must be between 1 and template maxHP \(template.maxHP)."))
+                }
+            } else {
+                errors.append(DataValidationError(message: "Initial unit \(unit.id) references unknown template \(unit.templateId)."))
+            }
+
+            if HexDirection(rawValue: unit.facing) == nil {
+                errors.append(DataValidationError(message: "Initial unit \(unit.id) has unknown facing \(unit.facing)."))
+            }
+            if SupplyState(rawValue: unit.supplyState) == nil {
+                errors.append(DataValidationError(message: "Initial unit \(unit.id) has unknown supplyState \(unit.supplyState)."))
+            }
+            if let retreatMode = unit.retreatMode, RetreatMode(rawValue: retreatMode) == nil {
+                errors.append(DataValidationError(message: "Initial unit \(unit.id) has unknown retreatMode \(retreatMode)."))
+            }
+
+            let coord = HexCoord(q: unit.coord.q, r: unit.coord.r)
+            if !tileCoords.contains(coord) {
+                errors.append(DataValidationError(message: "Initial unit \(unit.id) references missing tile \(coord.q),\(coord.r)."))
+            }
+
+            if let assignedAgentId = unit.assignedAgentId,
+               generalRegistry.general(id: assignedAgentId) == nil {
+                errors.append(DataValidationError(message: "Initial unit \(unit.id) references unknown assignedAgentId \(assignedAgentId)."))
+            }
+        }
+    }
+
+    private func validateReinforcement(
+        _ reinforcement: ReinforcementDefinition,
+        declaredFactionIds: Set<String>,
+        tileCoords: Set<HexCoord>,
+        templatesById: [String: UnitTemplateDefinition],
+        objectiveIds: Set<String>,
+        generalRegistry: GeneralRegistry,
+        errors: inout [DataValidationError]
+    ) {
+        if Faction(rawValue: reinforcement.faction) == nil {
+            errors.append(DataValidationError(message: "Reinforcement \(reinforcement.id) has unknown faction \(reinforcement.faction)."))
+        } else if !declaredFactionIds.contains(reinforcement.faction) {
+            errors.append(DataValidationError(message: "Reinforcement \(reinforcement.id) faction \(reinforcement.faction) is not declared in scenario factions."))
+        }
+
+        if let template = templatesById[reinforcement.templateId] {
+            if reinforcement.hp <= 0 || reinforcement.hp > template.maxHP {
+                errors.append(DataValidationError(message: "Reinforcement \(reinforcement.id) hp \(reinforcement.hp) must be between 1 and template maxHP \(template.maxHP)."))
+            }
+        } else {
+            errors.append(DataValidationError(message: "Reinforcement \(reinforcement.id) references unknown template \(reinforcement.templateId)."))
+        }
+
+        if HexDirection(rawValue: reinforcement.facing) == nil {
+            errors.append(DataValidationError(message: "Reinforcement \(reinforcement.id) has unknown facing \(reinforcement.facing)."))
+        }
+        if SupplyState(rawValue: reinforcement.supplyState) == nil {
+            errors.append(DataValidationError(message: "Reinforcement \(reinforcement.id) has unknown supplyState \(reinforcement.supplyState)."))
+        }
+        if let retreatMode = reinforcement.retreatMode, RetreatMode(rawValue: retreatMode) == nil {
+            errors.append(DataValidationError(message: "Reinforcement \(reinforcement.id) has unknown retreatMode \(retreatMode)."))
+        }
+
+        let entryCoord = HexCoord(q: reinforcement.entryCoord.q, r: reinforcement.entryCoord.r)
+        if !tileCoords.contains(entryCoord) {
+            errors.append(DataValidationError(message: "Reinforcement \(reinforcement.id) references missing entry tile \(entryCoord.q),\(entryCoord.r)."))
+        }
+
+        if let triggerObjectiveId = reinforcement.triggerObjectiveId,
+           !objectiveIds.contains(triggerObjectiveId) {
+            errors.append(DataValidationError(message: "Reinforcement \(reinforcement.id) references unknown triggerObjectiveId \(triggerObjectiveId)."))
+        }
+
+        if let triggerController = reinforcement.triggerController {
+            if Faction(rawValue: triggerController) == nil {
+                errors.append(DataValidationError(message: "Reinforcement \(reinforcement.id) has unknown trigger controller \(triggerController)."))
+            } else if !declaredFactionIds.contains(triggerController) {
+                errors.append(DataValidationError(message: "Reinforcement \(reinforcement.id) trigger controller \(triggerController) is not declared in scenario factions."))
+            }
+        }
+
+        if let assignedAgentId = reinforcement.assignedAgentId,
+           generalRegistry.general(id: assignedAgentId) == nil {
+            errors.append(DataValidationError(message: "Reinforcement \(reinforcement.id) references unknown assignedAgentId \(assignedAgentId)."))
+        }
+    }
+
+    private func scenarioIdsMatch(_ lhs: String, _ rhs: String) -> Bool {
+        if lhs == rhs {
+            return true
+        }
+        if let entry = ScenarioCatalog.entry(for: lhs), entry.matches(rhs) {
+            return true
+        }
+        if let entry = ScenarioCatalog.entry(for: rhs), entry.matches(lhs) {
+            return true
+        }
+        return false
+    }
+
+    private static func parseHexToRegionKey(_ key: String) -> HexCoord? {
+        let parts = key.split(separator: ",", omittingEmptySubsequences: false)
+        guard parts.count == 2,
+              let q = Int(parts[0]),
+              let r = Int(parts[1]) else {
+            return nil
+        }
+        return HexCoord(q: q, r: r)
     }
 
     private func loadJSON<T: Decodable>(_ type: T.Type, named resourceName: String) throws -> T {
@@ -447,9 +1278,9 @@ struct DataLoader {
     private func assignGenerals(
         to deploymentState: WarDeploymentState,
         map: MapState,
-        regionData: RegionDataSet
+        regionData: RegionDataSet,
+        registry: GeneralRegistry = .empty
     ) -> WarDeploymentState {
-        let registry = (try? loadGeneralRegistry()) ?? .empty
         let seedAssignments = Dictionary(uniqueKeysWithValues: regionData.regions.compactMap { definition in
             definition.assignedGeneralId.map { (definition.id, $0) }
         })
@@ -460,8 +1291,12 @@ struct DataLoader {
         )
     }
 
-    private func makeDivisions(from definitions: [InitialUnitDefinition]) throws -> [Division] {
-        let templates = (try? loadUnitTemplates()) ?? []
+    private func makeDivisions(
+        from definitions: [InitialUnitDefinition],
+        unitTemplateName: String = "unit_templates"
+    ) throws -> [Division] {
+        let templates = try loadUnitTemplates(named: unitTemplateName)
+        let usesLegacyFallback = unitTemplateName == "unit_templates"
         var errors: [DataValidationError] = []
         let divisions = definitions.compactMap { definition -> Division? in
             guard let faction = Faction(rawValue: definition.faction) else {
@@ -470,13 +1305,28 @@ struct DataLoader {
             }
 
             let components: [DivisionComponent]
+            let maxHP: Int
             if let template = templates.first(where: { $0.id == definition.templateId }) {
-                components = template.components.compactMap { component in
-                    guard let type = ComponentType(rawValue: component.type) else { return nil }
-                    return DivisionComponent(type: type, weight: component.weight)
+                maxHP = usesLegacyFallback ? 10 : template.maxHP
+                var parsedComponents: [DivisionComponent] = []
+                for component in template.components {
+                    guard let type = ComponentType(rawValue: component.type) else {
+                        errors.append(
+                            DataValidationError(
+                                message: "Unit template \(template.id) contains unknown component type \(component.type)."
+                            )
+                        )
+                        continue
+                    }
+                    parsedComponents.append(DivisionComponent(type: type, weight: component.weight))
                 }
-            } else {
+                components = parsedComponents
+            } else if usesLegacyFallback {
+                maxHP = 10
                 components = fallbackComponents(for: definition.templateId)
+            } else {
+                errors.append(DataValidationError(message: "Unit \(definition.id) references unknown template \(definition.templateId)."))
+                return nil
             }
 
             guard !components.isEmpty else {
@@ -491,7 +1341,7 @@ struct DataLoader {
                 coord: HexCoord(q: definition.coord.q, r: definition.coord.r),
                 facing: HexDirection(rawValue: definition.facing) ?? .west,
                 hp: definition.hp,
-                maxHP: 10,
+                maxHP: maxHP,
                 components: components,
                 supplyState: SupplyState(rawValue: definition.supplyState) ?? .supplied,
                 retreatMode: definition.retreatMode.flatMap(RetreatMode.init(rawValue:)) ?? .retreatable
@@ -502,6 +1352,102 @@ struct DataLoader {
             throw DataLoaderError.validationFailed(errors)
         }
         return divisions
+    }
+
+    private func makeReinforcements(
+        from definitions: [ReinforcementDefinition],
+        unitTemplateName: String = "unit_templates",
+        map: MapState
+    ) throws -> ReinforcementState {
+        guard !definitions.isEmpty else {
+            return .empty
+        }
+
+        let templates = try loadUnitTemplates(named: unitTemplateName)
+        let usesLegacyFallback = unitTemplateName == "unit_templates"
+        var errors: [DataValidationError] = []
+        appendDuplicateErrors(definitions.map(\.id), label: "reinforcement id", to: &errors)
+
+        let scheduled = definitions.compactMap { definition -> ScheduledReinforcement? in
+            guard let faction = Faction(rawValue: definition.faction) else {
+                errors.append(DataValidationError(message: "Unknown reinforcement faction \(definition.faction)."))
+                return nil
+            }
+
+            let entryCoord = HexCoord(q: definition.entryCoord.q, r: definition.entryCoord.r)
+            guard map.tile(at: entryCoord) != nil else {
+                errors.append(
+                    DataValidationError(
+                        message: "Reinforcement \(definition.id) references missing entry tile \(entryCoord.q),\(entryCoord.r)."
+                    )
+                )
+                return nil
+            }
+
+            let components: [DivisionComponent]
+            let maxHP: Int
+            if let template = templates.first(where: { $0.id == definition.templateId }) {
+                maxHP = usesLegacyFallback ? 10 : template.maxHP
+                var parsedComponents: [DivisionComponent] = []
+                for component in template.components {
+                    guard let type = ComponentType(rawValue: component.type) else {
+                        errors.append(
+                            DataValidationError(
+                                message: "Reinforcement template \(template.id) contains unknown component type \(component.type)."
+                            )
+                        )
+                        continue
+                    }
+                    parsedComponents.append(DivisionComponent(type: type, weight: component.weight))
+                }
+                components = parsedComponents
+            } else if usesLegacyFallback {
+                maxHP = 10
+                components = fallbackComponents(for: definition.templateId)
+            } else {
+                errors.append(DataValidationError(message: "Reinforcement \(definition.id) references unknown template \(definition.templateId)."))
+                return nil
+            }
+
+            guard !components.isEmpty else {
+                errors.append(DataValidationError(message: "Reinforcement \(definition.id) references empty template \(definition.templateId)."))
+                return nil
+            }
+
+            let triggerController = definition.triggerController.flatMap(Faction.init(rawValue:))
+            if definition.triggerController != nil && triggerController == nil {
+                errors.append(DataValidationError(message: "Reinforcement \(definition.id) has unknown trigger controller \(definition.triggerController ?? "")."))
+                return nil
+            }
+
+            let division = Division(
+                id: definition.id,
+                name: definition.name,
+                faction: faction,
+                coord: entryCoord,
+                facing: HexDirection(rawValue: definition.facing) ?? .west,
+                hp: definition.hp,
+                maxHP: maxHP,
+                components: components,
+                supplyState: SupplyState(rawValue: definition.supplyState) ?? .supplied,
+                retreatMode: definition.retreatMode.flatMap(RetreatMode.init(rawValue:)) ?? .retreatable
+            )
+
+            return ScheduledReinforcement(
+                id: definition.id,
+                arrivalTurn: max(1, definition.arrivalTurn),
+                entryCoord: entryCoord,
+                division: division,
+                triggerObjectiveId: definition.triggerObjectiveId,
+                triggerController: triggerController
+            )
+        }
+
+        if !errors.isEmpty {
+            throw DataLoaderError.validationFailed(errors)
+        }
+
+        return ReinforcementState(pending: scheduled)
     }
 
     private func fallbackComponents(for templateId: String) -> [DivisionComponent] {
@@ -521,6 +1467,7 @@ struct DataLoader {
         map: MapState,
         regionData: RegionDataSet,
         divisions: [Division],
+        diplomacyState: DiplomacyState = .empty,
         turn: Int
     ) -> TheaterState {
         let assignments = Dictionary(uniqueKeysWithValues: regionData.regions.compactMap { definition in
@@ -528,7 +1475,12 @@ struct DataLoader {
         })
 
         guard !assignments.isEmpty else {
-            return TheaterSystem().makeInitialFixedTheaters(map: map, divisions: divisions, turn: turn)
+            return TheaterSystem().makeInitialFixedTheaters(
+                map: map,
+                divisions: divisions,
+                diplomacyState: diplomacyState,
+                turn: turn
+            )
         }
 
         var groupedRegions: [TheaterId: [RegionId]] = [:]
@@ -556,7 +1508,13 @@ struct DataLoader {
             regionIds.map { ($0, theaterId) }
         })
         let state = TheaterState(theaters: theaters, regionToTheater: regionToTheater)
-        var updated = TheaterSystem().updateTheaters(state: state, map: map, divisions: divisions, turn: turn)
+        var updated = TheaterSystem().updateTheaters(
+            state: state,
+            map: map,
+            divisions: divisions,
+            diplomacyState: diplomacyState,
+            turn: turn
+        )
         updated.initialSnapshot = TheaterInitialSnapshot.capture(from: updated)
         return updated
     }

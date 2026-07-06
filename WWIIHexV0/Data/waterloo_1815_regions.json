@@ -1,0 +1,360 @@
+{
+  "schemaVersion": 1,
+  "scenarioId": "waterloo_1815",
+  "displayName": "Waterloo 1815 Region Slice",
+  "hexToRegion": {
+    "0,0": "region_french_ridge",
+    "0,1": "region_french_ridge",
+    "0,2": "region_french_ridge",
+    "1,0": "region_la_haye_sainte",
+    "1,1": "region_la_haye_sainte",
+    "1,2": "region_hougoumont",
+    "2,0": "region_mont_saint_jean",
+    "2,1": "region_mont_saint_jean",
+    "2,2": "region_hougoumont",
+    "3,0": "region_papelotte",
+    "3,1": "region_papelotte",
+    "4,0": "region_prussian_approach",
+    "4,1": "region_prussian_approach"
+  },
+  "regions": [
+    {
+      "id": "region_french_ridge",
+      "name": "French Ridge",
+      "owner": "france",
+      "controller": "france",
+      "theaterId": "zone_french_center",
+      "assignedGeneralId": "commander_napoleon",
+      "terrain": "hill",
+      "neighbors": [
+        "region_la_haye_sainte",
+        "region_hougoumont"
+      ],
+      "displayHexes": [
+        {
+          "q": 0,
+          "r": 0
+        },
+        {
+          "q": 0,
+          "r": 1
+        },
+        {
+          "q": 0,
+          "r": 2
+        }
+      ],
+      "representativeHex": {
+        "q": 0,
+        "r": 0
+      },
+      "city": null,
+      "infrastructure": 2,
+      "supplyValue": 3,
+      "factories": 0,
+      "resources": [],
+      "coreOf": [
+        "france"
+      ],
+      "occupationState": null,
+      "isPassable": true
+    },
+    {
+      "id": "region_la_haye_sainte",
+      "name": "La Haye Sainte",
+      "owner": "neutral",
+      "controller": "neutral",
+      "theaterId": "zone_center_objectives",
+      "assignedGeneralId": null,
+      "terrain": "fortress",
+      "neighbors": [
+        "region_french_ridge",
+        "region_mont_saint_jean",
+        "region_hougoumont"
+      ],
+      "displayHexes": [
+        {
+          "q": 1,
+          "r": 0
+        },
+        {
+          "q": 1,
+          "r": 1
+        }
+      ],
+      "representativeHex": {
+        "q": 1,
+        "r": 0
+      },
+      "city": {
+        "name": "La Haye Sainte",
+        "victoryPoints": 4,
+        "isCapital": false
+      },
+      "infrastructure": 1,
+      "supplyValue": 1,
+      "factories": 0,
+      "resources": [],
+      "coreOf": [
+        "neutral"
+      ],
+      "occupationState": null,
+      "isPassable": true
+    },
+    {
+      "id": "region_hougoumont",
+      "name": "Hougoumont",
+      "owner": "angloAllied",
+      "controller": "angloAllied",
+      "theaterId": "zone_anglo_right",
+      "assignedGeneralId": "commander_wellington",
+      "terrain": "fortress",
+      "neighbors": [
+        "region_french_ridge",
+        "region_la_haye_sainte",
+        "region_mont_saint_jean"
+      ],
+      "displayHexes": [
+        {
+          "q": 1,
+          "r": 2
+        },
+        {
+          "q": 2,
+          "r": 2
+        }
+      ],
+      "representativeHex": {
+        "q": 1,
+        "r": 2
+      },
+      "city": {
+        "name": "Hougoumont",
+        "victoryPoints": 3,
+        "isCapital": false
+      },
+      "infrastructure": 1,
+      "supplyValue": 1,
+      "factories": 0,
+      "resources": [],
+      "coreOf": [
+        "angloAllied"
+      ],
+      "occupationState": null,
+      "isPassable": true
+    },
+    {
+      "id": "region_mont_saint_jean",
+      "name": "Mont-Saint-Jean",
+      "owner": "angloAllied",
+      "controller": "angloAllied",
+      "theaterId": "zone_anglo_center",
+      "assignedGeneralId": "commander_wellington",
+      "terrain": "hill",
+      "neighbors": [
+        "region_la_haye_sainte",
+        "region_hougoumont",
+        "region_papelotte"
+      ],
+      "displayHexes": [
+        {
+          "q": 2,
+          "r": 0
+        },
+        {
+          "q": 2,
+          "r": 1
+        }
+      ],
+      "representativeHex": {
+        "q": 2,
+        "r": 0
+      },
+      "city": {
+        "name": "Mont-Saint-Jean",
+        "victoryPoints": 5,
+        "isCapital": false
+      },
+      "infrastructure": 2,
+      "supplyValue": 3,
+      "factories": 0,
+      "resources": [],
+      "coreOf": [
+        "angloAllied"
+      ],
+      "occupationState": null,
+      "isPassable": true
+    },
+    {
+      "id": "region_papelotte",
+      "name": "Papelotte",
+      "owner": "angloAllied",
+      "controller": "angloAllied",
+      "theaterId": "zone_anglo_left",
+      "assignedGeneralId": "commander_wellington",
+      "terrain": "city",
+      "neighbors": [
+        "region_mont_saint_jean",
+        "region_prussian_approach"
+      ],
+      "displayHexes": [
+        {
+          "q": 3,
+          "r": 0
+        },
+        {
+          "q": 3,
+          "r": 1
+        }
+      ],
+      "representativeHex": {
+        "q": 3,
+        "r": 1
+      },
+      "city": {
+        "name": "Papelotte",
+        "victoryPoints": 2,
+        "isCapital": false
+      },
+      "infrastructure": 1,
+      "supplyValue": 2,
+      "factories": 0,
+      "resources": [],
+      "coreOf": [
+        "angloAllied"
+      ],
+      "occupationState": null,
+      "isPassable": true
+    },
+    {
+      "id": "region_prussian_approach",
+      "name": "Prussian Approach",
+      "owner": "prussia",
+      "controller": "prussia",
+      "theaterId": "zone_prussian_vanguard",
+      "assignedGeneralId": "commander_blucher",
+      "terrain": "hill",
+      "neighbors": [
+        "region_papelotte"
+      ],
+      "displayHexes": [
+        {
+          "q": 4,
+          "r": 0
+        },
+        {
+          "q": 4,
+          "r": 1
+        }
+      ],
+      "representativeHex": {
+        "q": 4,
+        "r": 1
+      },
+      "city": null,
+      "infrastructure": 1,
+      "supplyValue": 3,
+      "factories": 0,
+      "resources": [],
+      "coreOf": [
+        "prussia"
+      ],
+      "occupationState": null,
+      "isPassable": true
+    }
+  ],
+  "edges": [
+    {
+      "from": "region_french_ridge",
+      "to": "region_la_haye_sainte",
+      "hasRoad": true,
+      "hasRiverCrossing": false,
+      "movementCostModifier": 0
+    },
+    {
+      "from": "region_french_ridge",
+      "to": "region_hougoumont",
+      "hasRoad": true,
+      "hasRiverCrossing": false,
+      "movementCostModifier": 0
+    },
+    {
+      "from": "region_la_haye_sainte",
+      "to": "region_mont_saint_jean",
+      "hasRoad": true,
+      "hasRiverCrossing": false,
+      "movementCostModifier": 0
+    },
+    {
+      "from": "region_la_haye_sainte",
+      "to": "region_hougoumont",
+      "hasRoad": true,
+      "hasRiverCrossing": false,
+      "movementCostModifier": 0
+    },
+    {
+      "from": "region_hougoumont",
+      "to": "region_mont_saint_jean",
+      "hasRoad": false,
+      "hasRiverCrossing": false,
+      "movementCostModifier": 1
+    },
+    {
+      "from": "region_mont_saint_jean",
+      "to": "region_papelotte",
+      "hasRoad": true,
+      "hasRiverCrossing": false,
+      "movementCostModifier": 0
+    },
+    {
+      "from": "region_papelotte",
+      "to": "region_prussian_approach",
+      "hasRoad": true,
+      "hasRiverCrossing": false,
+      "movementCostModifier": 0
+    }
+  ],
+  "supplySources": [
+    {
+      "id": "supply_french_ridge",
+      "faction": "france",
+      "regionId": "region_french_ridge"
+    },
+    {
+      "id": "supply_mont_saint_jean",
+      "faction": "angloAllied",
+      "regionId": "region_mont_saint_jean"
+    },
+    {
+      "id": "supply_prussian_approach",
+      "faction": "prussia",
+      "regionId": "region_prussian_approach"
+    }
+  ],
+  "objectives": [
+    {
+      "id": "region_objective_la_haye_sainte",
+      "name": "La Haye Sainte",
+      "regionId": "region_la_haye_sainte",
+      "type": "fortress",
+      "victoryPoints": 4,
+      "mainObjective": true
+    },
+    {
+      "id": "region_objective_mont_saint_jean",
+      "name": "Mont-Saint-Jean",
+      "regionId": "region_mont_saint_jean",
+      "type": "city",
+      "victoryPoints": 5,
+      "mainObjective": true
+    },
+    {
+      "id": "region_objective_prussian_approach",
+      "name": "Prussian Approach",
+      "regionId": "region_prussian_approach",
+      "type": "supply",
+      "victoryPoints": 3,
+      "mainObjective": false
+    }
+  ]
+}

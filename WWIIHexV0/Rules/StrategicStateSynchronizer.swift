@@ -30,6 +30,7 @@ struct StrategicStateSynchronizer {
             state: state.theaterState,
             map: state.map,
             divisions: state.divisions,
+            diplomacyState: state.diplomacyState,
             turn: syncTurn,
             force: true
         )
@@ -44,6 +45,7 @@ struct StrategicStateSynchronizer {
             map: state.map,
             theaterState: state.theaterState,
             divisions: state.divisions,
+            diplomacyState: state.diplomacyState,
             turn: syncTurn,
             events: frontEvents
         )
@@ -53,6 +55,7 @@ struct StrategicStateSynchronizer {
             state: state.warDeploymentState,
             map: state.map,
             divisions: state.divisions,
+            diplomacyState: state.diplomacyState,
             turn: syncTurn,
             events: deploymentEvents
         )

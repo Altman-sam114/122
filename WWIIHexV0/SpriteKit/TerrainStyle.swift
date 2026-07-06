@@ -44,6 +44,20 @@ enum TerrainStyle {
             return SKColor(red: 0.23, green: 0.24, blue: 0.25, alpha: 1)
         case .allies:
             return SKColor(red: 0.12, green: 0.36, blue: 0.68, alpha: 1)
+        case .france:
+            return SKColor(red: 0.10, green: 0.25, blue: 0.68, alpha: 1)
+        case .angloAllied:
+            return SKColor(red: 0.58, green: 0.12, blue: 0.14, alpha: 1)
+        case .prussia:
+            return SKColor(red: 0.08, green: 0.12, blue: 0.18, alpha: 1)
+        case .austria:
+            return SKColor(red: 0.92, green: 0.88, blue: 0.70, alpha: 1)
+        case .russia:
+            return SKColor(red: 0.14, green: 0.42, blue: 0.24, alpha: 1)
+        case .spain:
+            return SKColor(red: 0.72, green: 0.44, blue: 0.12, alpha: 1)
+        case .neutral:
+            return SKColor(red: 0.55, green: 0.52, blue: 0.45, alpha: 1)
         }
     }
 
@@ -53,6 +67,20 @@ enum TerrainStyle {
             return SKColor(red: 0.05, green: 0.05, blue: 0.05, alpha: 1)
         case .allies:
             return SKColor(red: 0.04, green: 0.18, blue: 0.36, alpha: 1)
+        case .france:
+            return SKColor(red: 0.03, green: 0.08, blue: 0.28, alpha: 1)
+        case .angloAllied:
+            return SKColor(red: 0.28, green: 0.04, blue: 0.05, alpha: 1)
+        case .prussia:
+            return SKColor(red: 0.02, green: 0.03, blue: 0.05, alpha: 1)
+        case .austria:
+            return SKColor(red: 0.48, green: 0.42, blue: 0.24, alpha: 1)
+        case .russia:
+            return SKColor(red: 0.04, green: 0.18, blue: 0.08, alpha: 1)
+        case .spain:
+            return SKColor(red: 0.32, green: 0.18, blue: 0.04, alpha: 1)
+        case .neutral:
+            return SKColor(red: 0.24, green: 0.22, blue: 0.18, alpha: 1)
         }
     }
 
@@ -70,6 +98,8 @@ enum TerrainStyle {
             return SKColor(red: 0.20, green: 0.85, blue: 0.45, alpha: 1)
         case (.allies, .garrisonUnit):
             return SKColor(red: 0.42, green: 0.38, blue: 0.95, alpha: 1)
+        default:
+            return unitFillColor(for: faction)
         }
     }
 
@@ -79,6 +109,20 @@ enum TerrainStyle {
             return SKColor(red: 0.08, green: 0.08, blue: 0.08, alpha: 1)
         case .allies:
             return SKColor(red: 0.04, green: 0.20, blue: 0.62, alpha: 1)
+        case .france:
+            return SKColor(red: 0.06, green: 0.18, blue: 0.58, alpha: 1)
+        case .angloAllied:
+            return SKColor(red: 0.52, green: 0.10, blue: 0.12, alpha: 1)
+        case .prussia:
+            return SKColor(red: 0.08, green: 0.10, blue: 0.14, alpha: 1)
+        case .austria:
+            return SKColor(red: 0.82, green: 0.78, blue: 0.58, alpha: 1)
+        case .russia:
+            return SKColor(red: 0.10, green: 0.34, blue: 0.18, alpha: 1)
+        case .spain:
+            return SKColor(red: 0.62, green: 0.34, blue: 0.08, alpha: 1)
+        case .neutral:
+            return SKColor(red: 0.68, green: 0.64, blue: 0.52, alpha: 1)
         case nil:
             return SKColor(red: 0.88, green: 0.82, blue: 0.45, alpha: 1)
         }

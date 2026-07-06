@@ -2,6 +2,7 @@ import SwiftUI
 
 struct GeneralCommandPanelView: View {
     let zone: FrontZone?
+    let activeFaction: Faction
     let general: GeneralData?
     let assignment: GeneralAssignment?
     let assignedDivisions: [Division]
@@ -17,16 +18,17 @@ struct GeneralCommandPanelView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("General Command")
+            Text(label("General Command"))
                 .font(.headline)
+                .foregroundStyle(activeFaction.usesNapoleonicLogisticsVocabulary ? NapoleonicDesignTokens.imperialBlue : .primary)
 
             if let zone {
-                LabeledContent("Front Zone") {
+                LabeledContent(label("Front Zone")) {
                     Text(zone.name)
                         .multilineTextAlignment(.trailing)
                 }
             } else {
-                Text("No allied front zone selected.")
+                Text(label("No friendly front zone selected."))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
@@ -60,30 +62,30 @@ struct GeneralCommandPanelView: View {
                     }
 
                     if let assignment {
-                        metricBar(title: "Loyalty", value: assignment.loyalty)
-                        metricBar(title: "Satisfaction", value: assignment.satisfaction)
-                        LabeledContent("Interventions") {
+                        metricBar(title: label("Loyalty"), value: assignment.loyalty)
+                        metricBar(title: label("Satisfaction"), value: assignment.satisfaction)
+                        LabeledContent(label("Interventions")) {
                             Text("\(assignment.interventionCount)")
                         }
                     }
 
-                    Button("View Profile", systemImage: "person.text.rectangle", action: onShowProfile)
+                    Button(label("View Profile"), systemImage: "person.text.rectangle", action: onShowProfile)
                         .buttonStyle(.bordered)
                 }
             } else if zone != nil {
-                Text("No general assigned to this zone.")
+                Text(label("No general assigned to this zone."))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
 
             if hqUnderAttack {
-                Label("HQ region contested", systemImage: "exclamationmark.triangle.fill")
+                Label(label("HQ region contested"), systemImage: "exclamationmark.triangle.fill")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.orange)
             }
 
             if !assignedDivisions.isEmpty {
-                Text("Assigned Units")
+                Text(label("Assigned Units"))
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
                 VStack(alignment: .leading, spacing: 4) {
@@ -95,22 +97,22 @@ struct GeneralCommandPanelView: View {
                 }
             }
 
-            if let targetRegion, targetZone?.faction != zone?.faction {
-                LabeledContent("Target") {
+            if let targetRegion, canAttackRegion {
+                LabeledContent(label("Target")) {
                     Text(targetRegion.name)
                 }
             }
 
             HStack(spacing: 8) {
-                Button("Hold Line", systemImage: "shield.fill", action: onHoldLine)
+                Button(label("Hold Line"), systemImage: "shield.fill", action: onHoldLine)
                     .disabled(!canHoldLine)
-                Button("Attack Region", systemImage: "arrow.up.right.circle", action: onAttackRegion)
+                Button(label("Attack Region"), systemImage: "arrow.up.right.circle", action: onAttackRegion)
                     .disabled(!canAttackRegion)
             }
             .buttonStyle(.bordered)
 
             if !plannedOperations.isEmpty {
-                Text("Planned Operations")
+                Text(label("Planned Operations"))
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
                 VStack(alignment: .leading, spacing: 4) {
@@ -125,6 +127,43 @@ struct GeneralCommandPanelView: View {
         .padding(12)
         .background(PlatformStyles.systemBackground)
         .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
+    private func label(_ legacy: String) -> String {
+        guard activeFaction.usesNapoleonicLogisticsVocabulary else {
+            return legacy
+        }
+
+        switch legacy {
+        case "General Command":
+            return "Corps Command"
+        case "Front Zone":
+            return "Corps Sector"
+        case "No friendly front zone selected.":
+            return "No friendly corps sector selected."
+        case "No general assigned to this zone.":
+            return "No commander assigned to this sector."
+        case "HQ region contested":
+            return "Headquarters sector contested"
+        case "Assigned Units":
+            return "Assigned Formations"
+        case "Target":
+            return "Target Sector"
+        case "Hold Line":
+            return "Hold Contact Line"
+        case "Attack Region":
+            return "Attack Sector"
+        case "Planned Operations":
+            return "Planned Orders"
+        case "View Profile":
+            return "Commander Profile"
+        case "Satisfaction":
+            return "Confidence"
+        case "Interventions":
+            return "Command Interventions"
+        default:
+            return legacy
+        }
     }
 
     private func portraitBadge(for general: GeneralData) -> some View {
@@ -182,6 +221,19 @@ struct GeneralCommandPanelView: View {
 
     private func operationSummary(_ operation: PlayerPlannedOperation) -> String {
         let target = operation.targetRegionId?.rawValue ?? operation.sourceRegionId?.rawValue ?? operation.zoneId.rawValue
-        return "\(operation.directiveType.rawValue) / \(target)"
+        return "\(directiveLabel(operation.directiveType)) / \(target)"
+    }
+
+    private func directiveLabel(_ type: DirectiveType) -> String {
+        guard activeFaction.usesNapoleonicLogisticsVocabulary else {
+            return type.rawValue
+        }
+
+        switch type {
+        case .attack:
+            return "Attack Sector"
+        case .defend:
+            return "Hold Contact Line"
+        }
     }
 }

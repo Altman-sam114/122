@@ -1,0 +1,115 @@
+{
+  "schemaVersion": 1,
+  "templates": [
+    {
+      "id": "line_infantry_brigade",
+      "displayName": "Line Infantry Brigade",
+      "maxHP": 10,
+      "components": [
+        {
+          "type": "lineInfantry",
+          "weight": 0.75
+        },
+        {
+          "type": "lightInfantry",
+          "weight": 0.1
+        },
+        {
+          "type": "artillery",
+          "weight": 0.15
+        }
+      ]
+    },
+    {
+      "id": "grand_battery",
+      "displayName": "Grand Battery",
+      "maxHP": 8,
+      "components": [
+        {
+          "type": "lineInfantry",
+          "weight": 0.15
+        },
+        {
+          "type": "artillery",
+          "weight": 0.85
+        }
+      ]
+    },
+    {
+      "id": "strongpoint_guard",
+      "displayName": "Strongpoint Guard",
+      "maxHP": 9,
+      "components": [
+        {
+          "type": "guard",
+          "weight": 0.75
+        },
+        {
+          "type": "engineer",
+          "weight": 0.1
+        },
+        {
+          "type": "artillery",
+          "weight": 0.15
+        }
+      ]
+    },
+    {
+      "id": "prussian_vanguard",
+      "displayName": "Prussian Vanguard",
+      "maxHP": 10,
+      "components": [
+        {
+          "type": "lineInfantry",
+          "weight": 0.65
+        },
+        {
+          "type": "lightInfantry",
+          "weight": 0.2
+        },
+        {
+          "type": "artillery",
+          "weight": 0.15
+        }
+      ]
+    },
+    {
+      "id": "reserve_infantry_column",
+      "displayName": "Reserve Infantry Column",
+      "maxHP": 10,
+      "components": [
+        {
+          "type": "lineInfantry",
+          "weight": 0.7
+        },
+        {
+          "type": "guard",
+          "weight": 0.1
+        },
+        {
+          "type": "artillery",
+          "weight": 0.2
+        }
+      ]
+    },
+    {
+      "id": "cavalry_reserve",
+      "displayName": "Cavalry Reserve",
+      "maxHP": 9,
+      "components": [
+        {
+          "type": "cavalry",
+          "weight": 0.7
+        },
+        {
+          "type": "lightInfantry",
+          "weight": 0.15
+        },
+        {
+          "type": "artillery",
+          "weight": 0.15
+        }
+      ]
+    }
+  ]
+}

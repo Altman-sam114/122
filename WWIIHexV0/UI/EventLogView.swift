@@ -2,23 +2,39 @@ import SwiftUI
 
 struct EventLogView: View {
     let entries: [GameLogEntry]
+    let activeFaction: Faction
+    let replayDetailLevel: ReplayDetailLevel
+    let playtestTextSize: PlaytestTextSize
+
+    init(
+        entries: [GameLogEntry],
+        activeFaction: Faction = .allies,
+        replayDetailLevel: ReplayDetailLevel = .standard,
+        playtestTextSize: PlaytestTextSize = .standard
+    ) {
+        self.entries = entries
+        self.activeFaction = activeFaction
+        self.replayDetailLevel = replayDetailLevel
+        self.playtestTextSize = playtestTextSize
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Event Log")
-                .font(.headline)
+        VStack(alignment: .leading, spacing: playtestTextSize.sectionSpacing) {
+            Text(title)
+                .font(playtestTextSize.headingFont)
 
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 8) {
+                LazyVStack(alignment: .leading, spacing: playtestTextSize.rowSpacing) {
                     if recentEntries.isEmpty {
                         Text("No events yet.")
+                            .font(playtestTextSize.messageFont)
                             .foregroundStyle(.secondary)
                     } else {
                         ForEach(recentEntries) { item in
-                            VStack(alignment: .leading, spacing: 2) {
+                            VStack(alignment: .leading, spacing: playtestTextSize.itemSpacing) {
                                 HStack(spacing: 6) {
-                                    Text(item.category.displayName)
-                                        .font(.caption.weight(.semibold))
+                                    Text(item.category.displayName(for: activeFaction))
+                                        .font(playtestTextSize.badgeFont)
                                         .foregroundStyle(item.category.foregroundStyle)
                                         .padding(.horizontal, 6)
                                         .padding(.vertical, 2)
@@ -26,12 +42,12 @@ struct EventLogView: View {
                                         .clipShape(RoundedRectangle(cornerRadius: 4))
 
                                     Text(metadata(for: item.entry))
-                                        .font(.caption)
+                                        .font(playtestTextSize.metadataFont)
                                         .foregroundStyle(.secondary)
                                 }
 
-                                Text(item.entry.message)
-                                    .font(.body)
+                                Text(messageDisplayText(for: item.entry))
+                                    .font(playtestTextSize.messageFont)
                                     .lineLimit(nil)
                                     .fixedSize(horizontal: false, vertical: true)
                             }
@@ -47,20 +63,71 @@ struct EventLogView: View {
         .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 
+    private var title: String {
+        activeFaction.usesNapoleonicLogisticsVocabulary ? "Dispatches" : "Event Log"
+    }
+
     private var recentEntries: [LogDisplayEntry] {
         entries
-            .suffix(60)
+            .suffix(replayDetailLevel.eventLimit)
             .reversed()
             .map { LogDisplayEntry(entry: $0, category: LogDisplayCategory(entry: $0)) }
     }
 
     private func metadata(for entry: GameLogEntry) -> String {
-        let faction = entry.faction?.displayName ?? "System"
-        let phase = entry.phase?.displayName ?? "Setup"
-        if let relatedRecordId = entry.relatedRecordId {
+        let faction = factionDisplayName(entry.faction)
+        if replayDetailLevel == .concise {
+            return "Turn \(entry.turn) - \(faction)"
+        }
+
+        let phase = phaseDisplayName(entry.phase, faction: entry.faction ?? activeFaction)
+        if let relatedRecordId = entry.relatedRecordId,
+           replayDetailLevel.showsRecordIdentifiers {
             return "Turn \(entry.turn) - \(faction) - \(phase) - \(relatedRecordId)"
         }
         return "Turn \(entry.turn) - \(faction) - \(phase)"
+    }
+
+    private func factionDisplayName(_ faction: Faction?) -> String {
+        guard let faction else {
+            return activeFaction.usesNapoleonicLogisticsVocabulary ? "Staff" : "System"
+        }
+
+        if activeFaction.usesNapoleonicLogisticsVocabulary && faction.isLegacyWorldWarIIFaction {
+            return "Archived Force"
+        }
+
+        return faction.displayName
+    }
+
+    private func messageDisplayText(for entry: GameLogEntry) -> String {
+        guard activeFaction.usesNapoleonicLogisticsVocabulary else {
+            return entry.message
+        }
+
+        return napoleonicDisplayText(entry.message)
+    }
+
+    private func napoleonicDisplayText(_ text: String) -> String {
+        NapoleonicMessageSanitizer.displayText(text, for: activeFaction)
+    }
+
+    private func phaseDisplayName(_ phase: GamePhase?, faction: Faction) -> String {
+        guard let phase else {
+            return "Setup"
+        }
+        guard faction.usesNapoleonicLogisticsVocabulary else {
+            return phase.displayName
+        }
+
+        switch phase {
+        case .germanAI, .aiCommand:
+            return "Staff Dispatch"
+        case .alliedPlayer, .playerCommand:
+            return "Orders"
+        case .resolution:
+            return "Resolution"
+        }
     }
 }
 
@@ -136,7 +203,24 @@ private enum LogDisplayCategory {
         }
     }
 
-    var displayName: String {
+    func displayName(for faction: Faction) -> String {
+        if faction.usesNapoleonicLogisticsVocabulary {
+            switch self {
+            case .reinforcement:
+                return "Reserve"
+            case .frontChange:
+                return "Contact"
+            case .theaterChange:
+                return "Wing"
+            case .regionOwnerChange:
+                return "Sector"
+            case .diplomacy:
+                return "Coalition"
+            default:
+                break
+            }
+        }
+
         switch self {
         case .combat:
             return "Combat"
@@ -188,5 +272,84 @@ private enum LogDisplayCategory {
 
     var backgroundStyle: Color {
         foregroundStyle.opacity(0.12)
+    }
+}
+
+private extension PlaytestTextSize {
+    var headingFont: Font {
+        switch self {
+        case .compact:
+            return .subheadline.weight(.semibold)
+        case .standard:
+            return .headline
+        case .large:
+            return .title3.weight(.semibold)
+        }
+    }
+
+    var badgeFont: Font {
+        switch self {
+        case .compact:
+            return .caption2.weight(.semibold)
+        case .standard:
+            return .caption.weight(.semibold)
+        case .large:
+            return .callout.weight(.semibold)
+        }
+    }
+
+    var metadataFont: Font {
+        switch self {
+        case .compact:
+            return .caption2
+        case .standard:
+            return .caption
+        case .large:
+            return .callout
+        }
+    }
+
+    var messageFont: Font {
+        switch self {
+        case .compact:
+            return .callout
+        case .standard:
+            return .body
+        case .large:
+            return .title3
+        }
+    }
+
+    var sectionSpacing: CGFloat {
+        switch self {
+        case .compact:
+            return 6
+        case .standard:
+            return 8
+        case .large:
+            return 10
+        }
+    }
+
+    var rowSpacing: CGFloat {
+        switch self {
+        case .compact:
+            return 6
+        case .standard:
+            return 8
+        case .large:
+            return 12
+        }
+    }
+
+    var itemSpacing: CGFloat {
+        switch self {
+        case .compact:
+            return 1
+        case .standard:
+            return 2
+        case .large:
+            return 4
+        }
     }
 }

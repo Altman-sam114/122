@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "generals": [
+    {
+      "id": "commander_napoleon",
+      "name": "Napoleon Bonaparte",
+      "localizedName": "拿破仑",
+      "rank": "Emperor",
+      "faction": "france",
+      "commandStyle": "aggressive",
+      "skills": [
+        "central_position",
+        "grand_battery",
+        "reserve_commitment"
+      ],
+      "portrait": "portrait_napoleon_generated",
+      "biography": "A decisive commander who concentrates force, exploits weak centers, and accepts operational risk for tempo.",
+      "preferredTheaterIds": [
+        "zone_french_center"
+      ],
+      "preferredRegionIds": [
+        "region_french_ridge",
+        "region_la_haye_sainte"
+      ],
+      "baseLoyalty": 96,
+      "baseSatisfaction": 88
+    },
+    {
+      "id": "commander_wellington",
+      "name": "Arthur Wellesley",
+      "localizedName": "威灵顿",
+      "rank": "Field Marshal",
+      "faction": "angloAllied",
+      "commandStyle": "cautious",
+      "skills": [
+        "reverse_slope_defense",
+        "strongpoint_control",
+        "coalition_coordination"
+      ],
+      "portrait": "portrait_wellington_generated",
+      "biography": "A defensive coalition commander who uses terrain, strongpoints, reserves, and timing to blunt attacks.",
+      "preferredTheaterIds": [
+        "zone_anglo_center",
+        "zone_anglo_right",
+        "zone_anglo_left"
+      ],
+      "preferredRegionIds": [
+        "region_hougoumont",
+        "region_mont_saint_jean",
+        "region_papelotte"
+      ],
+      "baseLoyalty": 82,
+      "baseSatisfaction": 80
+    },
+    {
+      "id": "commander_blucher",
+      "name": "Gebhard Leberecht von Blucher",
+      "localizedName": "布吕歇尔",
+      "rank": "Field Marshal",
+      "faction": "prussia",
+      "commandStyle": "aggressive",
+      "skills": [
+        "forced_march",
+        "coalition_relief",
+        "flank_pressure"
+      ],
+      "portrait": "portrait_blucher_generated",
+      "biography": "An aggressive Prussian commander focused on rapid arrival, flank pressure, and coalition relief.",
+      "preferredTheaterIds": [
+        "zone_prussian_vanguard"
+      ],
+      "preferredRegionIds": [
+        "region_prussian_approach",
+        "region_papelotte"
+      ],
+      "baseLoyalty": 84,
+      "baseSatisfaction": 78
+    }
+  ]
+}

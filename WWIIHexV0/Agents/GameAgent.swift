@@ -1,7 +1,7 @@
 import Foundation
 
-// v0 runtime agent. Lightweight: no cabinet, no directive board, no authority ranks.
-// Only Guderian army commander used in v0 German AI turn. v0.5+ can extend.
+// Legacy runtime agent model. Lightweight: no cabinet, directive board, or authority ranks.
+// Current default AI path uses directive pipelines; this remains for compatibility data.
 
 enum AgentRole: String, Codable, Equatable, CaseIterable {
     case ruler

@@ -1,5 +1,21 @@
 import Foundation
 
+struct ScenarioVictoryCondition: Codable, Equatable, Identifiable {
+    let id: String
+    let type: String
+    let faction: Faction
+    let objectiveId: String?
+    let objectiveIds: [String]
+    let targetFaction: Faction?
+    let turn: Int?
+    let status: String
+    let description: String
+
+    var isActive: Bool {
+        status == "active"
+    }
+}
+
 struct GameState: Codable, Equatable {
     var scenarioId: String
     var turn: Int
@@ -7,12 +23,15 @@ struct GameState: Codable, Equatable {
     var activeFaction: Faction
     var phase: GamePhase
     var map: MapState
+    var terrainRules: TerrainRuleSet
     var theaterState: TheaterState
     var frontLineState: FrontLineState
     var warDeploymentState: WarDeploymentState
     var economyState: EconomyState
+    var reinforcementState: ReinforcementState
     var diplomacyState: DiplomacyState
     var divisions: [Division]
+    var victoryConditions: [ScenarioVictoryCondition]
     var victoryState: VictoryState
     var selectedUnitSummary: String?
     var eventLog: [GameLogEntry]
@@ -26,12 +45,15 @@ struct GameState: Codable, Equatable {
         activeFaction: Faction,
         phase: GamePhase,
         map: MapState,
+        terrainRules: TerrainRuleSet = .legacy,
         theaterState: TheaterState = .empty,
         frontLineState: FrontLineState = .empty,
         warDeploymentState: WarDeploymentState = .empty,
         economyState: EconomyState = .empty,
+        reinforcementState: ReinforcementState = .empty,
         diplomacyState: DiplomacyState = .empty,
         divisions: [Division],
+        victoryConditions: [ScenarioVictoryCondition] = [],
         victoryState: VictoryState,
         selectedUnitSummary: String?,
         eventLog: [GameLogEntry],
@@ -44,12 +66,15 @@ struct GameState: Codable, Equatable {
         self.activeFaction = activeFaction
         self.phase = phase
         self.map = map
+        self.terrainRules = terrainRules
         self.theaterState = theaterState
         self.frontLineState = frontLineState
         self.warDeploymentState = warDeploymentState
         self.economyState = economyState
+        self.reinforcementState = reinforcementState
         self.diplomacyState = diplomacyState
         self.divisions = divisions
+        self.victoryConditions = victoryConditions
         self.victoryState = victoryState
         self.selectedUnitSummary = selectedUnitSummary
         self.eventLog = eventLog
@@ -71,7 +96,7 @@ struct GameState: Codable, Equatable {
             frontLineState: .empty,
             warDeploymentState: .empty,
             economyState: .empty,
-            diplomacyState: DiplomacyState.initial(for: Faction.allCases, turn: 1),
+            diplomacyState: DiplomacyState.initial(for: Faction.legacyWorldWarIIFactions, turn: 1),
             divisions: [
                 .panzer(
                     id: "ger_panzer_1",
@@ -129,7 +154,7 @@ struct GameState: Codable, Equatable {
                     turn: 1,
                     faction: .germany,
                     phase: .germanAI,
-                    message: "Ardennes V0 scenario initialized."
+                    message: "Legacy scenario initialized."
                 )
             ]
         )
@@ -142,12 +167,15 @@ struct GameState: Codable, Equatable {
         case activeFaction
         case phase
         case map
+        case terrainRules
         case theaterState
         case frontLineState
         case warDeploymentState
         case economyState
+        case reinforcementState
         case diplomacyState
         case divisions
+        case victoryConditions
         case victoryState
         case selectedUnitSummary
         case eventLog
@@ -164,12 +192,15 @@ struct GameState: Codable, Equatable {
             activeFaction: try container.decode(Faction.self, forKey: .activeFaction),
             phase: try container.decode(GamePhase.self, forKey: .phase),
             map: try container.decode(MapState.self, forKey: .map),
+            terrainRules: try container.decodeIfPresent(TerrainRuleSet.self, forKey: .terrainRules) ?? .legacy,
             theaterState: try container.decodeIfPresent(TheaterState.self, forKey: .theaterState) ?? .empty,
             frontLineState: try container.decodeIfPresent(FrontLineState.self, forKey: .frontLineState) ?? .empty,
             warDeploymentState: try container.decodeIfPresent(WarDeploymentState.self, forKey: .warDeploymentState) ?? .empty,
             economyState: try container.decodeIfPresent(EconomyState.self, forKey: .economyState) ?? .empty,
+            reinforcementState: try container.decodeIfPresent(ReinforcementState.self, forKey: .reinforcementState) ?? .empty,
             diplomacyState: try container.decodeIfPresent(DiplomacyState.self, forKey: .diplomacyState) ?? .empty,
             divisions: try container.decode([Division].self, forKey: .divisions),
+            victoryConditions: try container.decodeIfPresent([ScenarioVictoryCondition].self, forKey: .victoryConditions) ?? [],
             victoryState: try container.decode(VictoryState.self, forKey: .victoryState),
             selectedUnitSummary: try container.decodeIfPresent(String.self, forKey: .selectedUnitSummary),
             eventLog: try container.decode([GameLogEntry].self, forKey: .eventLog),
@@ -216,5 +247,27 @@ struct GameState: Codable, Equatable {
                 message: message
             )
         )
+    }
+
+    var participatingFactions: [Faction] {
+        let mapControllers = map.tiles.values.compactMap(\.controller)
+        let regionControllers = map.regions.values.flatMap { [$0.owner, $0.controller] }
+        let supplyFactions = map.supplySources.map(\.faction)
+        let factions = [activeFaction] + divisions.map(\.faction) + mapControllers + regionControllers + supplyFactions
+        return Self.sortedUniqueFactions(factions)
+    }
+
+    var turnOrderFactions: [Faction] {
+        let factions = participatingFactions.filter { !$0.isNeutral }
+        return factions.isEmpty ? [activeFaction].filter { !$0.isNeutral } : factions
+    }
+
+    private static func sortedUniqueFactions(_ factions: [Faction]) -> [Faction] {
+        Array(Set(factions)).sorted {
+            if $0.turnOrderPriority == $1.turnOrderPriority {
+                return $0.rawValue < $1.rawValue
+            }
+            return $0.turnOrderPriority < $1.turnOrderPriority
+        }
     }
 }

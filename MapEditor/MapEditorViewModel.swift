@@ -304,13 +304,17 @@ final class MapEditorViewModel: ObservableObject {
     }
 
     func loadDefaultGameResources() {
+        loadLegacyArdennesGameResources()
+    }
+
+    func loadLegacyArdennesGameResources() {
         do {
-            document = try MapEditorGameResourceBridge.loadDefaultDocument()
+            document = try MapEditorGameResourceBridge.loadLegacyArdennesDocument()
             selectedRegionId = document.regions.keys.sorted { $0.rawValue < $1.rawValue }.first
             selectedTheaterId = document.theaters.keys.sorted { $0.rawValue < $1.rawValue }.first
             syncBackgroundControlsFromDocument()
             lastErrorMessage = nil
-            lastStatusMessage = "已读取默认游戏资源。"
+            lastStatusMessage = "已读取 Legacy 阿登游戏资源。"
             markChanged()
         } catch {
             lastErrorMessage = String(describing: error)
@@ -318,11 +322,15 @@ final class MapEditorViewModel: ObservableObject {
     }
 
     func overwriteDefaultGameResources() {
+        overwriteLegacyArdennesGameResources()
+    }
+
+    func overwriteLegacyArdennesGameResources() {
         do {
-            let result = try MapEditorGameResourceBridge.overwriteDefaultGameResources(document: document)
+            let result = try MapEditorGameResourceBridge.overwriteLegacyArdennesGameResources(document: document)
             lastExportResult = result
             lastErrorMessage = nil
-            lastStatusMessage = "已覆盖 \(result.scenarioFileName).json 和 \(result.regionFileName).json。"
+            lastStatusMessage = "已覆盖 Legacy 阿登资源：\(result.scenarioFileName).json 和 \(result.regionFileName).json。"
         } catch {
             lastErrorMessage = String(describing: error)
         }
@@ -434,8 +442,11 @@ final class MapEditorViewModel: ObservableObject {
 
     private func stampUnit(at coord: HexCoord) {
         document.initialUnits.removeAll { $0.coord == coord }
-        let nextIndex = document.initialUnits.count + 1
-        let factionPrefix = selectedUnitFaction == .germany ? "ger" : "all"
+        let factionPrefix = selectedUnitFaction.mapEditorUnitIdPrefix
+        let nextIndex = nextNumericSuffix(
+            used: document.initialUnits.map(\.id),
+            prefix: "\(factionPrefix)_editor_"
+        )
         let id = "\(factionPrefix)_editor_\(nextIndex)"
         document.initialUnits.append(
             MapEditorUnitDraft(
@@ -520,6 +531,31 @@ private extension Set where Element == HexCoord {
     func sortedByMapOrder() -> [HexCoord] {
         sorted { lhs, rhs in
             lhs.r == rhs.r ? lhs.q < rhs.q : lhs.r < rhs.r
+        }
+    }
+}
+
+private extension Faction {
+    var mapEditorUnitIdPrefix: String {
+        switch self {
+        case .germany:
+            return "germany"
+        case .allies:
+            return "allies"
+        case .france:
+            return "france"
+        case .angloAllied:
+            return "anglo_allied"
+        case .prussia:
+            return "prussia"
+        case .austria:
+            return "austria"
+        case .russia:
+            return "russia"
+        case .spain:
+            return "spain"
+        case .neutral:
+            return "neutral"
         }
     }
 }

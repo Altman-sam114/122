@@ -2,16 +2,18 @@ import SwiftUI
 
 struct RegionInspectorView: View {
     let inspectorState: RegionInspectorState?
+    let activeFaction: Faction
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Region")
+            Text(label("Region"))
                 .font(.headline)
+                .foregroundStyle(activeFaction.usesNapoleonicLogisticsVocabulary ? NapoleonicDesignTokens.imperialBlue : .primary)
 
             if let inspectorState {
                 regionDetails(inspectorState)
             } else {
-                Text("No region selected.")
+                Text(label("No region selected."))
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -31,86 +33,156 @@ struct RegionInspectorView: View {
                     Text("\(selectedHex.q),\(selectedHex.r)")
                 }
 
-                LabeledContent("Hex Controller") {
+                LabeledContent(label("Hex Controller")) {
                     Text(state.selectedHexController?.displayName ?? "None")
                 }
 
-                LabeledContent("Hex Dynamic Theater") {
+                LabeledContent(label("Hex Dynamic Theater")) {
                     Text(state.selectedHexDynamicTheaterId?.rawValue ?? "None")
                 }
 
-                LabeledContent("Hex FrontZone") {
+                LabeledContent(label("Hex FrontZone")) {
                     Text(state.selectedHexFrontZoneId?.rawValue ?? "None")
                 }
             }
 
-            LabeledContent("Controller") {
+            LabeledContent(label("Controller")) {
                 Text(state.region.controller.displayName)
             }
 
-            LabeledContent("Terrain") {
-                Text(state.region.terrain.displayName)
+            LabeledContent(label("Terrain")) {
+                Text(terrainDisplayName(state.region.terrain))
             }
 
-            LabeledContent("City") {
+            LabeledContent(label("City")) {
                 Text(state.region.city?.name ?? "None")
             }
 
-            LabeledContent("City Level") {
+            LabeledContent(label("City Level")) {
                 Text(state.cityLevel.displayName)
             }
 
-            LabeledContent("Fortress") {
-                Text(state.region.terrain == .fortress ? "Yes" : "No")
+            LabeledContent(label("Fortress")) {
+                Text(state.region.terrain == .fortress ? label("Yes") : label("No"))
             }
 
-            LabeledContent("Supply") {
+            LabeledContent(label("Supply")) {
                 Text("\(state.region.supplyValue)")
             }
 
-            LabeledContent("Factories") {
+            LabeledContent(label("Factories")) {
                 Text("\(state.region.factories)")
             }
 
-            LabeledContent("Output") {
-                Text("MP \(state.economicOutput.manpower), IC \(state.economicOutput.industry), SUP \(state.economicOutput.supplies)")
+            LabeledContent(label("Output")) {
+                Text(state.economicOutput.summary(for: activeFaction))
                     .multilineTextAlignment(.trailing)
             }
 
-            LabeledContent("Theater") {
+            LabeledContent(label("Theater")) {
                 Text(state.theaterId?.rawValue ?? "None")
             }
 
-            LabeledContent("FrontZone") {
+            LabeledContent(label("FrontZone")) {
                 Text(state.frontZoneId?.rawValue ?? "None")
             }
 
-            LabeledContent("Front Pressure") {
+            LabeledContent(label("Front Pressure")) {
                 Text(state.frontPressure, format: .number.precision(.fractionLength(2)))
             }
 
-            LabeledContent("Infrastructure") {
+            LabeledContent(label("Infrastructure")) {
                 Text("\(state.region.infrastructure)")
             }
 
-            LabeledContent("Objectives") {
+            LabeledContent(label("Objectives")) {
                 Text(state.objectiveNames.isEmpty ? "None" : state.objectiveNames.joined(separator: ", "))
                     .multilineTextAlignment(.trailing)
             }
 
-            LabeledContent("Objective Status") {
+            LabeledContent(label("Objective Status")) {
                 Text(state.objectiveStatus)
             }
 
-            LabeledContent("Friendly Units") {
+            LabeledContent(label("Friendly Units")) {
                 Text(unitNames(state.friendlyDivisions))
                     .multilineTextAlignment(.trailing)
             }
 
-            LabeledContent("Visible Enemies") {
+            LabeledContent(label("Visible Enemies")) {
                 Text(unitNames(state.visibleEnemyDivisions))
                     .multilineTextAlignment(.trailing)
             }
+        }
+    }
+
+    private func label(_ legacy: String) -> String {
+        guard activeFaction.usesNapoleonicLogisticsVocabulary else {
+            return legacy
+        }
+
+        switch legacy {
+        case "Region":
+            return "Sector"
+        case "No region selected.":
+            return "No sector selected."
+        case "Hex Controller":
+            return "Hex Control"
+        case "Hex Dynamic Theater":
+            return "Hex Active Wing"
+        case "Hex FrontZone":
+            return "Hex Corps Sector"
+        case "Controller":
+            return "Control"
+        case "Terrain":
+            return "Ground"
+        case "City":
+            return "Settlement"
+        case "City Level":
+            return "Settlement Level"
+        case "Fortress":
+            return "Strongpoint"
+        case "Yes":
+            return "Present"
+        case "No":
+            return "None"
+        case "Supply":
+            return "Logistics"
+        case "Factories":
+            return "Depots"
+        case "Output":
+            return "Logistics Output"
+        case "Theater":
+            return "Wing"
+        case "FrontZone":
+            return "Corps Sector"
+        case "Front Pressure":
+            return "Contact Pressure"
+        case "Infrastructure":
+            return "Roads & Works"
+        case "Objectives":
+            return "Battle Objectives"
+        case "Objective Status":
+            return "Objective Control"
+        case "Friendly Units":
+            return "Friendly Formations"
+        case "Visible Enemies":
+            return "Visible Enemy Formations"
+        default:
+            return legacy
+        }
+    }
+
+    private func terrainDisplayName(_ terrain: BaseTerrain) -> String {
+        guard activeFaction.usesNapoleonicLogisticsVocabulary else {
+            return terrain.displayName
+        }
+
+        switch terrain {
+        case .fortress:
+            return "Strongpoint"
+        default:
+            return terrain.displayName
         }
     }
 

@@ -16,14 +16,15 @@ struct CommandResultSummary: Identifiable, Codable, Equatable {
         orderIndex: Int,
         order: AgentOrder,
         command: Command,
-        result: CommandResult
+        result: CommandResult,
+        faction: Faction
     ) -> CommandResultSummary {
         CommandResultSummary(
             id: "order_\(orderIndex)_\(order.divisionId)_\(order.type.rawValue)",
             orderIndex: orderIndex,
             divisionId: order.divisionId,
             orderType: order.type,
-            commandDisplayName: command.displayName,
+            commandDisplayName: command.displayName(for: faction),
             mappingSucceeded: true,
             validationSucceeded: result.validation.isValid,
             executed: result.succeeded,
@@ -51,13 +52,13 @@ struct CommandResultSummary: Identifiable, Codable, Equatable {
         )
     }
 
-    static func endTurn(result: CommandResult) -> CommandResultSummary {
+    static func endTurn(result: CommandResult, faction: Faction) -> CommandResultSummary {
         CommandResultSummary(
             id: "end_turn",
             orderIndex: nil,
             divisionId: nil,
             orderType: nil,
-            commandDisplayName: Command.endTurn.displayName,
+            commandDisplayName: Command.endTurn.displayName(for: faction),
             mappingSucceeded: true,
             validationSucceeded: result.validation.isValid,
             executed: result.succeeded,
@@ -71,14 +72,15 @@ struct CommandResultSummary: Identifiable, Codable, Equatable {
         commandIndex: Int,
         directive: ZoneDirective,
         command: Command,
-        result: CommandResult
+        result: CommandResult,
+        faction: Faction
     ) -> CommandResultSummary {
         CommandResultSummary(
             id: "directive_\(directiveIndex)_command_\(commandIndex)_\(directive.type.rawValue)",
             orderIndex: commandIndex,
             divisionId: command.actingDivisionId,
             orderType: nil,
-            commandDisplayName: command.displayName,
+            commandDisplayName: command.displayName(for: faction),
             mappingSucceeded: true,
             validationSucceeded: result.validation.isValid,
             executed: result.succeeded,

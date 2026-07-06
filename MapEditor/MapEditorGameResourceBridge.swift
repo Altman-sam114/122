@@ -15,8 +15,11 @@ enum MapEditorGameResourceBridgeError: Error, CustomStringConvertible {
 }
 
 enum MapEditorGameResourceBridge {
-    static let scenarioResourceName = "ardennes_v0_scenario"
-    static let regionResourceName = "ardennes_v02_regions"
+    static let legacyArdennesScenarioResourceName = "ardennes_v0_scenario"
+    static let legacyArdennesRegionResourceName = "ardennes_v02_regions"
+
+    static let scenarioResourceName = legacyArdennesScenarioResourceName
+    static let regionResourceName = legacyArdennesRegionResourceName
 
     static var gameDataDirectory: URL {
         URL(fileURLWithPath: #filePath)
@@ -27,8 +30,12 @@ enum MapEditorGameResourceBridge {
     }
 
     static func loadDefaultDocument() throws -> MapEditorDocument {
-        let scenarioURL = gameDataDirectory.appending(path: scenarioResourceName).appendingPathExtension("json")
-        let regionURL = gameDataDirectory.appending(path: regionResourceName).appendingPathExtension("json")
+        try loadLegacyArdennesDocument()
+    }
+
+    static func loadLegacyArdennesDocument() throws -> MapEditorDocument {
+        let scenarioURL = gameDataDirectory.appending(path: legacyArdennesScenarioResourceName).appendingPathExtension("json")
+        let regionURL = gameDataDirectory.appending(path: legacyArdennesRegionResourceName).appendingPathExtension("json")
         guard FileManager.default.fileExists(atPath: scenarioURL.path) else {
             throw MapEditorGameResourceBridgeError.missingResource(scenarioURL)
         }
@@ -43,10 +50,14 @@ enum MapEditorGameResourceBridge {
     }
 
     static func overwriteDefaultGameResources(document: MapEditorDocument) throws -> MapEditorExportResult {
+        try overwriteLegacyArdennesGameResources(document: document)
+    }
+
+    static func overwriteLegacyArdennesGameResources(document: MapEditorDocument) throws -> MapEditorExportResult {
         let result = try MapEditorExporter.export(
             document: document,
-            scenarioFileName: scenarioResourceName,
-            regionFileName: regionResourceName
+            scenarioFileName: legacyArdennesScenarioResourceName,
+            regionFileName: legacyArdennesRegionResourceName
         )
         try MapEditorExporter.write(result, to: gameDataDirectory)
         return result

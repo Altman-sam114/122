@@ -5,8 +5,11 @@ struct CommandPanelView: View {
     let activeFaction: Faction
     let phase: GamePhase
     let playerFaction: Faction
+    let aiControlMode: PlaytestAIControlMode
+    let canAdvanceOrders: Bool
     let observerModeEnabled: Bool
     let lastCommandMessage: String?
+    let playerOrdersStatusMessage: String?
     let onHold: () -> Void
     let onAllowRetreat: () -> Void
     let onResupply: () -> Void
@@ -14,8 +17,9 @@ struct CommandPanelView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Commands")
+            Text(label("Commands"))
                 .font(.headline)
+                .foregroundStyle(activeFaction.usesNapoleonicLogisticsVocabulary ? NapoleonicDesignTokens.imperialBlue : .primary)
 
             Text(statusText)
                 .font(.subheadline)
@@ -24,30 +28,31 @@ struct CommandPanelView: View {
 
             HStack(spacing: 8) {
                 Button(action: onHold) {
-                    Label("Hold", systemImage: "shield.fill")
+                    Label(label("Hold"), systemImage: "shield.fill")
                 }
                 .disabled(!canSetHold)
 
                 Button(action: onAllowRetreat) {
-                    Label("Retreat OK", systemImage: "arrow.uturn.backward.circle")
+                    Label(label("Retreat OK"), systemImage: "arrow.uturn.backward.circle")
                 }
                 .disabled(!canSetRetreatable)
 
                 Button(action: onResupply) {
-                    Label("Reinforce", systemImage: "cross.circle")
+                    Label(label("Reinforce"), systemImage: "cross.circle")
                 }
                 .disabled(!canCommandSelectedUnit)
             }
             .buttonStyle(.bordered)
 
             Button(action: onEndTurn) {
-                Label("End Turn", systemImage: "forward.end")
+                Label(label("End Turn"), systemImage: "forward.end")
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
+            .disabled(!canAdvanceOrders)
 
             if let lastCommandMessage {
-                Text(lastCommandMessage)
+                Text(messageDisplayText(lastCommandMessage))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -69,7 +74,7 @@ struct CommandPanelView: View {
 
         return selectedDivision.faction == playerFaction &&
             activeFaction == playerFaction &&
-            phase == .alliedPlayer &&
+            phase.allowsCommands &&
             !selectedDivision.hasActed
     }
 
@@ -83,25 +88,97 @@ struct CommandPanelView: View {
 
     private var statusText: String {
         if observerModeEnabled {
-            return "Observer mode: commands disabled."
+            if canAdvanceOrders {
+                return activeFaction.usesNapoleonicLogisticsVocabulary
+                    ? "Observer mode: use End Orders to advance staff dispatch."
+                    : "Observer mode: use End Turn to advance AI."
+            }
+
+            return activeFaction.usesNapoleonicLogisticsVocabulary
+                ? "Observer mode: orders disabled."
+                : "Observer mode: commands disabled."
         }
 
         guard let selectedDivision else {
-            return "No active unit selected."
+            if activeFaction != playerFaction && phase.allowsCommands {
+                if aiControlMode == .manualAdvance {
+                    return activeFaction.usesNapoleonicLogisticsVocabulary
+                        ? "Manual dispatch: use End Orders to advance \(activeFaction.displayName)."
+                        : "Manual command: use End Turn to advance \(activeFaction.displayName)."
+                }
+
+                return activeFaction.usesNapoleonicLogisticsVocabulary
+                    ? "Staff dispatch is resolving \(activeFaction.displayName)."
+                    : "AI command is resolving \(activeFaction.displayName)."
+            }
+
+            if let playerOrdersStatusMessage {
+                return playerOrdersStatusMessage
+            }
+
+            return activeFaction.usesNapoleonicLogisticsVocabulary
+                ? "No active formation selected."
+                : "No active unit selected."
         }
 
         guard selectedDivision.faction == playerFaction else {
-            return "Enemy unit selected. Commands disabled."
+            return activeFaction.usesNapoleonicLogisticsVocabulary
+                ? "Enemy formation selected. Orders disabled."
+                : "Enemy unit selected. Commands disabled."
         }
 
-        guard activeFaction == playerFaction, phase == .alliedPlayer else {
-            return "Commands unavailable during \(phase.displayName)."
+        guard activeFaction == playerFaction, phase.allowsCommands else {
+            return activeFaction.usesNapoleonicLogisticsVocabulary
+                ? "Orders unavailable during \(phaseDisplayName)."
+                : "Commands unavailable during \(phase.displayName)."
         }
 
         guard !selectedDivision.hasActed else {
-            return "Selected unit has acted."
+            return activeFaction.usesNapoleonicLogisticsVocabulary
+                ? "Selected formation has spent its orders."
+                : "Selected unit has acted."
         }
 
-        return "Move/Attack ready."
+        return activeFaction.usesNapoleonicLogisticsVocabulary
+            ? "Move/Attack orders ready."
+            : "Move/Attack ready."
+    }
+
+    private func messageDisplayText(_ text: String) -> String {
+        NapoleonicMessageSanitizer.displayText(text, for: activeFaction)
+    }
+
+    private var phaseDisplayName: String {
+        guard activeFaction.usesNapoleonicLogisticsVocabulary else {
+            return phase.displayName
+        }
+
+        switch phase {
+        case .germanAI, .aiCommand:
+            return "Staff Dispatch"
+        case .alliedPlayer, .playerCommand:
+            return "Orders"
+        case .resolution:
+            return "Resolution"
+        }
+    }
+
+    private func label(_ legacy: String) -> String {
+        guard activeFaction.usesNapoleonicLogisticsVocabulary else {
+            return legacy
+        }
+
+        switch legacy {
+        case "Commands":
+            return "Orders"
+        case "Retreat OK":
+            return "Withdraw OK"
+        case "Reinforce":
+            return "Rest & Supply"
+        case "End Turn":
+            return "End Orders"
+        default:
+            return legacy
+        }
     }
 }

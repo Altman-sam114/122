@@ -38,11 +38,13 @@ struct CommandExecutor {
 
         let origin = state.divisions[index].coord
         let sourceZoneId = state.warDeploymentState.zoneId(for: origin, map: state.map)
+        let movementPath = movementRules.shortestPath(for: state.divisions[index], to: destination, in: state)
         if let direction = directionForMove(from: origin, to: destination, division: state.divisions[index], in: state) {
             state.divisions[index].facing = direction
         }
         state.divisions[index].coord = destination
         state.divisions[index].hasActed = true
+        applyMovementFatigue(path: movementPath, to: index, in: &state)
 
         if occupationRules.canOccupy(division: state.divisions[index], destination: destination, in: state),
            var tile = state.map.tile(at: destination) {
@@ -80,6 +82,7 @@ struct CommandExecutor {
 
         state.divisions[attackerIndex].hasActed = true
         state.divisions[attackerIndex].facing = attackerFacing
+        applyAttackWear(to: attackerId, in: &state)
         applyCombatDamage(damage, to: targetId, in: &state)
 
         let attackOutcome = resolveCombatResult(for: defender, damage: damage, in: &state)
@@ -88,7 +91,8 @@ struct CommandExecutor {
                 prefix: "\(attacker.name) attacked \(defender.name)",
                 subjectName: defender.name,
                 damage: damage,
-                outcome: attackOutcome
+                outcome: attackOutcome,
+                faction: attacker.faction
             )
         )
 
@@ -108,6 +112,7 @@ struct CommandExecutor {
         if !attackOutcome.shouldRetreat,
            combatRules.canCounterAttack(defender: updatedDefender, attacker: updatedAttacker) {
             let counterDamage = combatRules.counterAttackDamage(defender: updatedDefender, attacker: updatedAttacker, in: state)
+            applyCounterAttackWear(to: targetId, in: &state)
             applyCombatDamage(counterDamage, to: attackerId, in: &state)
 
             let counterOutcome = resolveCombatResult(for: updatedAttacker, damage: counterDamage, in: &state)
@@ -116,7 +121,8 @@ struct CommandExecutor {
                     prefix: "\(updatedDefender.name) counterattacked \(updatedAttacker.name)",
                     subjectName: updatedAttacker.name,
                     damage: counterDamage,
-                    outcome: counterOutcome
+                    outcome: counterOutcome,
+                    faction: updatedDefender.faction
                 )
             )
 
@@ -133,7 +139,9 @@ struct CommandExecutor {
 
         state.divisions[index].retreatMode = .hold
         state.divisions[index].hasActed = true
-        state.appendEvent("\(state.divisions[index].name) set stance to HOLD: no retreat, +20% defense, +20% losses.")
+        state.divisions[index].recoverFatigue(2)
+        state.divisions[index].recoverMorale(3)
+        state.appendEvent(holdStanceMessage(for: state.divisions[index], in: state))
     }
 
     private func executeAllowRetreat(divisionId: String, in state: inout GameState) {
@@ -143,7 +151,7 @@ struct CommandExecutor {
 
         state.divisions[index].retreatMode = .retreatable
         state.divisions[index].hasActed = true
-        state.appendEvent("\(state.divisions[index].name) set stance to RETREATABLE: auto-retreat after severe losses.")
+        state.appendEvent(retreatableStanceMessage(for: state.divisions[index], in: state))
     }
 
     private func executeResupply(divisionId: String, in state: inout GameState) {
@@ -170,19 +178,21 @@ struct CommandExecutor {
         supplyRules.applyEncirclementAttrition(in: &state)
         victoryRules.updateVictoryState(in: &state)
 
-        switch state.activeFaction {
-        case .germany:
-            state.activeFaction = .allies
-            state.phase = .alliedPlayer
-        case .allies:
-            state.activeFaction = .germany
-            state.phase = .germanAI
-            state.turn += 1
+        let turnOrder = state.turnOrderFactions
+        if let currentIndex = turnOrder.firstIndex(of: state.activeFaction), !turnOrder.isEmpty {
+            let nextIndex = (currentIndex + 1) % turnOrder.count
+            state.activeFaction = turnOrder[nextIndex]
+            state.phase = GamePhase.legacyCompatibleCommandPhase(for: state.activeFaction)
+            if nextIndex == 0 {
+                state.turn += 1
+            }
+        } else {
+            state.phase = .resolution
         }
 
         resetActionsForActiveFaction(in: &state)
         state = StrategicStateBootstrapper().refreshRuntimeState(state)
-        state.appendEvent("Turn advanced to \(state.turn), \(state.activeFaction.displayName) active.")
+        state.appendEvent(turnAdvancedMessage(in: state))
     }
 
     private func resetActionsForActiveFaction(in state: inout GameState) {
@@ -212,6 +222,49 @@ struct CommandExecutor {
         }
 
         state.divisions[index].receiveStrengthDamage(damage.strengthDamage)
+        state.divisions[index].loseMorale(moraleDamage(for: damage.strengthDamage))
+    }
+
+    private func applyMovementFatigue(path: MovementPath?, to index: Int, in state: inout GameState) {
+        let pathCost = path?.cost ?? 1
+        var fatigueGain = max(1, pathCost)
+        switch state.divisions[index].supplyState {
+        case .supplied:
+            break
+        case .lowSupply:
+            fatigueGain += 2
+        case .encircled:
+            fatigueGain += 4
+        }
+
+        state.divisions[index].addFatigue(fatigueGain)
+    }
+
+    private func applyAttackWear(to divisionId: String, in state: inout GameState) {
+        guard let index = state.divisionIndex(id: divisionId) else {
+            return
+        }
+
+        var fatigueGain = state.divisions[index].isCavalry ? 8 : 6
+        if state.divisions[index].isArtillery {
+            fatigueGain = 4
+        }
+        state.divisions[index].addFatigue(fatigueGain)
+
+        if state.divisions[index].isAmmunitionSensitive {
+            state.divisions[index].consumeAmmunition(1)
+        }
+    }
+
+    private func applyCounterAttackWear(to divisionId: String, in state: inout GameState) {
+        guard let index = state.divisionIndex(id: divisionId) else {
+            return
+        }
+
+        state.divisions[index].addFatigue(3)
+        if state.divisions[index].isAmmunitionSensitive {
+            state.divisions[index].consumeAmmunition(1)
+        }
     }
 
     private func resolveCombatResult(
@@ -223,19 +276,23 @@ struct CommandExecutor {
             return CombatResultSummary(shouldRetreat: false, wasDestroyed: true, extraStrengthDamage: 0)
         }
 
+        let lowMoraleRetreat = damage.strengthDamage > 0
+            && state.divisions[index].morale <= Division.brokenMoraleThreshold
         let shouldRetreat = state.divisions[index].retreatMode == .retreatable &&
             !state.divisions[index].isDestroyed &&
-            damage.lossRatio >= retreatLossThreshold
+            (damage.lossRatio >= retreatLossThreshold || lowMoraleRetreat)
         var extraStrengthDamage = 0
 
         if state.divisions[index].retreatMode == .hold && !state.divisions[index].isDestroyed {
             extraStrengthDamage += max(1, Int((Double(damage.strengthDamage) * 0.2).rounded()))
             state.divisions[index].receiveStrengthDamage(extraStrengthDamage)
+            state.divisions[index].loseMorale(moraleDamage(for: extraStrengthDamage))
         }
 
         if shouldRetreat && state.divisions[index].supplyState == .encircled && !state.divisions[index].isDestroyed {
             extraStrengthDamage = max(1, damage.strengthDamage / 2)
             state.divisions[index].receiveStrengthDamage(extraStrengthDamage)
+            state.divisions[index].loseMorale(moraleDamage(for: extraStrengthDamage))
         }
 
         if state.divisions[index].isDestroyed {
@@ -290,7 +347,8 @@ struct CommandExecutor {
             divisions: state.divisions,
             breakthroughHex: hex,
             advancingTheaterId: advancingTheaterId,
-            faction: faction
+            faction: faction,
+            diplomacyState: state.diplomacyState
         ).state
 
         let oldZoneId = state.warDeploymentState.zoneId(for: hex, map: state.map)
@@ -302,12 +360,13 @@ struct CommandExecutor {
                 state: state.warDeploymentState,
                 map: state.map,
                 divisions: state.divisions,
+                diplomacyState: state.diplomacyState,
                 turn: state.turn
             )
         }
 
         state.appendEvent(
-            "Hex \(hex.q),\(hex.r) reassigned to dynamic theater \(advancingTheaterId.rawValue).",
+            theaterAdvanceMessage(hex: hex, theaterId: advancingTheaterId, in: state),
             category: .theaterChange,
             relatedRecordId: nil
         )
@@ -323,11 +382,11 @@ struct CommandExecutor {
         if let destinationZoneId,
            destinationZoneId != sourceZoneId,
            let destinationFaction = state.warDeploymentState.frontZones[destinationZoneId]?.faction {
-            return destinationFaction != faction
+            return !state.diplomacyState.isFriendly(faction, to: destinationFaction)
         }
 
         if let controller = state.map.tile(at: hex)?.controller {
-            return controller != faction
+            return !state.diplomacyState.isFriendly(faction, to: controller)
         }
 
         return false
@@ -337,14 +396,16 @@ struct CommandExecutor {
         prefix: String,
         subjectName: String,
         damage: CombatDamage,
-        outcome: CombatResultSummary
+        outcome: CombatResultSummary,
+        faction: Faction
     ) -> String {
         var parts = [
             "\(prefix): strength -\(damage.strengthDamage)"
         ]
 
         if outcome.shouldRetreat {
-            parts.append("\(subjectName) triggered automatic retreat")
+            let retreatText = faction.usesNapoleonicLogisticsVocabulary ? "automatic withdrawal" : "automatic retreat"
+            parts.append("\(subjectName) triggered \(retreatText)")
         }
 
         if outcome.extraStrengthDamage > 0 {
@@ -356,6 +417,45 @@ struct CommandExecutor {
         }
 
         return parts.joined(separator: "; ") + "."
+    }
+
+    private func holdStanceMessage(for division: Division, in state: GameState) -> String {
+        if state.activeFaction.usesNapoleonicLogisticsVocabulary {
+            return "\(division.name) formed a Hold Line order: no withdrawal, +20% defense, +20% losses."
+        }
+
+        return "\(division.name) set stance to HOLD: no retreat, +20% defense, +20% losses."
+    }
+
+    private func retreatableStanceMessage(for division: Division, in state: GameState) -> String {
+        if state.activeFaction.usesNapoleonicLogisticsVocabulary {
+            return "\(division.name) received withdrawal orders: auto-withdraw after severe losses."
+        }
+
+        return "\(division.name) set stance to RETREATABLE: auto-retreat after severe losses."
+    }
+
+    private func turnAdvancedMessage(in state: GameState) -> String {
+        if state.activeFaction.usesNapoleonicLogisticsVocabulary {
+            return "Orders advanced to turn \(state.turn), \(state.activeFaction.displayName) active."
+        }
+
+        return "Turn advanced to \(state.turn), \(state.activeFaction.displayName) active."
+    }
+
+    private func theaterAdvanceMessage(hex: HexCoord, theaterId: TheaterId, in state: GameState) -> String {
+        if state.activeFaction.usesNapoleonicLogisticsVocabulary {
+            return "Hex \(hex.q),\(hex.r) reassigned to active wing \(theaterId.rawValue)."
+        }
+
+        return "Hex \(hex.q),\(hex.r) reassigned to dynamic theater \(theaterId.rawValue)."
+    }
+
+    private func moraleDamage(for strengthDamage: Int) -> Int {
+        guard strengthDamage > 0 else {
+            return 0
+        }
+        return max(3, strengthDamage * 4)
     }
 }
 

@@ -30,6 +30,9 @@ struct DivisionSummary: Codable, Equatable {
     let strength: Int
     let maxStrength: Int
     let supplyState: SupplyState
+    let morale: Int
+    let fatigue: Int
+    let ammunition: Int
     let hasActed: Bool
     let movement: Int
     let range: Int
@@ -129,7 +132,7 @@ struct AgentContextBuilder {
             .map { divisionSummary($0, state: state) }
             .sorted { $0.id < $1.id }
         let enemyDivisions = state.divisions
-            .filter { $0.faction == agent.faction.opponent }
+            .filter { state.diplomacyState.isHostile(agent.faction, to: $0.faction) }
             .map { divisionSummary($0, state: state) }
             .sorted { $0.id < $1.id }
 
@@ -214,6 +217,9 @@ struct AgentContextBuilder {
             strength: division.strength,
             maxStrength: division.maxStrength,
             supplyState: division.supplyState,
+            morale: division.morale,
+            fatigue: division.fatigue,
+            ammunition: division.ammunition,
             hasActed: division.hasActed,
             movement: division.movement,
             range: division.range,
@@ -224,7 +230,7 @@ struct AgentContextBuilder {
 
     private func supplySummary(for faction: Faction, state: GameState) -> SupplySummary {
         let friendly = state.divisions.filter { $0.faction == faction }
-        let enemy = state.divisions.filter { $0.faction == faction.opponent }
+        let enemy = state.divisions.filter { state.diplomacyState.isHostile(faction, to: $0.faction) }
 
         return SupplySummary(
             friendlySupplied: friendly.filter { $0.supplyState == .supplied }.count,

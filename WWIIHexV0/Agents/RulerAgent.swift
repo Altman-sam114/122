@@ -5,6 +5,13 @@ struct RulerDirectiveAdjustment: Equatable {
     let record: RulerDecisionRecord
 }
 
+struct RulerPostureResolution: Equatable {
+    let rawStrategicJSON: String?
+    let envelope: StrategicPostureEnvelope
+    let record: RulerDecisionRecord
+    let diagnostics: [String]
+}
+
 struct RulerAgentConfig: Codable, Equatable, Identifiable {
     let id: String
     let name: String
@@ -33,8 +40,221 @@ struct RulerAgentConfig: Codable, Equatable, Identifiable {
     }
 }
 
+struct StrategicPostureEnvelope: Codable, Equatable {
+    let schemaVersion: Int
+    let issuerId: String
+    let turn: Int
+    let faction: Faction
+    let countryId: CountryId?
+    let posture: RulerStrategicPosture
+    let preferredFrontZoneId: FrontZoneId?
+    let targetRegionIds: [RegionId]
+    let attackThresholdAdjustment: Double
+    let reserveBias: Int
+    let strategicIntent: String
+    let coalitionGuidance: String?
+    let rationale: String
+
+    init(
+        schemaVersion: Int = 1,
+        issuerId: String,
+        turn: Int,
+        faction: Faction,
+        countryId: CountryId?,
+        posture: RulerStrategicPosture,
+        preferredFrontZoneId: FrontZoneId?,
+        targetRegionIds: [RegionId],
+        attackThresholdAdjustment: Double,
+        reserveBias: Int,
+        strategicIntent: String,
+        coalitionGuidance: String? = nil,
+        rationale: String
+    ) {
+        self.schemaVersion = schemaVersion
+        self.issuerId = issuerId
+        self.turn = turn
+        self.faction = faction
+        self.countryId = countryId
+        self.posture = posture
+        self.preferredFrontZoneId = preferredFrontZoneId
+        self.targetRegionIds = Self.unique(targetRegionIds)
+        self.attackThresholdAdjustment = attackThresholdAdjustment
+        self.reserveBias = max(0, reserveBias)
+        self.strategicIntent = strategicIntent
+        self.coalitionGuidance = coalitionGuidance
+        self.rationale = rationale
+    }
+
+    private static func unique<T: Hashable>(_ values: [T]) -> [T] {
+        var seen: Set<T> = []
+        var result: [T] = []
+        for value in values where !seen.contains(value) {
+            seen.insert(value)
+            result.append(value)
+        }
+        return result
+    }
+}
+
+enum StrategicPostureDecoderError: Error, Equatable, LocalizedError {
+    case invalidUTF8
+    case malformedJSON(String)
+    case unsupportedSchemaVersion(Int)
+    case issuerMismatch(expected: String, actual: String)
+    case turnMismatch(expected: Int, actual: Int)
+    case factionMismatch(expected: Faction, actual: Faction)
+    case missingZone(FrontZoneId)
+    case zoneFactionMismatch(zoneId: FrontZoneId, expected: Faction, actual: Faction)
+    case missingRegion(RegionId)
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidUTF8:
+            return "Strategic posture JSON is not valid UTF-8."
+        case .malformedJSON(let detail):
+            return "Malformed strategic posture JSON: \(detail)"
+        case .unsupportedSchemaVersion(let version):
+            return "Unsupported strategic posture schemaVersion \(version)."
+        case .issuerMismatch(let expected, let actual):
+            return "Strategic posture issuer mismatch. Expected \(expected), got \(actual)."
+        case .turnMismatch(let expected, let actual):
+            return "Strategic posture turn mismatch. Expected \(expected), got \(actual)."
+        case .factionMismatch(let expected, let actual):
+            return "Strategic posture faction mismatch. Expected \(expected.displayName), got \(actual.displayName)."
+        case .missingZone(let zoneId):
+            return "Strategic posture references missing corps sector \(zoneId.rawValue)."
+        case .zoneFactionMismatch(let zoneId, let expected, let actual):
+            return "Strategic posture sector \(zoneId.rawValue) belongs to \(actual.displayName), expected \(expected.displayName)."
+        case .missingRegion(let regionId):
+            return "Strategic posture references missing region \(regionId.rawValue)."
+        }
+    }
+}
+
+struct StrategicPostureDecoder {
+    let supportedSchemaVersions: Set<Int>
+    private let decoder: JSONDecoder
+
+    init(supportedSchemaVersions: Set<Int> = [1], decoder: JSONDecoder = JSONDecoder()) {
+        self.supportedSchemaVersions = supportedSchemaVersions
+        self.decoder = decoder
+    }
+
+    func parse(
+        _ rawResponse: String,
+        expectedIssuerId: String? = nil,
+        expectedTurn: Int? = nil,
+        expectedFaction: Faction? = nil,
+        state: GameState
+    ) throws -> StrategicPostureEnvelope {
+        let json = extractJSON(from: rawResponse)
+        guard let data = json.data(using: .utf8) else {
+            throw StrategicPostureDecoderError.invalidUTF8
+        }
+
+        let envelope: StrategicPostureEnvelope
+        do {
+            envelope = try decoder.decode(StrategicPostureEnvelope.self, from: data)
+        } catch {
+            throw StrategicPostureDecoderError.malformedJSON(error.localizedDescription)
+        }
+
+        guard supportedSchemaVersions.contains(envelope.schemaVersion) else {
+            throw StrategicPostureDecoderError.unsupportedSchemaVersion(envelope.schemaVersion)
+        }
+        if let expectedIssuerId, envelope.issuerId != expectedIssuerId {
+            throw StrategicPostureDecoderError.issuerMismatch(expected: expectedIssuerId, actual: envelope.issuerId)
+        }
+        if let expectedTurn, envelope.turn != expectedTurn {
+            throw StrategicPostureDecoderError.turnMismatch(expected: expectedTurn, actual: envelope.turn)
+        }
+        if let expectedFaction, envelope.faction != expectedFaction {
+            throw StrategicPostureDecoderError.factionMismatch(expected: expectedFaction, actual: envelope.faction)
+        }
+
+        try validate(envelope, state: state)
+        return envelope
+    }
+
+    func extractJSON(from rawResponse: String) -> String {
+        if let fenced = fencedJSON(in: rawResponse, marker: "```json") {
+            return fenced
+        }
+        if let fenced = fencedJSON(in: rawResponse, marker: "```") {
+            return fenced
+        }
+        return rawResponse.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func validate(_ envelope: StrategicPostureEnvelope, state: GameState) throws {
+        if let zoneId = envelope.preferredFrontZoneId {
+            guard let zone = state.warDeploymentState.frontZones[zoneId] else {
+                throw StrategicPostureDecoderError.missingZone(zoneId)
+            }
+            guard zone.faction == envelope.faction else {
+                throw StrategicPostureDecoderError.zoneFactionMismatch(
+                    zoneId: zoneId,
+                    expected: envelope.faction,
+                    actual: zone.faction
+                )
+            }
+        }
+
+        for regionId in envelope.targetRegionIds where state.map.region(id: regionId) == nil {
+            throw StrategicPostureDecoderError.missingRegion(regionId)
+        }
+    }
+
+    private func fencedJSON(in rawResponse: String, marker: String) -> String? {
+        guard let start = rawResponse.range(of: marker) else {
+            return nil
+        }
+        let contentStart = start.upperBound
+        guard let end = rawResponse[contentStart...].range(of: "```") else {
+            return nil
+        }
+        return String(rawResponse[contentStart..<end.lowerBound])
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
 struct RulerAgent {
     let config: RulerAgentConfig
+    let decoder: StrategicPostureDecoder
+
+    init(config: RulerAgentConfig, decoder: StrategicPostureDecoder = StrategicPostureDecoder()) {
+        self.config = config
+        self.decoder = decoder
+    }
+
+    func resolvePosture(in state: GameState) -> RulerPostureResolution {
+        let snapshot = RulerStrategicSnapshot(faction: config.faction, state: state)
+        let fallback = makeStrategicPostureEnvelope(snapshot: snapshot, state: state)
+        let raw = Self.fencedJSON(fallback)
+
+        do {
+            let envelope = try decoder.parse(
+                raw,
+                expectedIssuerId: config.id,
+                expectedTurn: state.turn,
+                expectedFaction: config.faction,
+                state: state
+            )
+            return RulerPostureResolution(
+                rawStrategicJSON: raw,
+                envelope: envelope,
+                record: makeRecord(from: envelope, state: state),
+                diagnostics: []
+            )
+        } catch {
+            return RulerPostureResolution(
+                rawStrategicJSON: raw,
+                envelope: fallback,
+                record: makeRecord(from: fallback, state: state),
+                diagnostics: ["Strategic posture decode failed: \(error.localizedDescription). Deterministic ruler fallback used."]
+            )
+        }
+    }
 
     func adjust(envelope: DirectiveEnvelope, in state: GameState) -> RulerDirectiveAdjustment {
         let snapshot = RulerStrategicSnapshot(faction: config.faction, state: state)
@@ -65,6 +285,46 @@ struct RulerAgent {
             theaterContext: appendRulerContext(envelope.theaterContext, record: record)
         )
         return RulerDirectiveAdjustment(envelope: adjustedEnvelope, record: record)
+    }
+
+    private func makeStrategicPostureEnvelope(
+        snapshot: RulerStrategicSnapshot,
+        state: GameState
+    ) -> StrategicPostureEnvelope {
+        let posture = choosePosture(snapshot: snapshot)
+        let preferredZoneId = choosePreferredZoneId(snapshot: snapshot)
+        let targetRegionIds = chooseTargetRegionIds(directives: [], snapshot: snapshot)
+        return StrategicPostureEnvelope(
+            issuerId: config.id,
+            turn: state.turn,
+            faction: config.faction,
+            countryId: config.countryId,
+            posture: posture,
+            preferredFrontZoneId: preferredZoneId,
+            targetRegionIds: targetRegionIds,
+            attackThresholdAdjustment: thresholdAdjustment(for: posture),
+            reserveBias: reserveBias(for: posture),
+            strategicIntent: strategicIntent(for: posture, snapshot: snapshot),
+            coalitionGuidance: coalitionGuidance(for: posture, state: state),
+            rationale: rationale(for: posture, snapshot: snapshot)
+        )
+    }
+
+    private func makeRecord(from envelope: StrategicPostureEnvelope, state: GameState) -> RulerDecisionRecord {
+        RulerDecisionRecord(
+            id: "ruler_\(envelope.issuerId)_turn_\(state.turn)_\(envelope.faction.rawValue)",
+            turn: state.turn,
+            faction: envelope.faction,
+            countryId: envelope.countryId,
+            rulerAgentId: envelope.issuerId,
+            posture: envelope.posture,
+            preferredFrontZoneId: envelope.preferredFrontZoneId,
+            targetRegionIds: envelope.targetRegionIds,
+            attackThresholdAdjustment: envelope.attackThresholdAdjustment,
+            reserveBias: envelope.reserveBias,
+            diplomacySummary: state.diplomacyState.summary(for: envelope.faction),
+            rationale: envelope.rationale
+        )
     }
 
     private func choosePosture(snapshot: RulerStrategicSnapshot) -> RulerStrategicPosture {
@@ -211,6 +471,33 @@ struct RulerAgent {
         }
     }
 
+    private func strategicIntent(for posture: RulerStrategicPosture, snapshot: RulerStrategicSnapshot) -> String {
+        switch posture {
+        case .offensive:
+            return "Seek a decisive battle through the preferred front while keeping exhausted or unsupported zones from overcommitting."
+        case .defensive:
+            return "Preserve the army, hold strongpoints, and accept only local counterattacks until pressure eases."
+        case .coalitionMaintenance:
+            return "Coordinate coalition fronts, protect reserves, and avoid isolated advances while \(snapshot.hostileCountryCount) hostile country record(s) remain active."
+        case .stabilizeFront:
+            return "Restore command cohesion across contested fronts before committing reserves to a larger offensive."
+        }
+    }
+
+    private func coalitionGuidance(for posture: RulerStrategicPosture, state: GameState) -> String? {
+        guard posture == .coalitionMaintenance || config.faction.isNapoleonicCoalitionMember else {
+            return nil
+        }
+        let friendlyFactions = Faction.allCases
+            .filter { state.diplomacyState.isFriendly(config.faction, to: $0) && $0 != config.faction }
+            .map(\.displayName)
+            .sorted()
+        if friendlyFactions.isEmpty {
+            return "Maintain reserve discipline until a friendly coalition front can coordinate."
+        }
+        return "Coordinate with \(friendlyFactions.joined(separator: ", ")); avoid isolated pursuit beyond supporting distance."
+    }
+
     private func appendRulerContext(_ context: String?, record: RulerDecisionRecord) -> String {
         let rulerContext = "Ruler \(record.rulerAgentId): \(record.posture.displayName), target \(record.preferredFrontZoneId?.rawValue ?? "none")."
         guard let context, !context.isEmpty else {
@@ -227,6 +514,13 @@ struct RulerAgent {
             result.append(value)
         }
         return result
+    }
+
+    private static func fencedJSON(_ envelope: StrategicPostureEnvelope) -> String {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        let data = (try? encoder.encode(envelope)) ?? Data()
+        return "```json\n\(String(decoding: data, as: UTF8.self))\n```"
     }
 }
 
@@ -300,7 +594,7 @@ struct RulerStrategicSnapshot {
     private static func enemyStrength(adjacentTo zone: FrontZone, state: GameState) -> Int {
         let visibleEnemyRegions = Set(zone.frontSegments.map(\.regionId))
         return state.divisions
-            .filter { $0.faction != zone.faction && !$0.isDestroyed }
+            .filter { state.diplomacyState.isHostile(zone.faction, to: $0.faction) && !$0.isDestroyed }
             .filter { division in
                 guard let regionId = division.location(in: state.map) else {
                     return false
@@ -357,6 +651,46 @@ extension RulerAgent {
                 aggression: 58,
                 coalitionDiscipline: 82,
                 riskTolerance: 48
+            )
+        case .france:
+            config = RulerAgentConfig(
+                id: country?.rulerAgentId ?? "ruler_napoleon",
+                name: "Napoleon",
+                faction: faction,
+                countryId: country?.id,
+                aggression: 88,
+                coalitionDiscipline: 62,
+                riskTolerance: 76
+            )
+        case .angloAllied:
+            config = RulerAgentConfig(
+                id: country?.rulerAgentId ?? "ruler_wellington",
+                name: "Anglo-Allied Command",
+                faction: faction,
+                countryId: country?.id,
+                aggression: 56,
+                coalitionDiscipline: 84,
+                riskTolerance: 44
+            )
+        case .prussia:
+            config = RulerAgentConfig(
+                id: country?.rulerAgentId ?? "ruler_prussia",
+                name: "Prussian Command",
+                faction: faction,
+                countryId: country?.id,
+                aggression: 74,
+                coalitionDiscipline: 78,
+                riskTolerance: 66
+            )
+        case .austria, .russia, .spain, .neutral:
+            config = RulerAgentConfig(
+                id: country?.rulerAgentId ?? "ruler_\(faction.rawValue)",
+                name: "\(faction.displayName) Command",
+                faction: faction,
+                countryId: country?.id,
+                aggression: faction.isNeutral ? 20 : 58,
+                coalitionDiscipline: faction.isNeutral ? 50 : 72,
+                riskTolerance: faction.isNeutral ? 20 : 50
             )
         }
         return RulerAgent(config: config)

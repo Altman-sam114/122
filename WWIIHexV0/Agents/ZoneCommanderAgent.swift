@@ -52,9 +52,7 @@ struct TacticConditionChecker {
     }
 
     private func isMobile(_ division: Division) -> Bool {
-        division.isArmor
-            || division.movement >= 5
-            || division.components.contains { $0.type == .motorizedInfantry && $0.weight >= 0.25 }
+        division.isMobileFormation
     }
 }
 
@@ -592,7 +590,8 @@ struct ZoneCommanderAgent: ZoneCommanderProviding {
         let visibleEnemyRegions = Set(visibleEnemyRegionIds(zone: zone, state: state))
         var strengthByRegion: [RegionId: Int] = [:]
 
-        for division in state.divisions where division.faction != zone.faction && !division.isDestroyed {
+        for division in state.divisions
+            where state.diplomacyState.isHostile(zone.faction, to: division.faction) && !division.isDestroyed {
             guard let regionId = division.location(in: state.map),
                   visibleEnemyRegions.contains(regionId) else {
                 continue
@@ -606,7 +605,7 @@ struct ZoneCommanderAgent: ZoneCommanderProviding {
     private func visibleEnemyRegionIds(zone: FrontZone, state: GameState) -> [RegionId] {
         var regionIds: [RegionId] = []
         for segment in zone.frontSegments.sorted(by: { $0.regionId.rawValue < $1.regionId.rawValue }) {
-            if state.map.regions[segment.regionId]?.controller != zone.faction ||
+            if regionIsHostileControlled(segment.regionId, zone: zone, state: state) ||
                 hasEnemyPresence(in: segment.regionId, zone: zone, state: state) {
                 regionIds.append(segment.regionId)
             }
@@ -618,7 +617,7 @@ struct ZoneCommanderAgent: ZoneCommanderProviding {
                     targetZoneId: segment.neighborEnemyZone,
                     state: state
                 ),
-                    (state.map.regions[neighborId]?.controller != zone.faction ||
+                    (regionIsHostileControlled(neighborId, zone: zone, state: state) ||
                      hasEnemyPresence(in: neighborId, zone: zone, state: state)) else {
                     continue
                 }
@@ -707,7 +706,7 @@ struct ZoneCommanderAgent: ZoneCommanderProviding {
         state: GameState
     ) -> Bool {
         state.divisions.contains { division in
-            guard division.faction != zone.faction,
+            guard state.diplomacyState.isHostile(zone.faction, to: division.faction),
                   !division.isDestroyed else {
                 return false
             }
@@ -725,8 +724,15 @@ struct ZoneCommanderAgent: ZoneCommanderProviding {
                   let region = state.map.regions[regionId] else {
                 return false
             }
-            return region.controller != zone.faction
+            return state.diplomacyState.isHostile(zone.faction, to: region.controller)
         }
+    }
+
+    private func regionIsHostileControlled(_ regionId: RegionId, zone: FrontZone, state: GameState) -> Bool {
+        guard let controller = state.map.regions[regionId]?.controller else {
+            return false
+        }
+        return state.diplomacyState.isHostile(zone.faction, to: controller)
     }
 
     private func hasRecentStaticDefense(zone: FrontZone, state: GameState) -> Bool {
@@ -782,7 +788,7 @@ struct ZoneCommanderAgent: ZoneCommanderProviding {
             + region.infrastructure / 2
         return RegionFocusSortKey(
             enemyStrength: enemyStrength,
-            movementCost: region.terrain.movementCost,
+            movementCost: state.terrainRules.movementCost(for: region.terrain),
             roadPenalty: hasRoad ? 0 : 1,
             valueScore: valueScore,
             id: regionId.rawValue
@@ -790,9 +796,7 @@ struct ZoneCommanderAgent: ZoneCommanderProviding {
     }
 
     private func isMobile(_ division: Division) -> Bool {
-        division.isArmor
-            || division.movement >= 5
-            || division.components.contains { $0.type == .motorizedInfantry && $0.weight >= 0.25 }
+        division.isMobileFormation
     }
 
     private func stableUnique<T: Hashable>(_ values: [T]) -> [T] {
@@ -842,8 +846,10 @@ struct TheaterCommanderPool {
     }
 
     static func defaultConfig(for zone: FrontZone) -> ZoneCommanderAgentConfig {
-        let style: ZoneCommanderAgentConfig.CommandStyle = zone.faction == .germany ? .aggressive : .balanced
-        let factionName = zone.faction == .germany ? "German" : "Allied"
+        let style: ZoneCommanderAgentConfig.CommandStyle = (zone.faction == .germany || zone.faction == .france || zone.faction == .prussia)
+            ? .aggressive
+            : .balanced
+        let factionName = zone.faction.displayName
         return ZoneCommanderAgentConfig(
             id: "auto_\(zone.id.rawValue)",
             name: "\(factionName) Commander (\(zone.id.rawValue))",
@@ -912,6 +918,42 @@ struct MarshalAgentConfig: Codable, Equatable, Identifiable {
                 strategicBias: .balanced,
                 theaterGroupZoneIds: zoneIds
             )
+        case .france:
+            return MarshalAgentConfig(
+                id: "marshal_napoleon",
+                name: "Napoleon",
+                faction: .france,
+                personality: "Seeks decisive concentration, artillery preparation, and rapid exploitation through the enemy center.",
+                strategicBias: .offensive,
+                theaterGroupZoneIds: zoneIds
+            )
+        case .angloAllied:
+            return MarshalAgentConfig(
+                id: "marshal_wellington",
+                name: "Duke of Wellington",
+                faction: .angloAllied,
+                personality: "Coalition commander; favors reverse-slope defense, strongpoints, reserves, and controlled counterattacks.",
+                strategicBias: .defensive,
+                theaterGroupZoneIds: zoneIds
+            )
+        case .prussia:
+            return MarshalAgentConfig(
+                id: "marshal_blucher",
+                name: "Gebhard Leberecht von Blucher",
+                faction: .prussia,
+                personality: "Aggressive coalition commander; prioritizes rapid pressure, flank attacks, and support to allies.",
+                strategicBias: .offensive,
+                theaterGroupZoneIds: zoneIds
+            )
+        case .austria, .russia, .spain, .neutral:
+            return MarshalAgentConfig(
+                id: "marshal_\(faction.rawValue)",
+                name: "\(faction.displayName) Marshal",
+                faction: faction,
+                personality: "Fallback commander; maintains coherent lines, reserves, and cautious pressure.",
+                strategicBias: faction.isNeutral ? .defensive : .balanced,
+                theaterGroupZoneIds: zoneIds
+            )
         }
     }
 }
@@ -949,6 +991,9 @@ struct MarshalFrontSummary: Codable, Equatable, Identifiable {
     let depthUnitCount: Int
     let garrisonUnitCount: Int
     let supplyWarningCount: Int
+    let moraleWarningCount: Int
+    let fatigueWarningCount: Int
+    let ammunitionWarningCount: Int
     let keyObjectivesHeld: [String]
     let keyObjectivesLost: [String]
     let status: String
@@ -986,11 +1031,11 @@ struct MarshalBattlefieldSummarizer {
             .map { frontSummary(for: $0, faction: faction, state: state) }
 
         let heldObjectives = objectiveNames(controlledBy: faction, state: state)
-        let lostObjectives = objectiveNames(controlledBy: faction.opponent, state: state)
+        let lostObjectives = objectiveNames(controlledByHostileTo: faction, state: state)
         let recentEvents = Array(state.eventLog.suffix(maxRecentEvents)).map(\.message)
 
         return MarshalBattlefieldSummary(
-            schemaVersion: 5,
+            schemaVersion: 6,
             turn: state.turn,
             faction: faction,
             marshalId: config.id,
@@ -1021,17 +1066,35 @@ struct MarshalBattlefieldSummarizer {
         let enemyStrength = enemyRegionIds.reduce(0) { total, regionId in
             total + state.divisions
                 .filter {
-                    $0.faction != faction
+                    state.diplomacyState.isHostile(faction, to: $0.faction)
                         && !$0.isDestroyed
                         && $0.location(in: state.map) == regionId
                 }
                 .reduce(0) { $0 + max(1, $1.strength) + max(1, $1.defense) }
         }
         let ratio = enemyStrength == 0 ? Double(max(1, frontStrength)) : Double(frontStrength) / Double(enemyStrength)
-        let unitIds = Set(zone.unitsFront + zone.unitsDepth + zone.unitsGarrison)
-        let supplyWarnings = state.divisions.filter {
+        let unitIds = Set(
+            zone.unitsFront
+                + zone.unitsDepth
+                + zone.unitsGarrison
+                + zone.frontSegments.flatMap(\.assignedFrontUnitIds)
+        )
+        let zoneUnits = state.divisions.filter {
             unitIds.contains($0.id)
-                && ($0.supplyState == .lowSupply || $0.supplyState == .encircled)
+                && $0.faction == faction
+                && !$0.isDestroyed
+        }
+        let supplyWarnings = zoneUnits.filter {
+            $0.supplyState == .lowSupply || $0.supplyState == .encircled
+        }.count
+        let moraleWarnings = zoneUnits.filter {
+            $0.isLowMorale
+        }.count
+        let fatigueWarnings = zoneUnits.filter {
+            $0.fatigue >= 70
+        }.count
+        let ammunitionWarnings = zoneUnits.filter {
+            $0.isAmmunitionSensitive && $0.isLowAmmunition
         }.count
 
         return MarshalFrontSummary(
@@ -1050,9 +1113,19 @@ struct MarshalBattlefieldSummarizer {
             depthUnitCount: zone.unitsDepth.count,
             garrisonUnitCount: zone.unitsGarrison.count,
             supplyWarningCount: supplyWarnings,
+            moraleWarningCount: moraleWarnings,
+            fatigueWarningCount: fatigueWarnings,
+            ammunitionWarningCount: ammunitionWarnings,
             keyObjectivesHeld: objectiveNames(in: frontRegionIds, controlledBy: faction, state: state),
-            keyObjectivesLost: objectiveNames(in: enemyRegionIds, controlledBy: faction.opponent, state: state),
-            status: status(for: zone, ratio: ratio, supplyWarnings: supplyWarnings)
+            keyObjectivesLost: objectiveNames(in: enemyRegionIds, controlledByHostileTo: faction, state: state),
+            status: status(
+                for: zone,
+                ratio: ratio,
+                supplyWarnings: supplyWarnings,
+                moraleWarnings: moraleWarnings,
+                fatigueWarnings: fatigueWarnings,
+                ammunitionWarnings: ammunitionWarnings
+            )
         )
     }
 
@@ -1083,7 +1156,7 @@ struct MarshalBattlefieldSummarizer {
     private func visibleEnemyRegionIds(zone: FrontZone, state: GameState) -> [RegionId] {
         var regionIds: [RegionId] = []
         for segment in zone.frontSegments.sorted(by: { $0.regionId.rawValue < $1.regionId.rawValue }) {
-            if state.map.regions[segment.regionId]?.controller != zone.faction ||
+            if regionIsHostileControlled(segment.regionId, to: zone.faction, state: state) ||
                 hasEnemyPresence(in: segment.regionId, zone: zone, state: state) {
                 regionIds.append(segment.regionId)
             }
@@ -1095,7 +1168,7 @@ struct MarshalBattlefieldSummarizer {
                     targetZoneId: segment.neighborEnemyZone,
                     state: state
                 ),
-                    (state.map.regions[neighborId]?.controller != zone.faction ||
+                    (regionIsHostileControlled(neighborId, to: zone.faction, state: state) ||
                      hasEnemyPresence(in: neighborId, zone: zone, state: state)) else {
                     continue
                 }
@@ -1131,15 +1204,34 @@ struct MarshalBattlefieldSummarizer {
 
     private func hasEnemyPresence(in regionId: RegionId, zone: FrontZone, state: GameState) -> Bool {
         state.divisions.contains { division in
-            division.faction != zone.faction
+            state.diplomacyState.isHostile(zone.faction, to: division.faction)
                 && !division.isDestroyed
                 && division.location(in: state.map) == regionId
         }
     }
 
+    private func regionIsHostileControlled(_ regionId: RegionId, to faction: Faction, state: GameState) -> Bool {
+        guard let controller = state.map.regions[regionId]?.controller else {
+            return false
+        }
+        return state.diplomacyState.isHostile(faction, to: controller)
+    }
+
     private func objectiveNames(controlledBy faction: Faction, state: GameState) -> [String] {
         state.map.objectives
             .filter { state.map.tile(at: $0.coord)?.controller == faction }
+            .map(\.name)
+            .sorted()
+    }
+
+    private func objectiveNames(controlledByHostileTo faction: Faction, state: GameState) -> [String] {
+        state.map.objectives
+            .filter { objective in
+                guard let controller = state.map.tile(at: objective.coord)?.controller else {
+                    return false
+                }
+                return state.diplomacyState.isHostile(faction, to: controller)
+            }
             .map(\.name)
             .sorted()
     }
@@ -1162,9 +1254,44 @@ struct MarshalBattlefieldSummarizer {
             .sorted()
     }
 
-    private func status(for zone: FrontZone, ratio: Double, supplyWarnings: Int) -> String {
+    private func objectiveNames(
+        in regionIds: [RegionId],
+        controlledByHostileTo faction: Faction,
+        state: GameState
+    ) -> [String] {
+        let regionSet = Set(regionIds)
+        return state.map.objectives
+            .filter { objective in
+                guard let controller = state.map.tile(at: objective.coord)?.controller,
+                      state.diplomacyState.isHostile(faction, to: controller),
+                      let regionId = state.map.region(for: objective.coord) else {
+                    return false
+                }
+                return regionSet.contains(regionId)
+            }
+            .map(\.name)
+            .sorted()
+    }
+
+    private func status(
+        for zone: FrontZone,
+        ratio: Double,
+        supplyWarnings: Int,
+        moraleWarnings: Int,
+        fatigueWarnings: Int,
+        ammunitionWarnings: Int
+    ) -> String {
         if supplyWarnings > 0 {
             return "supply_warning"
+        }
+        if moraleWarnings > 0 {
+            return "morale_warning"
+        }
+        if fatigueWarnings > 0 {
+            return "fatigue_warning"
+        }
+        if ammunitionWarnings > 0 {
+            return "ammunition_warning"
         }
         if zone.pressure >= 3 {
             return "under_pressure"
@@ -1192,19 +1319,21 @@ struct MarshalBattlefieldSummarizer {
 protocol MarshalLLMClient {
     func completeTheaterDirectiveJSON(
         summary: MarshalBattlefieldSummary,
-        config: MarshalAgentConfig
+        config: MarshalAgentConfig,
+        strategicPosture: StrategicPostureEnvelope?
     ) throws -> String
 }
 
 struct SimulatedMarshalLLMClient: MarshalLLMClient {
     func completeTheaterDirectiveJSON(
         summary: MarshalBattlefieldSummary,
-        config: MarshalAgentConfig
+        config: MarshalAgentConfig,
+        strategicPosture: StrategicPostureEnvelope?
     ) throws -> String {
         let directives = summary.fronts.map { front -> TheaterDirective in
-            let shouldAttack = shouldAttack(front: front, bias: config.strategicBias)
+            let shouldAttack = shouldAttack(front: front, bias: config.strategicBias, strategicPosture: strategicPosture)
             if shouldAttack {
-                let tactic = offensiveTactic(front: front, bias: config.strategicBias)
+                let tactic = offensiveTactic(front: front, bias: config.strategicBias, strategicPosture: strategicPosture)
                 return TheaterDirective(
                     id: "marshal_\(summary.turn)_\(front.id.rawValue)",
                     zoneId: front.id,
@@ -1217,11 +1346,11 @@ struct SimulatedMarshalLLMClient: MarshalLLMClient {
                     supportRegionIds: Array(front.frontRegionIds.prefix(2)),
                     convergenceRegionId: tactic == .pincerMovement ? front.enemyRegionIds.first : nil,
                     coordinatedZoneIds: tactic == .pincerMovement ? front.enemyZoneIds : [front.id],
-                    reserveBias: 0,
-                    intensity: front.strengthRatio >= 1.8 ? .allOut : .limitedCounter,
+                    reserveBias: max(0, (strategicPosture?.reserveBias ?? 0) - 1),
+                    intensity: attackIntensity(front: front, strategicPosture: strategicPosture),
                     maxCommittedUnits: front.frontUnitCount + max(0, front.depthUnitCount / 2),
-                    exploitDepth: front.strengthRatio >= 1.8 ? 1 : 0,
-                    rationale: "Simulated marshal JSON: \(tactic.rawValue) selected from strength ratio \(String(format: "%.2f", front.strengthRatio))."
+                    exploitDepth: front.strengthRatio >= 1.8 && strategicPosture?.posture == .offensive ? 1 : 0,
+                    rationale: offensiveRationale(front: front, tactic: tactic, strategicPosture: strategicPosture)
                 )
             }
 
@@ -1235,9 +1364,9 @@ struct SimulatedMarshalLLMClient: MarshalLLMClient {
                 weightedRegions: front.frontRegionIds,
                 focusRegionId: front.frontRegionIds.first,
                 supportRegionIds: front.enemyRegionIds,
-                reserveBias: max(1, min(3, front.depthUnitCount)),
+                reserveBias: max(strategicPosture?.reserveBias ?? 1, min(3, front.depthUnitCount)),
                 maxCommittedUnits: front.frontUnitCount,
-                rationale: "Simulated marshal JSON: \(tactic.rawValue) selected for front status \(front.status)."
+                rationale: defensiveRationale(front: front, tactic: tactic, strategicPosture: strategicPosture)
             )
         }
 
@@ -1245,9 +1374,9 @@ struct SimulatedMarshalLLMClient: MarshalLLMClient {
             issuerId: summary.marshalId,
             turn: summary.turn,
             faction: summary.faction,
-            strategicIntent: strategicIntent(summary: summary, bias: config.strategicBias),
+            strategicIntent: strategicIntent(summary: summary, bias: config.strategicBias, strategicPosture: strategicPosture),
             directives: directives,
-            summary: "\(summary.marshalName): \(directives.count) theater directive(s) from summarized fronts."
+            summary: "\(summary.marshalName): \(directives.count) command directive(s) from summarized contact lines."
         )
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
@@ -1257,22 +1386,37 @@ struct SimulatedMarshalLLMClient: MarshalLLMClient {
 
     private func shouldAttack(
         front: MarshalFrontSummary,
-        bias: MarshalAgentConfig.StrategicBias
+        bias: MarshalAgentConfig.StrategicBias,
+        strategicPosture: StrategicPostureEnvelope?
     ) -> Bool {
         guard !front.enemyZoneIds.isEmpty else {
             return false
         }
-        if front.supplyWarningCount > 0 {
+        if front.supplyWarningCount > 0 || front.moraleWarningCount > 0 {
             return false
         }
+        if strategicPosture?.preferredFrontZoneId == front.id,
+           strategicPosture?.posture == .offensive,
+           front.strengthRatio >= 0.95 {
+            return true
+        }
 
-        switch bias {
-        case .offensive:
-            return front.strengthRatio >= 1.05 || front.status == "advantage"
-        case .balanced:
-            return front.strengthRatio >= 1.25
+        switch strategicPosture?.posture {
         case .defensive:
-            return front.strengthRatio >= 1.55 && front.pressure < 3
+            return front.strengthRatio >= 1.65 && front.pressure < 2
+        case .coalitionMaintenance:
+            return front.strengthRatio >= 1.35 && front.pressure <= 2
+        case .stabilizeFront:
+            return front.strengthRatio >= 1.45 && front.pressure == 0
+        case .offensive, .none:
+            switch bias {
+            case .offensive:
+                return front.strengthRatio >= 1.05 || front.status == "advantage"
+            case .balanced:
+                return front.strengthRatio >= 1.25
+            case .defensive:
+                return front.strengthRatio >= 1.55 && front.pressure < 3
+            }
         }
     }
 
@@ -1281,13 +1425,27 @@ struct SimulatedMarshalLLMClient: MarshalLLMClient {
     }
 
     private func defensivePriority(front: MarshalFrontSummary) -> Int {
-        min(100, 55 + front.pressure * 8 + front.supplyWarningCount * 10)
+        min(
+            100,
+            55
+                + front.pressure * 8
+                + front.supplyWarningCount * 10
+                + front.moraleWarningCount * 8
+                + front.fatigueWarningCount * 6
+                + front.ammunitionWarningCount * 6
+        )
     }
 
     private func offensiveTactic(
         front: MarshalFrontSummary,
-        bias: MarshalAgentConfig.StrategicBias
+        bias: MarshalAgentConfig.StrategicBias,
+        strategicPosture: StrategicPostureEnvelope?
     ) -> TacticName {
+        if strategicPosture?.posture == .coalitionMaintenance,
+           front.enemyZoneIds.count >= 2,
+           front.strengthRatio >= 1.35 {
+            return .pincerMovement
+        }
         if front.enemyZoneIds.count >= 2,
            front.strengthRatio >= 1.25 {
             return .pincerMovement
@@ -1295,7 +1453,7 @@ struct SimulatedMarshalLLMClient: MarshalLLMClient {
         if bias == .offensive,
            front.depthUnitCount > 0,
            front.strengthRatio >= 1.8 {
-            return .blitzkrieg
+            return .breakthrough
         }
         if front.depthUnitCount > 0,
            front.strengthRatio >= 1.35 {
@@ -1319,16 +1477,39 @@ struct SimulatedMarshalLLMClient: MarshalLLMClient {
            (front.pressure >= 2 || front.strengthRatio <= 0.9) {
             return .defenseInDepth
         }
-        if front.supplyWarningCount > 0 || front.strengthRatio <= 0.75 {
+        if front.supplyWarningCount > 0
+            || front.moraleWarningCount > 0
+            || front.fatigueWarningCount > 0
+            || front.ammunitionWarningCount > 0
+            || front.strengthRatio <= 0.75 {
             return .elasticDefense
         }
         return .holdPosition
     }
 
+    private func attackIntensity(
+        front: MarshalFrontSummary,
+        strategicPosture: StrategicPostureEnvelope?
+    ) -> AttackIntensity {
+        switch strategicPosture?.posture {
+        case .offensive where front.strengthRatio >= 1.8:
+            return .allOut
+        case .defensive, .coalitionMaintenance, .stabilizeFront:
+            return .limitedCounter
+        case .offensive, .none:
+            return front.strengthRatio >= 1.8 ? .allOut : .limitedCounter
+        }
+    }
+
     private func strategicIntent(
         summary: MarshalBattlefieldSummary,
-        bias: MarshalAgentConfig.StrategicBias
+        bias: MarshalAgentConfig.StrategicBias,
+        strategicPosture: StrategicPostureEnvelope?
     ) -> String {
+        if let strategicPosture {
+            return "\(strategicPosture.strategicIntent) Marshal converts posture \(strategicPosture.posture.rawValue) into command directives."
+        }
+
         switch bias {
         case .offensive:
             return "Concentrate active fronts with favorable odds; hold strained fronts with minimal reserves."
@@ -1337,6 +1518,28 @@ struct SimulatedMarshalLLMClient: MarshalLLMClient {
         case .defensive:
             return "Stabilize threatened fronts and keep reserves available for counterattacks."
         }
+    }
+
+    private func offensiveRationale(
+        front: MarshalFrontSummary,
+        tactic: TacticName,
+        strategicPosture: StrategicPostureEnvelope?
+    ) -> String {
+        if let strategicPosture {
+            return "Simulated marshal JSON: \(tactic.rawValue) selected for \(strategicPosture.posture.rawValue) posture, strength ratio \(front.strengthRatio)."
+        }
+        return "Simulated marshal JSON: \(tactic.rawValue) selected from strength ratio \(front.strengthRatio)."
+    }
+
+    private func defensiveRationale(
+        front: MarshalFrontSummary,
+        tactic: TacticName,
+        strategicPosture: StrategicPostureEnvelope?
+    ) -> String {
+        if let strategicPosture {
+            return "Simulated marshal JSON: \(tactic.rawValue) selected under \(strategicPosture.posture.rawValue) posture for front status \(front.status)."
+        }
+        return "Simulated marshal JSON: \(tactic.rawValue) selected for front status \(front.status)."
     }
 }
 
@@ -1485,7 +1688,8 @@ struct MarshalAgent {
         for faction: Faction,
         in state: GameState,
         fallbackPool: TheaterCommanderPool,
-        issuerId: String
+        issuerId: String,
+        strategicPosture: StrategicPostureEnvelope? = nil
     ) -> MarshalDirectiveResolution {
         guard config.faction == faction else {
             let fallback = fallbackPool.envelope(for: faction, in: state, issuerId: issuerId)
@@ -1499,7 +1703,11 @@ struct MarshalAgent {
 
         do {
             let summary = summarizer.summary(for: config, in: state)
-            let raw = try llmClient.completeTheaterDirectiveJSON(summary: summary, config: config)
+            let raw = try llmClient.completeTheaterDirectiveJSON(
+                summary: summary,
+                config: config,
+                strategicPosture: strategicPosture
+            )
             let theaterEnvelope = try decoder.parse(
                 raw,
                 expectedIssuerId: config.id,
@@ -1525,7 +1733,7 @@ struct MarshalAgent {
                 rawTheaterJSON: nil,
                 theaterEnvelope: nil,
                 directiveEnvelope: fallback,
-                diagnostics: ["Marshal directive decode/compile failed: \(error.localizedDescription). Fallback TheaterCommanderPool used."]
+                diagnostics: ["Marshal directive decode/compile failed: \(error.localizedDescription). Fallback command staff used."]
             )
         }
     }

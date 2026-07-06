@@ -6,10 +6,15 @@ struct MovementPath: Equatable {
 }
 
 struct MovementRules {
-    func movementCost(from: HexTile, to: HexTile, direction: HexDirection) -> Int {
-        var cost = from.hasRoad && to.hasRoad ? 1 : to.baseTerrain.movementCost
+    func movementCost(
+        from: HexTile,
+        to: HexTile,
+        direction: HexDirection,
+        terrainRules: TerrainRuleSet = .legacy
+    ) -> Int {
+        var cost = from.hasRoad && to.hasRoad ? terrainRules.roadMovementCost : terrainRules.movementCost(for: to.baseTerrain)
         if hasRiverCrossing(from: from, to: to, direction: direction), !(from.hasRoad && to.hasRoad) {
-            cost += 2
+            cost += terrainRules.riverCrossingExtraCost
         }
         return cost
     }
@@ -28,7 +33,9 @@ struct MovementRules {
 
     func isEnemyZoneOfControl(_ coord: HexCoord, for faction: Faction, in state: GameState) -> Bool {
         state.divisions.contains { division in
-            division.faction != faction && division.coord.distance(to: coord) == 1
+            !division.isDestroyed &&
+                state.diplomacyState.isHostile(faction, to: division.faction) &&
+                division.coord.distance(to: coord) == 1
         }
     }
 
@@ -76,12 +83,12 @@ struct MovementRules {
 
                 if let occupyingDivision = state.division(at: next),
                    occupyingDivision.id != division.id,
-                   occupyingDivision.faction != division.faction {
+                   state.diplomacyState.isHostile(division.faction, to: occupyingDivision.faction) {
                     continue
                 }
 
                 let nextCost = current.cost
-                    + movementCost(from: fromTile, to: toTile, direction: direction)
+                    + movementCost(from: fromTile, to: toTile, direction: direction, terrainRules: state.terrainRules)
                     + tacticalTerrainPenalty(for: division, entering: toTile)
                 guard nextCost <= movementLimit else {
                     continue

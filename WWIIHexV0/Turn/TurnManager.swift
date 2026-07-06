@@ -1,7 +1,8 @@
 import Foundation
 
-// v0 TurnManager: only orchestrates German AI turn. Does not implement rules.
-// Builds context -> provider -> JSON -> parser -> mapper -> RuleEngine -> record.
+// AI turn orchestrator only; rules still execute through RuleEngine.
+// Default path is Ruler/Marshal -> ZoneDirective -> WarCommandExecutor -> RuleEngine.
+// Legacy Agent D parser/mapper flow is kept only for explicit legacy mode.
 
 struct AgentTurnOutcome: Equatable {
     let state: GameState
@@ -68,7 +69,7 @@ struct TurnManager {
         pipelineMode: WarPipelineMode = .marshalDirective
     ) async -> AgentTurnOutcome {
         let context = contextBuilder.agentContext(for: agent, state: state, playerDirective: nil)
-        let contextSummary = Self.contextSummary(context)
+        let contextSummary = Self.contextSummary(context, agentName: agent.name)
 
         guard agent.faction == faction else {
             return AgentTurnOutcome(
@@ -78,7 +79,7 @@ struct TurnManager {
                     contextSummary: contextSummary,
                     rawJSON: nil,
                     parsedIntent: nil,
-                    errors: ["AI turn requested for \(faction.displayName), but manager agent belongs to \(agent.faction.displayName)."]
+                    errors: ["Staff dispatch requested for \(faction.displayName), but the assigned staff belongs to \(agent.faction.displayName)."]
                 )
             )
         }
@@ -91,7 +92,7 @@ struct TurnManager {
                     contextSummary: contextSummary,
                     rawJSON: nil,
                     parsedIntent: nil,
-                    errors: ["\(faction.displayName) AI turn requested outside its controllable phase."]
+                    errors: ["\(faction.displayName) staff dispatch requested outside its command phase."]
                 )
             )
         }
@@ -125,7 +126,7 @@ struct TurnManager {
             let parsedDecision = try parser.parse(rawJSON, expectedAgentId: agent.id, expectedTurn: state.turn)
             var nextState = state
             var commandResults: [CommandResultSummary] = []
-            var errors: [String] = parsedDecision.orders.isEmpty ? ["Agent returned no orders."] : []
+            var errors: [String] = parsedDecision.orders.isEmpty ? ["Staff returned no field orders."] : []
 
             for (index, order) in parsedDecision.orders.enumerated() {
                 do {
@@ -133,7 +134,13 @@ struct TurnManager {
                     let result = commandHandler.execute(issuedCommand.command, in: nextState)
                     nextState = result.state
                     commandResults.append(
-                        .mapped(orderIndex: index, order: order, command: issuedCommand.command, result: result)
+                        .mapped(
+                            orderIndex: index,
+                            order: order,
+                            command: issuedCommand.command,
+                            result: result,
+                            faction: agent.faction
+                        )
                     )
 
                     if !result.succeeded {
@@ -147,9 +154,9 @@ struct TurnManager {
 
             let endTurnResult = commandHandler.execute(.endTurn, in: nextState)
             nextState = endTurnResult.state
-            commandResults.append(.endTurn(result: endTurnResult))
+            commandResults.append(.endTurn(result: endTurnResult, faction: agent.faction))
             if !endTurnResult.succeeded {
-                errors.append("AI end turn failed: \(endTurnResult.validation.errors.map(\.rawValue).joined(separator: ", ")).")
+                errors.append("End Orders failed: \(validationSummary(endTurnResult.validation.errors, faction: agent.faction)).")
             }
 
             let record = AgentDecisionRecord(
@@ -218,30 +225,41 @@ struct TurnManager {
     ) -> AgentTurnOutcome {
         do {
             let diagnostics = directiveDiagnostics(for: faction, state: state)
+            let ruler = RulerAgent.automatic(for: faction, in: state)
+            let postureResolution = ruler.resolvePosture(in: state)
+            var strategicState = state
+            strategicState.diplomacyState.appendRulerRecord(postureResolution.record)
+
             let fallbackPool = commanderPool ?? TheaterCommanderPool.automatic(for: state)
             let marshal = marshalAgent ?? MarshalAgent(
                 config: MarshalAgentConfig.automatic(for: faction, state: state)
             )
             let resolution = marshal.resolve(
                 for: faction,
-                in: state,
+                in: strategicState,
                 fallbackPool: fallbackPool,
-                issuerId: agent.id
+                issuerId: agent.id,
+                strategicPosture: postureResolution.envelope
             )
             let compiledJSON = try Self.canonicalDirectiveJSON(resolution.directiveEnvelope)
-            let rawJSON = resolution.rawTheaterJSON.map {
-                "\($0)\n\nCompiled ZoneDirective JSON:\n\(compiledJSON)"
-            } ?? compiledJSON
+            let postureJSON = postureResolution.rawStrategicJSON.map {
+                "StrategicPosture JSON:\n\($0)"
+            }
+            let theaterJSON = resolution.rawTheaterJSON.map {
+                "TheaterDirective JSON:\n\($0)"
+            }
+            let rawJSON = ([postureJSON, theaterJSON].compactMap { $0 } + ["Compiled ZoneDirective JSON:\n\(compiledJSON)"])
+                .joined(separator: "\n\n")
 
             return executeDirectiveEnvelope(
                 resolution.directiveEnvelope,
-                state: state,
+                state: strategicState,
                 faction: faction,
-                contextSummary: contextSummary,
+                contextSummary: "\(contextSummary) Strategic posture: \(postureResolution.envelope.posture.displayName).",
                 rawJSON: rawJSON,
-                parsedIntent: resolution.theaterEnvelope?.strategicIntent ?? "marshal directives",
+                parsedIntent: resolution.theaterEnvelope?.strategicIntent ?? postureResolution.envelope.strategicIntent,
                 providerSuffix: "MarshalDirective",
-                additionalDiagnostics: diagnostics + resolution.diagnostics
+                additionalDiagnostics: diagnostics + postureResolution.diagnostics + resolution.diagnostics
             )
         } catch {
             return AgentTurnOutcome(
@@ -286,7 +304,7 @@ struct TurnManager {
         var directiveRecords: [WarDirectiveRecord] = []
         var errors = additionalDiagnostics
         if envelope.directives.isEmpty {
-            errors.append("Commander returned no directives.")
+            errors.append("Command staff returned no corps orders.")
         }
 
         for (directiveIndex, directive) in envelope.directives.enumerated() {
@@ -296,7 +314,7 @@ struct TurnManager {
             var perDirectiveDiagnostics: [String] = []
 
             if execution.generatedCommands.isEmpty {
-                let diagnostic = "Directive \(directiveIndex) generated no executable commands."
+                let diagnostic = "Corps directive \(directiveIndex) produced no field orders."
                 errors.append(diagnostic)
                 perDirectiveDiagnostics.append(diagnostic)
             }
@@ -307,12 +325,13 @@ struct TurnManager {
                     commandIndex: commandIndex,
                     directive: directive,
                     command: pair.0,
-                    result: pair.1
+                    result: pair.1,
+                    faction: faction
                 )
                 commandResults.append(summary)
                 perDirectiveResults.append(summary)
                 if !pair.1.succeeded {
-                    let diagnostic = "Directive \(directiveIndex) command \(commandIndex) rejected: \(pair.1.validation.errors.map(\.rawValue).joined(separator: ", "))."
+                    let diagnostic = "Corps directive \(directiveIndex) order \(commandIndex) refused: \(validationSummary(pair.1.validation.errors, faction: faction))."
                     errors.append(diagnostic)
                     perDirectiveDiagnostics.append(diagnostic)
                 }
@@ -339,12 +358,15 @@ struct TurnManager {
 
         let endTurnResult = commandHandler.execute(.endTurn, in: nextState)
         nextState = endTurnResult.state
-        commandResults.append(.endTurn(result: endTurnResult))
+        commandResults.append(.endTurn(result: endTurnResult, faction: faction))
+        var endTurnDiagnostics: [String] = []
         if !endTurnResult.succeeded {
-            errors.append("AI end turn failed: \(endTurnResult.validation.errors.map(\.rawValue).joined(separator: ", ")).")
+            let diagnostic = "End Orders failed: \(validationSummary(endTurnResult.validation.errors, faction: faction))."
+            errors.append(diagnostic)
+            endTurnDiagnostics.append(diagnostic)
         }
 
-        if envelope.directives.isEmpty || !additionalDiagnostics.isEmpty {
+        if envelope.directives.isEmpty || !additionalDiagnostics.isEmpty || !endTurnDiagnostics.isEmpty {
             let record = WarDirectiveRecord(
                 id: "war_directive_\(envelope.issuerId)_turn_\(state.turn)_diagnostic",
                 issuerId: envelope.issuerId,
@@ -378,29 +400,30 @@ struct TurnManager {
     }
 
     private func isAITurn(faction: Faction, state: GameState) -> Bool {
-        switch faction {
-        case .germany:
-            return state.activeFaction == .germany && state.phase == .germanAI
-        case .allies:
-            return state.activeFaction == .allies && state.phase == .alliedPlayer
-        }
+        state.activeFaction == faction &&
+            state.phase.allowsCommands &&
+            !faction.isNeutral
     }
 
     private func directiveDiagnostics(for faction: Faction, state: GameState) -> [String] {
         var diagnostics: [String] = []
         if state.warDeploymentState.frontZones.isEmpty {
-            diagnostics.append("ZoneDirective pipeline selected but WarDeploymentState has no FrontZone data; legacy pipeline was not invoked.")
+            diagnostics.append("Staff dispatch unavailable: corps sectors are missing.")
         }
 
         for division in state.divisions where division.faction == faction && !division.isDestroyed {
             guard let regionId = division.location(in: state.map),
                   state.warDeploymentState.regionToFrontZone[regionId] != nil else {
-                diagnostics.append("Division \(division.id) is not assigned to any FrontZone; no directive generated for this unit.")
+                diagnostics.append("Formation \(division.name) is not assigned to any corps sector; no staff order was issued.")
                 continue
             }
         }
 
         return diagnostics
+    }
+
+    private func validationSummary(_ errors: [CommandValidationError], faction: Faction) -> String {
+        errors.map { $0.displayName(for: faction) }.joined(separator: ", ")
     }
 
     private func failureRecord(
@@ -423,8 +446,9 @@ struct TurnManager {
         )
     }
 
-    static func contextSummary(_ context: AgentContext) -> String {
-        "\(context.agentId) turn \(context.turn): \(context.friendlyDivisions.count) friendly divisions, \(context.enemyDivisions.count) known enemy divisions, \(context.objectives.count) objectives visible."
+    static func contextSummary(_ context: AgentContext, agentName: String? = nil) -> String {
+        let displayName = agentName?.isEmpty == false ? agentName! : context.agentId
+        return "\(displayName) turn \(context.turn): \(context.friendlyDivisions.count) friendly formations, \(context.enemyDivisions.count) known enemy formations, \(context.objectives.count) objectives visible."
     }
 
     static func canonicalJSON(_ envelope: AgentDecisionEnvelope) throws -> String {

@@ -31,12 +31,16 @@ MapEditor / JSON
 - `hexToTheater` 是运行时动态战区权威。
 - `hexToFrontZone` 是部署层动态归属权威。
 - 玩家、AI、聊天命令和 MockAI 都必须落到 `Command` / `ZoneDirective`，再经 `WarCommandExecutor`、`CommandValidator`、`RuleEngine` 执行。
-- 当前默认 AI 文档口径是 `MarshalAgent -> TheaterDirective JSON -> TheaterDirectiveDecoder -> TheaterDirectiveCompiler -> ZoneDirective -> WarCommandExecutor -> RuleEngine`。
+- 当前默认 AI 文档口径是 `RulerAgent -> StrategicPostureEnvelope -> StrategicPostureDecoder -> MarshalAgent -> TheaterDirective JSON -> TheaterDirectiveDecoder -> TheaterDirectiveCompiler -> ZoneDirective -> WarCommandExecutor -> RuleEngine`。
 - Legacy Agent D 管线保留作回归参考，默认战争 AI 主路径不得退回旧管线。
-- 当前 `Faction` 仍只有 `germany/allies`，且 `Faction.opponent`、`GamePhase.germanAI/alliedPlayer`、`CommandValidator`、`SupplyRules`、`FrontLineManager`、`WarCommandExecutor` 等处仍有二元阵营假设。
-- 当前单位源码类型叫 `Division`，兵种仍是 `tank`、`motorizedInfantry`、`infantry`、`artillery`。
-- 当前经济仍是 `manpower / industry / supplies`，生产项仍有 `Panzer Division`、`Motorized Division` 等二战语义。
-- 当前默认数据和 UI 仍有阿登、Germany、Allies、Bastogne、Guderian、Montgomery、Panzer、Division 等二战语义。
+- v3.1 已把 `Faction` 扩展为 legacy `.germany/.allies` 加拿战兼容 `.france/.angloAllied/.prussia/.austria/.russia/.spain/.neutral`；`Faction.opponent` 仅作为 legacy helper 保留，主路径敌我关系开始迁移到 `DiplomacyState.isHostile/isFriendly`。
+- v3.1 已新增 `GamePhase.aiCommand/playerCommand`、`allowsCommands` 和多势力 turn order helper；旧 `.germanAI/.alliedPlayer` raw value 仍保留旧数据兼容。
+- 当前单位源码类型叫 `Division`；legacy `tank` / `motorizedInfantry` / `infantry` / `artillery` 仍保留兼容，v3.3 已新增 `lineInfantry`、`lightInfantry`、`cavalry`、`guardInfantry`、`engineer`、`supplyTrain`。
+- 当前经济底层仍是 `manpower / industry / supplies`，`ProductionKind` raw case 仍保留 `panzerDivision`、`motorizedDivision` 等兼容名；v3.5 起 France / Anglo-Allied / Prussia 等拿战 faction 的 UI 与规则日志已显示为 `Recruits`、`Ammunition/Horses`、`Reserves`、`Guard Detachment`、`Cavalry Reserve` 等预备队语义，Waterloo 数据切片已有 French Imperial Guard / Prussian IV Corps delayed reinforcement schedule。`Division` 也已有最小 `morale` / `fatigue` / `ammunition` 战术字段，移动、攻击、反击、HOLD、resupply/rest、低士气攻防惩罚、broken morale move / attack 拒绝、低弹药火力惩罚和 UI / Marshal 摘要警告已接入。
+- v3.6 已新增 `NapoleonicDesignTokens`，并让 HUD、单位详情、tooltip 和预备队面板用文字加颜色表达 morale / fatigue / ammunition / readiness 状态；HUD 标题、RootGameView accessibility label 和 SpriteKit empty board title 已改读 `ScenarioCatalog.displayName(for:)`，不再硬编码 `Ardennes V0`；拿战 faction 下 map layer picker、compact tabs、dispatch 分类、interactionLog、`CommandResult.message`、规则事件日志、tooltip/VoiceOver、UnitNode formation symbols、reinforcement entry marker、objective marker、WarDirectiveRecord recent replay + tactic marker、AI 空状态以及单位/地域/命令/将军/指挥官档案/外交/AI 复盘面板内标签已开始脱离二战占位，显示 Sector、Active Wing、Contact、Corps、Formation、Formation Strength、Orders、Corps Order、Order executed/rejected、Hold Line、Withdrawal、Commander Profile、Coalition、Staff、Command Dispatch、Simulated Staff 等术语；完整地图美术、完整炮击/冲锋路径、指挥官头像、完整战报回放面板和视觉验收仍未完成。
+- v3.7 已起步新增新局配置入口、最小保存/继续路径、最小 slot label、基础试玩设置、非阻塞短引导、无可行动反馈、AI dispatch issue 可见诊断、诊断/拒绝原因预览和 AI 回放摘要：`NewGameSetupView` 从 HUD 打开，默认列出非 legacy scenario，打开 `Archived Campaigns` 后才显示 `ScenarioCatalog.all` 中的 legacy entry，按所选 scenario JSON 派生玩家可选非中立阵营，并通过 `AppContainer.startNewGame(scenario:playerFaction:startsAtPlayerFaction:)` 重载场景、将领目录和玩家阵营；`Opening Turn` toggle 可决定玩家所选 faction 是否先行动，sheet 也暴露 Save Slot、Slot Name / Rename Slot、Observer Mode、Map Layer、Dispatch Detail、Staff Pace、Staff Control、Guide Notes、Reduce Motion 和 Text Size，底层仍由 `AICommandPace` / `PlaytestAIControlMode` 持久化。HUD phase 会按 active faction、玩家阵营、Staff Control 和 observer 状态显示 Your Orders / Staff Dispatch / Manual Dispatch / Manual Observation。拿战 JSON 已加入 iOS / macOS bundle resources，可从新局入口选择 Waterloo 数据切片。`GameSaveSnapshot` 当前以 schemaVersion 1 把 `GameState`、scenario、玩家 faction 和开局顺序存入 `GameSaveSlot` 的 Slot 1 / Slot 2 / Slot 3 本地 `UserDefaults` key，Slot 1 兼容读取旧单槽 key `WWIIHexV0.savedGameSnapshot.v1`；`GameSaveSlot` 另以独立 `UserDefaults` key 保存 32 字以内 slot label，label 不写入 snapshot、不升级 schemaVersion；继续时必须匹配当前 `ScenarioCatalog` 中存在的 snapshot scenario，找不到 scenario 时按 slot 显示不可用原因；恢复成功会重载对应将领目录、重新 bootstrap / assign generals，并调用现有 `runAIIfNeeded()` eligibility gate；坏快照或 schema 不兼容时 Continue 区块会按 slot 显示不可用原因，并可 Clear Saved 清理坏快照或旧试玩快照；legacy snapshot 在归档开关关闭时只显示中性占位和清理入口，打开后才显示 forces 详情和继续入口；sheet 内 Status 区块会显示 Start / Save Current / Continue Saved / Clear Saved / Rename Slot 的最近操作结果，开始或继续失败时保留 sheet 并显示 `AppContainer.lastCommandMessage`。`PlaytestSessionSettings` 当前把 observer、map layer、`ReplayDetailLevel`、`AICommandPace`、`PlaytestAIControlMode`、Guide Notes、Reduce Motion 和 `PlaytestTextSize` 存到 `UserDefaults` key `WWIIHexV0.playtestSessionSettings.v1`；偏好数据无法解码时会移除损坏值、恢复标准设置并显示提示。`PlaytestAIControlMode` 默认 Staff 保持旧行为：非 observer 下玩家 faction 手动，其它非 neutral faction 自动走 simulated staff / MockAI fallback；`runAISequence` 以当前 turn order faction 数量为有限上限，连续处理非玩家 AI faction 直到回到玩家方或 AI 资格失效；Manual 只停用自动 dispatch，非 observer 下回合推进仍通过 End Orders / `Command.endTurn` 进入 `RuleEngine` 推进当前 active faction，observer + Manual 保持只读，`AppContainer.submit(_:)` 会拒绝 observer 直接命令，不允许直接操控其它 faction 单位。`ReplayDetailLevel` 当前控制事件日志条数、AI directive 条数、Staff Summary、Issue Preview、Recent Dispatch Timeline、context summary、逐条明细和 raw JSON 显示；`PlaytestTextSize` 当前提供 Compact / Standard / Large 三档，用 Dynamic Type 字体样式调整 `EventLogView` 与 `AgentPanelView` 的标题、metadata、正文、raw JSON 和行距；`AICommandPace` 只控制 simulated staff 行动前短延迟，Reduce Motion 开启时跳过这段本地等待；`AgentPanelView` 从 `AgentDecisionRecord` 与最近 `WarDirectiveRecord` 只读聚合执行、拒绝、问题、focus sector / target 和最新 tactic，并把最近 directive 按 turn、scope、target、tactic、执行/拒绝/问题数和首要拒绝或诊断原因摘要成 Recent Dispatch Timeline，Concise 下隐藏逐条 command / directive 明细但保留短摘要、Issue Preview 与时间线。`runAISequence` 会聚合连续 AI faction 的 record-level 错误并写入 `Command dispatch issue` / `AI issue` interaction log，有限步数 guard 结束后仍 AI-eligible 时追加 dispatch paused 诊断；默认 directive 管线的 AI end-turn 失败也会同步进诊断型 `WarDirectiveRecord`。`PlaytestGuideCue` 当前在首次选择 formation、炮兵/远程单位、骑兵和首次结束命令时写入短 `Staff note`，不弹 modal、不阻塞地图，并受 Guide Notes 本地设置控制；命令面板会显示本方剩余可行动 formation / unit 数量，Manual 非玩家 active faction 会提示用 End Orders 手动推进，observer + Staff 会提示用 End Orders 触发 staff dispatch，observer + Manual 保持 orders disabled，macOS Orders 菜单也跟随 `canAdvanceOrders` 禁用，AI 无有效战场命令时会追加 Staff note / AI note。
+- v3.8 已起步发布候选收口：`ScenarioCatalog.defaultPlayable` 已切到 Waterloo 1815 数据切片，`ScenarioCatalogEntry` 记录 `defaultPlayerFaction`，当前默认玩家阵营为 France；`AppContainer.bootstrap()` 按默认场景读取 Waterloo 将领目录和默认玩家阵营，默认加载失败时不再自动打开 Ardennes legacy，而是保留 Waterloo 元数据、构造 1x1 inert 恢复地图并提示打开 `New Campaign` 切换到可用 scenario；将领目录加载失败不再在新局/继续路径静默变成空 registry，新局或继续会保留当前状态并显示失败原因，启动恢复态只允许无将领目录的恢复提示；`DataLoader.loadGameState` 会复用已加载并校验过的 `GeneralRegistry` 做部署层将领分配，不再二次 `try?` 读取。`ScenarioCatalog.entry(for:)` 会把阿登 catalog id `ardennes_v0` 与 MapEditor legacy JSON runtime id `mapeditor_scenario` 解析到同一 legacy 场景，`loadGameState(ScenarioCatalogEntry)`、保存和继续会把 `GameState.scenarioId` 归一到 catalog id，存档继续、slot 摘要、HUD/棋盘标题和 legacy 校验不再分裂；`DataLoader.loadInitialGameState()` 仍保留为 legacy / probe fallback，不作为主 app 默认启动入口；`DataLoader.loadGameState` 会校验 `initialPhase`、`playerFaction`、`aiFaction`、terrain rules、raw hexToRegion key / tile region 反向映射、riverEdges、victory objective / target faction、general catalog、keyLocations、unit template maxHP/components/weight、unit/reinforcement hp/facing/supply/retreat mode 和资源引用，不再用 Germany / Allies fallback 吞坏 JSON；scenario JSON 的 `victoryConditions` 已映射进 `GameState.victoryConditions`，Waterloo 分支会按 `french_break_center` / `coalition_hold_until_prussia` 读取 objective id、target faction 和决定回合，旧存档缺字段时保留 fallback；`RegionVictoryRules` 只在 legacy 阿登 / MapEditor legacy runtime id 下评估 Bastogne / St. Vith region 胜负；`napoleonic_terrain_rules` 已映射进 `GameState.terrainRules`，Waterloo 主路径移动、战斗防御、渡河修正和 AI breakthrough / defensive sorting 已读取 runtime rule set；默认入口不预先创建 Guderian/Germany turn manager，stored Guderian manager 兼容特例会同时校验当前 scenario 与 runtime `GameState.scenarioId` 都匹配 Ardennes legacy；`AgentPanelView` / `AppContainer` 在拿战 faction 下把 raw `*_mock_commander` / `MockAI` / `MockAI+MarshalDirective` 包装为 Command Staff / Simulated Staff 展示，Standard context summary 使用 staff display name，EventLog phase metadata 显示 Orders / Staff Dispatch；`NapoleonicMessageSanitizer` 统一供 EventLog、AgentPanel、CommandPanel 和 AppContainer interaction log 净化 raw AI / MockAI / legacy pipeline / Germany / Allies / front zone、region、theater id / diagnostic / validation rawValue，`TurnManager` 和 `WarCommandExecutor` 的默认诊断/规则拒绝事件也会优先写 Staff / Corps / End Orders 与 `CommandValidationError.displayName(for:)` 文案，Full raw JSON 和底层记录仍保留 schema 审计内容；`CommandResultSummary` 和 `HexNode` 也已补拿战展示名 / 供给源短码；MapEditor 资源桥和 UI 已把旧 default wording 收口为 Legacy 阿登资源，旧 default API 只作兼容 wrapper，MapEditor 导出的 `factions/initialPhase/playerFaction/aiFaction` 和新单位 id 前缀会按实际 faction 派生；玩家军团 directive 回写也会经过 `refreshGeneralAssignments` / `normalizeCommandPhase`；阿登 legacy 仍保留在 `ScenarioCatalog.all` 中，但默认隐藏在 `Archived Campaigns` 后，旧 legacy 存档摘要默认也不显示 Germany / Allies forces 或继续按钮。默认入口已经是拿战剧本，但 Waterloo 仍是小规模数据骨架，通用 victory condition DSL、完整 terrain DSL、完整地图规模、发布级 UI、发布级命名存档/迁移器、文件导出、云同步、完整教学流程、完整动画回放、完整运行时错误恢复和人工授权重验证尚未完成。
+- 当前主要默认数据已切向 Waterloo；阿登、Germany、Allies、Bastogne、Guderian、Montgomery 等二战语义仍作为 legacy 兼容路径、历史文档或源码兼容名残留。滑铁卢剧本仍是最小数据骨架，拿战玩家可见语义只在多势力、单位模板、Agent 姿态、经济/预备队展示、战术士气/疲劳/弹药、UI 状态 token、AI replay staff 展示、供给源 marker、delayed reinforcement、Waterloo 最小胜负节奏、新局/默认入口等切片中起步接入。
 - 当前工作树可能混有 v0.4、v0.5、v0.7、v0.8、v0.9、v1.0、v1.1 等未提交改动。任何实现前必须做分支和文件冲突审查，不能回滚他人改动。
 
 迁移目标不是“换一套文字和颜色”，而是把这个工程逐步迁移为一个可发布的 AI Agent 驱动拿破仑战争战棋。
@@ -452,6 +456,7 @@ rg -n "enum Faction|struct Division|enum ComponentType|EconomyResources|Producti
 - 建立第一张可玩拿战剧本地图。
 - 保留 MapEditor 导出链路。
 - 默认新局加载滑铁卢剧本，而不是阿登。
+- 当前 v3.2-v3.8 起步已建立并切换 `ScenarioCatalog`：`defaultPlayable` 与 `napoleonicTarget` 均指向最小 `waterloo_1815_scenario` / `waterloo_1815_regions` / `napoleonic_terrain_rules` / `napoleonic_unit_templates` / `napoleonic_generals` 数据骨架，`ardennesLegacy` 作为兼容可选剧本保留。`ScenarioCatalogEntry.defaultPlayerFaction` 当前让默认 Waterloo 以 France 作为玩家阵营。`napoleonic_terrain_rules` 已进入运行时 `TerrainRuleSet`，Waterloo 移动/战斗主路径读取 `GameState.terrainRules`；`BaseTerrain` 保留为 legacy fallback 和未数据化特化规则来源；`napoleonic_generals` 已有 Napoleon / Wellington / Blucher 将领目录。v3.3 已新增 `lineInfantry`、`lightInfantry`、`cavalry`、`guardInfantry`（raw value 为 `guard`）、`engineer`、`supplyTrain` 等 `ComponentType` case，`napoleonic_unit_templates` 已使用这些拿战 raw value，`CombatRules` 已有最小骑兵/炮兵地形修正。v3.4 已起步接入 `RulerAgent -> StrategicPostureEnvelope -> StrategicPostureDecoder -> MarshalAgent`。v3.5 已起步接入拿战后勤展示、战术 morale / fatigue / ammunition 字段与消耗/恢复、broken morale move / attack 拒绝、delayed reinforcement schedule 和 Waterloo 专用最小胜负节奏。v3.6 已起步建立 `NapoleonicDesignTokens`、HUD/单位面板状态可读性基础、map layer picker、interactionLog、CommandResult / event log 术语、Commander Profile、Command Dispatch、目标点/增援入口 marker、WarDirectiveRecord recent replay + tactic marker 和面板内 Formation / Sector / Orders / Corps Order / Coalition 术语收口。v3.7 已起步新局入口、Waterloo 数据切片选择、三槽本地试玩快照、最小 slot label、基础试玩设置持久化、AI Control、短引导、无行动反馈、AI issue 可见诊断、Issue Preview 和 Recent Dispatch Timeline。但完整 ammunition / horses 经济账本、概率式命令摩擦、ChiefOfStaff / CorpsCommander / Diplomat 独立 Agent、真实 LLM、完整拿战 agent personality、完整 terrain DSL、发布级地图美术、发布级命名存档/迁移器、完整错误恢复、可玩地图规模和人工授权运行时验收仍未完成；后续仍需补齐高级士气、队形、完整骑兵冲锋、炮兵准备和完整 Waterloo 战役规模。
 
 默认剧本建议：
 
@@ -529,7 +534,7 @@ MapEditor 迁移：
   - lightInfantry
   - cavalry
   - artillery
-  - guard
+  - guardInfantry（raw value 为 guard）
   - engineer
   - supplyTrain
 - stats 仍可保留 attack / defense / movement / range / vision。
@@ -800,12 +805,12 @@ SpriteKit 要求：
 
 范围：
 
-- 新局：选择战役、选择阵营、选择 AI 控制选项。
-- 继续：本地存档 schema，保存/加载 GameState 或受控 snapshot。
-- 设置：AI 速度、日志详细度、地图图层默认值、Reduce Motion、文字大小适配。
-- 引导：第一次选中部队、炮击、骑兵冲锋、结束回合时给短提示；不要做大篇说明页面。
-- AI 回放：显示元帅意图、军团长命令、执行结果、拒绝原因。
-- 错误恢复：JSON 加载失败、AI 解码失败、无可行动单位、命令被拒绝必须有玩家可读反馈。
+- 新局：选择战役、选择阵营、选择 AI 控制选项。当前已起步实现战役、玩家阵营选择和最小 AI Control；默认 Staff 保持“其他非 neutral 阵营由 simulated staff / MockAI fallback 控制”，Manual 只关闭自动 dispatch；非 observer Manual 下回合推进仍走 End Orders / `Command.endTurn` 推进当前 active faction，observer + Manual 保持只读。
+- 继续：当前已起步 `UserDefaults` 三槽 `GameSaveSnapshot` 和独立 `UserDefaults` slot label，Slot 1 兼容旧单槽 key，坏快照、schema 不兼容或未知 scenario 快照会按 slot 显示不可用原因；恢复成功后会按现有 `runAIIfNeeded()` eligibility gate 决定是否 dispatch，Staff 模式（包括 observer + Staff）可续跑 AI，非 observer 下 Manual 需由 End Orders 推进，observer + Manual 保持只读；slot label 只用于本地槽名显示，不写入 snapshot schema。后续若要发布级体验，还需要发布级命名存档、迁移器、失败恢复、文件导出或云同步策略。
+- 设置：当前已起步 observer mode、地图图层、日志/AI 回放详细度、AI Pace、AI Control、Reduce Motion、Text Size 和持久化默认值；后续继续更完整的全 app 可读性适配、AI 控制治理和动画治理。
+- 引导：当前已起步首次选中 formation、炮兵/远程单位、骑兵和结束命令的 event log `Staff note`；后续补齐更完整的短引导状态、可关闭策略和视觉验收，不做大篇说明页面。
+- AI 回放：当前已起步 Staff Summary、Issue Preview 和 Recent Dispatch Timeline，只读聚合执行数、拒绝数、问题数、focus sector / target、最新 tactic 和首要拒绝/诊断原因，并把最近 directive 摘要为 turn / scope / target / tactic / status（executed / rejected / issues）；AI 无有效战场命令时会追加 Staff note / AI note；record-level AI 错误、默认 directive end-turn 失败、被拒绝命令原因和 AI 连跑 guard 暂停会进入事件日志、Issue Preview 或诊断型 `WarDirectiveRecord`；后续继续元帅意图、军团长命令、执行结果、拒绝原因的完整时间线与错误恢复。
+- 错误恢复：当前已有坏快照/坏设置/未知 scenario 快照、本方无可行动数量、AI 无有效战场命令、最小 AI issue 和拒绝原因预览的可读反馈；后续 JSON 加载失败、AI 解码失败、命令被拒绝等仍需更完整玩家可读反馈。
 
 推荐并发：
 
@@ -1067,7 +1072,7 @@ swiftc -parse path/to/ChangedFile.swift
 - `Faction.opponent` 残留会直接破坏多方联军和中立逻辑。
 - `GamePhase.germanAI/alliedPlayer` 残留会让新阵营控制权表现错误。
 - `RegionDataSet.toRegions()` 中 owner/controller nil fallback 到 `.allies` 是历史债，拿战迁移时必须修或隔离。
-- `DataLoader` 默认资源、fallback components、validation 仍硬编码阿登和 Guderian。
+- `DataLoader` 默认入口已切 Waterloo，但 fallback components、legacy scenario、历史 agent fallback 和部分 validation/文档仍保留阿登 / Guderian 兼容债。
 - `project.pbxproj` 已多次被多分支修改，只能由一个 Agent 处理。
 - UI/SpriteKit 改动需要视觉验证，但当前规范禁止主动启动 app；必须记录未验证风险。
 - 真实 LLM 接入、模型输出质量、长回合稳定性必须单独版本验证。
@@ -1086,4 +1091,3 @@ swiftc -parse path/to/ChangedFile.swift
 5. 还剩什么风险或下一步。
 
 如果进行了 git stage / commit / push，只能在实际成功后按 Codex 桌面规范输出对应 directive。
-

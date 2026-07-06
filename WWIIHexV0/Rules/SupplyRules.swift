@@ -5,6 +5,11 @@ struct SupplyRules {
     let suppliedResupplyHPRecovery = 2
     let encircledHPLoss = 1
     let failedRetreatHPLoss = 1
+    let suppliedFatigueRecovery = 10
+    let lowSupplyFatigueRecovery = 4
+    let suppliedAmmunitionRecovery = 2
+    let suppliedMoraleRecovery = 6
+    let lowSupplyMoraleRecovery = 2
     private let movementRules = MovementRules()
 
     func updateSupplyStates(in state: inout GameState) {
@@ -28,9 +33,20 @@ struct SupplyRules {
             recoverDivision(
                 at: index,
                 hp: suppliedResupplyHPRecovery,
+                fatigue: suppliedFatigueRecovery,
+                ammunition: suppliedAmmunitionRecovery,
+                morale: suppliedMoraleRecovery,
                 in: &state
             )
         case .lowSupply:
+            recoverDivision(
+                at: index,
+                hp: 0,
+                fatigue: lowSupplyFatigueRecovery,
+                ammunition: 0,
+                morale: lowSupplyMoraleRecovery,
+                in: &state
+            )
             break
         case .encircled:
             break
@@ -38,10 +54,13 @@ struct SupplyRules {
 
         let after = state.divisions[index]
         let hpRecovered = after.hp - before.hp
+        let fatigueRecovered = before.fatigue - after.fatigue
+        let ammunitionRecovered = after.ammunition - before.ammunition
+        let moraleRecovered = after.morale - before.morale
 
-        if hpRecovered > 0 {
+        if hpRecovered > 0 || fatigueRecovered > 0 || ammunitionRecovered > 0 || moraleRecovered > 0 {
             state.appendEvent(
-                "\(after.name) reinforced in \(after.supplyState.rawValue): +\(hpRecovered) strength."
+                "\(after.name) rested in \(after.supplyState.rawValue): +\(hpRecovered) strength, -\(fatigueRecovered) fatigue, +\(ammunitionRecovered) ammunition, +\(moraleRecovered) morale."
             )
         } else {
             state.appendEvent("\(after.name) could not recover while \(after.supplyState.rawValue).")
@@ -66,6 +85,7 @@ struct SupplyRules {
             )
         } else {
             state.divisions[index].hp = max(1, state.divisions[index].hp - failedRetreatHPLoss)
+            state.divisions[index].loseMorale(failedRetreatHPLoss * 8)
             state.appendEvent(
                 "\(division.name) failed to retreat and lost \(failedRetreatHPLoss) strength."
             )
@@ -90,6 +110,7 @@ struct SupplyRules {
 
             let hpLost = beforeHP - state.divisions[index].hp
             if hpLost > 0 {
+                state.divisions[index].loseMorale(hpLost * 5)
                 state.appendEvent(
                     "\(state.divisions[index].name) suffered encirclement attrition: -\(hpLost) strength."
                 )
@@ -134,7 +155,9 @@ struct SupplyRules {
             return false
         }
 
-        if tile.isCapturable && tile.controller == faction.opponent {
+        if tile.isCapturable,
+           let controller = tile.controller,
+           state.diplomacyState.isHostile(faction, to: controller) {
             return false
         }
 
@@ -210,16 +233,20 @@ struct SupplyRules {
     }
 
     private func canSupplyPass(through coord: HexCoord, tile: HexTile, for faction: Faction, in state: GameState) -> Bool {
-        if let division = state.division(at: coord), division.faction != faction {
+        if let division = state.division(at: coord),
+           state.diplomacyState.isHostile(faction, to: division.faction) {
             return false
         }
 
-        if tile.isCapturable && tile.controller == faction.opponent {
+        if tile.isCapturable,
+           let controller = tile.controller,
+           state.diplomacyState.isHostile(faction, to: controller) {
             return false
         }
 
         if movementRules.isEnemyZoneOfControl(coord, for: faction, in: state) {
-            if state.division(at: coord)?.faction == faction {
+            if let occupyingFaction = state.division(at: coord)?.faction,
+               state.diplomacyState.isFriendly(faction, to: occupyingFaction) {
                 return true
             }
             return false
@@ -247,8 +274,18 @@ struct SupplyRules {
         )
     }
 
-    private func recoverDivision(at index: Int, hp: Int, in state: inout GameState) {
+    private func recoverDivision(
+        at index: Int,
+        hp: Int,
+        fatigue: Int,
+        ammunition: Int,
+        morale: Int,
+        in state: inout GameState
+    ) {
         state.divisions[index].reinforceStrength(hp)
+        state.divisions[index].recoverFatigue(fatigue)
+        state.divisions[index].recoverAmmunition(ammunition)
+        state.divisions[index].recoverMorale(morale)
     }
 
     private func advanceRetreatStatusIfNeeded(for divisionId: String, in state: inout GameState) -> Bool {

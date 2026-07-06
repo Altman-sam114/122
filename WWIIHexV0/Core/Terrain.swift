@@ -92,6 +92,51 @@ enum BaseTerrain: String, Codable, Equatable, CaseIterable {
     }
 }
 
+struct TerrainRuleEntry: Codable, Equatable {
+    let movementCost: Int
+    let defenseBonus: Int
+}
+
+struct TerrainRuleSet: Codable, Equatable {
+    private let terrain: [String: TerrainRuleEntry]
+    let roadMovementCost: Int
+    let riverCrossingExtraCost: Int
+
+    init(
+        terrain: [String: TerrainRuleEntry],
+        roadMovementCost: Int,
+        riverCrossingExtraCost: Int
+    ) {
+        self.terrain = terrain
+        self.roadMovementCost = roadMovementCost
+        self.riverCrossingExtraCost = riverCrossingExtraCost
+    }
+
+    func movementCost(for terrain: BaseTerrain) -> Int {
+        self.terrain[terrain.rawValue]?.movementCost ?? terrain.movementCost
+    }
+
+    func defenseBonus(for terrain: BaseTerrain) -> Int {
+        self.terrain[terrain.rawValue]?.defenseBonus ?? terrain.defenseBonus
+    }
+
+    static let legacy = TerrainRuleSet(
+        terrain: Dictionary(
+            uniqueKeysWithValues: BaseTerrain.allCases.map {
+                (
+                    $0.rawValue,
+                    TerrainRuleEntry(
+                        movementCost: $0.movementCost,
+                        defenseBonus: $0.defenseBonus
+                    )
+                )
+            }
+        ),
+        roadMovementCost: 1,
+        riverCrossingExtraCost: 2
+    )
+}
+
 struct HexTile: Codable, Equatable {
     let coord: HexCoord
     var baseTerrain: BaseTerrain

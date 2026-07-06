@@ -7,7 +7,12 @@ struct TheaterSystem {
         self.formalizationThreshold = formalizationThreshold
     }
 
-    func makeInitialFixedTheaters(map: MapState, divisions: [Division], turn: Int? = nil) -> TheaterState {
+    func makeInitialFixedTheaters(
+        map: MapState,
+        divisions: [Division],
+        diplomacyState: DiplomacyState = .empty,
+        turn: Int? = nil
+    ) -> TheaterState {
         guard !map.regions.isEmpty else {
             return .empty
         }
@@ -38,7 +43,7 @@ struct TheaterSystem {
         }
 
         var state = TheaterState(theaters: theaters, hexToTheater: hexToTheater, regionToTheater: regionToTheater, lastUpdatedTurn: turn)
-        refreshDerivedFields(state: &state, map: map, divisions: divisions)
+        refreshDerivedFields(state: &state, map: map, divisions: divisions, diplomacyState: diplomacyState)
         state.initialSnapshot = TheaterInitialSnapshot.capture(from: state)
         return state
     }
@@ -47,6 +52,7 @@ struct TheaterSystem {
         state: TheaterState,
         map: MapState,
         divisions: [Division],
+        diplomacyState: DiplomacyState = .empty,
         turn: Int,
         force: Bool = false
     ) -> TheaterState {
@@ -55,7 +61,7 @@ struct TheaterSystem {
         }
 
         var next = state
-        refreshDerivedFields(state: &next, map: map, divisions: divisions)
+        refreshDerivedFields(state: &next, map: map, divisions: divisions, diplomacyState: diplomacyState)
         next.lastUpdatedTurn = turn
         return next
     }
@@ -65,7 +71,8 @@ struct TheaterSystem {
         map: MapState,
         divisions: [Division],
         breakthroughRegionId: RegionId,
-        faction: Faction
+        faction: Faction,
+        diplomacyState: DiplomacyState = .empty
     ) -> TheaterExpansionResult {
         guard map.regions[breakthroughRegionId] != nil else {
             return TheaterExpansionResult(state: state, transition: .none, affectedTheaterId: nil)
@@ -89,13 +96,13 @@ struct TheaterSystem {
         }
         next.regionToTheater[breakthroughRegionId] = targetTheaterId
 
-        refreshDerivedFields(state: &next, map: map, divisions: divisions)
+        refreshDerivedFields(state: &next, map: map, divisions: divisions, diplomacyState: diplomacyState)
         let ratio = next.theaters[targetTheaterId]?.controlRatios[faction] ?? 0
 
         if ratio >= formalizationThreshold {
             next.theaters[targetTheaterId]?.status = .active
             next.theaters[targetTheaterId]?.controllingFaction = faction
-            refreshDerivedFields(state: &next, map: map, divisions: divisions)
+            refreshDerivedFields(state: &next, map: map, divisions: divisions, diplomacyState: diplomacyState)
             return TheaterExpansionResult(
                 state: next,
                 transition: .formalized(theaterId: targetTheaterId, faction: faction, ratio: ratio),
@@ -117,7 +124,8 @@ struct TheaterSystem {
         divisions: [Division],
         breakthroughRegionId: RegionId,
         advancingTheaterId: TheaterId,
-        faction: Faction
+        faction: Faction,
+        diplomacyState: DiplomacyState = .empty
     ) -> TheaterExpansionResult {
         guard let breakthroughHex = map.region(id: breakthroughRegionId)?.representativeHex else {
             return TheaterExpansionResult(state: state, transition: .none, affectedTheaterId: nil)
@@ -129,7 +137,8 @@ struct TheaterSystem {
             divisions: divisions,
             breakthroughHex: breakthroughHex,
             advancingTheaterId: advancingTheaterId,
-            faction: faction
+            faction: faction,
+            diplomacyState: diplomacyState
         )
     }
 
@@ -139,7 +148,8 @@ struct TheaterSystem {
         divisions: [Division],
         breakthroughHex: HexCoord,
         advancingTheaterId: TheaterId,
-        faction: Faction
+        faction: Faction,
+        diplomacyState: DiplomacyState = .empty
     ) -> TheaterExpansionResult {
         guard map.tile(at: breakthroughHex) != nil,
               let breakthroughRegionId = map.region(for: breakthroughHex),
@@ -151,7 +161,7 @@ struct TheaterSystem {
         seedMissingHexAssignments(state: &next, map: map)
         next.hexToTheater[breakthroughHex] = advancingTheaterId
 
-        refreshDerivedFields(state: &next, map: map, divisions: divisions)
+        refreshDerivedFields(state: &next, map: map, divisions: divisions, diplomacyState: diplomacyState)
         let ratio = controlRatio(
             for: faction,
             inBasicRegionOf: breakthroughRegionId,
@@ -161,7 +171,7 @@ struct TheaterSystem {
         if ratio >= formalizationThreshold {
             next.theaters[advancingTheaterId]?.status = .active
             next.theaters[advancingTheaterId]?.controllingFaction = faction
-            refreshDerivedFields(state: &next, map: map, divisions: divisions)
+            refreshDerivedFields(state: &next, map: map, divisions: divisions, diplomacyState: diplomacyState)
             return TheaterExpansionResult(
                 state: next,
                 transition: .formalized(theaterId: advancingTheaterId, faction: faction, ratio: ratio),
@@ -181,7 +191,8 @@ struct TheaterSystem {
         state: TheaterState,
         map: MapState,
         divisions: [Division],
-        faction: Faction
+        faction: Faction,
+        diplomacyState: DiplomacyState = .empty
     ) -> TheaterState {
         var next = state
         rebuildNeighborTheaters(state: &next, map: map)
@@ -196,8 +207,13 @@ struct TheaterSystem {
                 continue
             }
 
-            let allNeighborsFriendly = theater.neighborTheaterIds.allSatisfy {
-                next.theaters[$0]?.controllingFaction == faction && next.theaters[$0]?.status == .active
+            let allNeighborsFriendly = theater.neighborTheaterIds.allSatisfy { neighborTheaterId in
+                guard let neighbor = next.theaters[neighborTheaterId],
+                      let neighborFaction = neighbor.controllingFaction,
+                      neighbor.status == .active else {
+                    return false
+                }
+                return diplomacyState.isFriendly(faction, to: neighborFaction)
             }
 
             guard allNeighborsFriendly else {
@@ -207,7 +223,7 @@ struct TheaterSystem {
             retire(theaterId: theater.id, state: &next)
         }
 
-        refreshDerivedFields(state: &next, map: map, divisions: divisions)
+        refreshDerivedFields(state: &next, map: map, divisions: divisions, diplomacyState: diplomacyState)
         return next
     }
 
@@ -301,7 +317,12 @@ struct TheaterSystem {
         }
     }
 
-    private func refreshDerivedFields(state: inout TheaterState, map: MapState, divisions: [Division]) {
+    private func refreshDerivedFields(
+        state: inout TheaterState,
+        map: MapState,
+        divisions: [Division],
+        diplomacyState: DiplomacyState
+    ) {
         seedMissingHexAssignments(state: &state, map: map)
         rebuildDynamicRegionMembership(state: &state, map: map)
         rebuildNeighborTheaters(state: &state, map: map)
@@ -309,7 +330,7 @@ struct TheaterSystem {
 
         for theaterId in state.theaters.keys {
             guard var theater = state.theaters[theaterId] else { continue }
-            let metrics = calculateMetrics(for: theater, state: state, map: map)
+            let metrics = calculateMetrics(for: theater, state: state, map: map, diplomacyState: diplomacyState)
             theater.controlRatios = metrics.controlRatios
             theater.controllingFaction = metrics.controllingFaction
             theater.victoryPointArea = metrics.victoryPointArea
@@ -412,7 +433,8 @@ struct TheaterSystem {
     private func calculateMetrics(
         for theater: TheaterNode,
         state: TheaterState,
-        map: MapState
+        map: MapState,
+        diplomacyState: DiplomacyState
     ) -> (
         controlRatios: [Faction: Double],
         controllingFaction: Faction?,
@@ -449,10 +471,12 @@ struct TheaterSystem {
                 return hex.neighbors.contains { neighborHex in
                     guard map.tile(at: neighborHex) != nil,
                           let neighborTheaterId = state.dynamicTheaterId(for: neighborHex, map: map),
-                          neighborTheaterId != theater.id else {
+                          neighborTheaterId != theater.id,
+                          let ownFaction = theater.controllingFaction,
+                          let neighborFaction = state.theaters[neighborTheaterId]?.controllingFaction else {
                         return false
                     }
-                    return state.theaters[neighborTheaterId]?.controllingFaction != theater.controllingFaction
+                    return diplomacyState.isHostile(ownFaction, to: neighborFaction)
                 }
             }
         }

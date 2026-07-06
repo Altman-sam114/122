@@ -242,7 +242,8 @@ struct MapDisplayAdapter {
             deploymentRole: WarDeploymentManager().deploymentRole(
                 for: division,
                 in: state.map,
-                state: state.warDeploymentState
+                state: state.warDeploymentState,
+                diplomacyState: state.diplomacyState
             )
         )
     }

@@ -5,6 +5,7 @@ struct RootGameView: View {
     @State private var selectedCompactPanel: CompactInfoPanel = .unit
     @State private var isInfoExpanded = false
     @State private var isGeneralProfilePresented = false
+    @State private var isNewGameSetupPresented = false
 
     var body: some View {
         GeometryReader { proxy in
@@ -17,8 +18,12 @@ struct RootGameView: View {
                 VStack {
                     HUDView(
                         gameState: container.gameState,
+                        playerFaction: container.playerFaction,
+                        aiControlMode: container.aiControlMode,
+                        canAdvanceOrders: container.canAdvanceOrders,
+                        observerModeEnabled: container.observerModeEnabled,
                         onEndTurn: container.advanceOrRunAI,
-                        onNewGame: container.resetGame
+                        onNewGame: showNewGameSetup
                     )
                     .padding(8)
                     .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
@@ -30,7 +35,7 @@ struct RootGameView: View {
                         set: { container.setMapDisplayLayer($0) }
                     )) {
                         ForEach(MapDisplayLayer.allCases) { layer in
-                            Text(layer.displayName).tag(layer)
+                            Text(layer.displayName(for: container.gameState.activeFaction)).tag(layer)
                         }
                     }
                     .pickerStyle(.segmented)
@@ -79,6 +84,7 @@ struct RootGameView: View {
                     assignment: container.selectedGeneralAssignment,
                     zone: container.selectedGeneralCommandZone,
                     assignedDivisions: container.selectedGeneralAssignedDivisions,
+                    activeFaction: container.gameState.activeFaction,
                     hqUnderAttack: container.selectedGeneralHQUnderAttack,
                     onClose: { isGeneralProfilePresented = false }
                 )
@@ -88,6 +94,114 @@ struct RootGameView: View {
                     .padding()
             }
         }
+        .sheet(isPresented: $isNewGameSetupPresented) {
+            NewGameSetupView(
+                scenarios: ScenarioCatalog.all,
+                currentScenario: container.currentScenario,
+                currentPlayerFaction: container.playerFaction,
+                currentStartsAtPlayerFaction: container.startsNewGameAtPlayerFaction,
+                currentSaveSlot: container.selectedSaveSlot,
+                savedGameSummaries: container.savedGameSummaries,
+                savedGameRecoveryMessages: container.savedGameRecoveryMessages,
+                saveSlotLabels: container.saveSlotLabels,
+                sessionSettingsRecoveryMessage: container.sessionSettingsRecoveryMessage,
+                currentObserverMode: container.observerModeEnabled,
+                currentMapDisplayLayer: container.mapDisplayLayer,
+                currentReplayDetailLevel: container.replayDetailLevel,
+                currentAICommandPace: container.aiCommandPace,
+                currentAIControlMode: container.aiControlMode,
+                currentPlaytestGuideCuesEnabled: container.playtestGuideCuesEnabled,
+                currentPlaytestTextSize: container.playtestTextSize,
+                currentReduceMotionEnabled: container.reduceMotionEnabled,
+                factionOptions: container.availablePlayerFactions(for:),
+                onStart: startNewGame,
+                onSaveCurrent: saveCurrentGame,
+                onContinueSaved: continueSavedGame,
+                onClearSaved: clearSavedGame,
+                onRenameSaveSlot: renameSaveSlot,
+                onSettingsChange: applySessionSettings,
+                onCancel: hideNewGameSetup
+            )
+        }
+    }
+
+    private func showNewGameSetup() {
+        isNewGameSetupPresented = true
+    }
+
+    private func hideNewGameSetup() {
+        isNewGameSetupPresented = false
+    }
+
+    private func startNewGame(
+        scenario: ScenarioCatalogEntry,
+        playerFaction: Faction,
+        startsAtPlayerFaction: Bool
+    ) -> (succeeded: Bool, message: String) {
+        let succeeded = container.startNewGame(
+            scenario: scenario,
+            playerFaction: playerFaction,
+            startsAtPlayerFaction: startsAtPlayerFaction
+        )
+        if succeeded {
+            hideNewGameSetup()
+        }
+        return operationResult(succeeded: succeeded, fallbackMessage: "New campaign could not be loaded.")
+    }
+
+    private func saveCurrentGame(slot: GameSaveSlot) -> (succeeded: Bool, message: String) {
+        let succeeded = container.saveCurrentGame(to: slot)
+        return operationResult(succeeded: succeeded, fallbackMessage: "Save failed.")
+    }
+
+    private func continueSavedGame(slot: GameSaveSlot) -> (succeeded: Bool, message: String) {
+        let succeeded = container.continueSavedGame(from: slot)
+        if succeeded {
+            hideNewGameSetup()
+        }
+        return operationResult(succeeded: succeeded, fallbackMessage: "Continue failed.")
+    }
+
+    private func clearSavedGame(slot: GameSaveSlot) -> (succeeded: Bool, message: String) {
+        container.clearSavedGame(slot: slot)
+        return operationResult(succeeded: true, fallbackMessage: "\(slot.displayName(using: container.saveSlotLabels)) campaign snapshot cleared.")
+    }
+
+    private func renameSaveSlot(
+        slot: GameSaveSlot,
+        label: String
+    ) -> (succeeded: Bool, message: String) {
+        container.setSaveSlotLabel(label, for: slot)
+        return operationResult(succeeded: true, fallbackMessage: "Save slot name updated.")
+    }
+
+    private func operationResult(
+        succeeded: Bool,
+        fallbackMessage: String
+    ) -> (succeeded: Bool, message: String) {
+        (succeeded: succeeded, message: container.lastCommandMessage ?? fallbackMessage)
+    }
+
+    private func applySessionSettings(
+        observerModeEnabled: Bool,
+        mapDisplayLayer: MapDisplayLayer,
+        replayDetailLevel: ReplayDetailLevel,
+        aiCommandPace: AICommandPace,
+        aiControlMode: PlaytestAIControlMode,
+        playtestGuideCuesEnabled: Bool,
+        playtestTextSize: PlaytestTextSize,
+        reduceMotionEnabled: Bool
+    ) {
+        container.applySessionSettings(
+            observerModeEnabled: observerModeEnabled,
+            mapDisplayLayer: mapDisplayLayer,
+            replayDetailLevel: replayDetailLevel,
+            aiCommandPace: aiCommandPace,
+            aiControlMode: aiControlMode,
+            playtestGuideCuesEnabled: playtestGuideCuesEnabled,
+            playtestTextSize: playtestTextSize,
+            reduceMotionEnabled: reduceMotionEnabled
+        )
     }
 
     private var boardView: some View {
@@ -95,7 +209,7 @@ struct RootGameView: View {
             renderState: BoardSceneAdapter.renderState(from: container),
             onHexTapped: container.handleBoardTap
         )
-        .accessibilityLabel("Ardennes V0 hex board")
+        .accessibilityLabel("\(ScenarioCatalog.displayName(for: container.gameState.scenarioId)) hex board")
     }
 
     private func infoOverlay(isLandscape: Bool, size: CGSize) -> some View {
@@ -123,7 +237,7 @@ struct RootGameView: View {
         VStack(spacing: 0) {
             Picker("Panel", selection: $selectedCompactPanel) {
                 ForEach(CompactInfoPanel.allCases) { panel in
-                    Text(panel.rawValue).tag(panel)
+                    Text(panel.displayName(for: container.gameState.activeFaction)).tag(panel)
                 }
             }
             .pickerStyle(.segmented)
@@ -141,17 +255,24 @@ struct RootGameView: View {
                 case .unit:
                     UnitInspectorView(
                         division: container.selectedDivision,
+                        activeFaction: container.gameState.activeFaction,
                         playerFaction: container.playerFaction,
                         strategicState: container.selectedUnitInspectorStrategicState
                     )
-                    RegionInspectorView(inspectorState: container.selectedRegionInspectorState)
+                    RegionInspectorView(
+                        inspectorState: container.selectedRegionInspectorState,
+                        activeFaction: container.gameState.activeFaction
+                    )
                     CommandPanelView(
                         selectedDivision: container.selectedDivision,
                         activeFaction: container.gameState.activeFaction,
                         phase: container.gameState.phase,
                         playerFaction: container.playerFaction,
+                        aiControlMode: container.aiControlMode,
+                        canAdvanceOrders: container.canAdvanceOrders,
                         observerModeEnabled: container.observerModeEnabled,
                         lastCommandMessage: container.lastCommandMessage,
+                        playerOrdersStatusMessage: container.playerOrdersStatusMessage,
                         onHold: container.holdSelected,
                         onAllowRetreat: container.allowRetreatSelected,
                         onResupply: container.resupplySelected,
@@ -159,6 +280,7 @@ struct RootGameView: View {
                     )
                     GeneralCommandPanelView(
                         zone: container.selectedGeneralCommandZone,
+                        activeFaction: container.gameState.activeFaction,
                         general: container.selectedGeneral,
                         assignment: container.selectedGeneralAssignment,
                         assignedDivisions: container.selectedGeneralAssignedDivisions,
@@ -173,10 +295,14 @@ struct RootGameView: View {
                         onAttackRegion: container.orderSelectedGeneralAttackRegion
                     )
                 case .region:
-                    RegionInspectorView(inspectorState: container.selectedRegionInspectorState)
+                    RegionInspectorView(
+                        inspectorState: container.selectedRegionInspectorState,
+                        activeFaction: container.gameState.activeFaction
+                    )
                 case .general:
                     GeneralCommandPanelView(
                         zone: container.selectedGeneralCommandZone,
+                        activeFaction: container.gameState.activeFaction,
                         general: container.selectedGeneral,
                         assignment: container.selectedGeneralAssignment,
                         assignedDivisions: container.selectedGeneralAssignedDivisions,
@@ -191,7 +317,12 @@ struct RootGameView: View {
                         onAttackRegion: container.orderSelectedGeneralAttackRegion
                     )
                 case .log:
-                    EventLogView(entries: container.displayEventLog)
+                    EventLogView(
+                        entries: container.displayEventLog,
+                        activeFaction: container.gameState.activeFaction,
+                        replayDetailLevel: container.replayDetailLevel,
+                        playtestTextSize: container.playtestTextSize
+                    )
                 case .economy:
                     EconomyPanelView(
                         gameState: container.gameState,
@@ -208,7 +339,10 @@ struct RootGameView: View {
                     AgentPanelView(
                         record: container.lastAgentDecisionRecord,
                         rulerRecord: container.gameState.diplomacyState.latestRulerRecord,
-                        directiveRecords: container.lastWarDirectiveRecords
+                        activeFaction: container.gameState.activeFaction,
+                        directiveRecords: container.lastWarDirectiveRecords,
+                        replayDetailLevel: container.replayDetailLevel,
+                        playtestTextSize: container.playtestTextSize
                     )
                 }
             }
@@ -229,5 +363,28 @@ private enum CompactInfoPanel: String, CaseIterable, Identifiable {
 
     var id: String {
         rawValue
+    }
+
+    func displayName(for faction: Faction) -> String {
+        guard faction.usesNapoleonicLogisticsVocabulary else {
+            return rawValue
+        }
+
+        switch self {
+        case .unit:
+            return "Formation"
+        case .region:
+            return "Sector"
+        case .general:
+            return "General"
+        case .log:
+            return "Dispatches"
+        case .economy:
+            return "Logistics"
+        case .diplomacy:
+            return "Coalition"
+        case .agent:
+            return "Staff"
+        }
     }
 }

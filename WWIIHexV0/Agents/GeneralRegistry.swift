@@ -198,12 +198,16 @@ struct GeneralDispatcher {
         return next
     }
 
-    func isHQUnderAttack(zone: FrontZone, map: MapState) -> Bool {
+    func isHQUnderAttack(
+        zone: FrontZone,
+        map: MapState,
+        diplomacyState: DiplomacyState = .empty
+    ) -> Bool {
         guard let hqRegionId = zone.generalAssignment?.hqRegionId,
               let region = map.region(id: hqRegionId) else {
             return false
         }
-        return region.controller != zone.faction
+        return diplomacyState.isHostile(zone.faction, to: region.controller)
     }
 
     private func seededGeneral(

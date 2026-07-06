@@ -8,21 +8,25 @@ struct RuleEngine {
         let preparedState = EconomyRules().bootstrapIfNeeded(state)
         let validation = validator.validate(command, in: preparedState)
         guard validation.isValid else {
-            let errorMessage = validation.errors.map(\.rawValue).joined(separator: ", ")
+            let errorMessage = validation.errors
+                .map { $0.displayName(for: preparedState.activeFaction) }
+                .joined(separator: ", ")
+            let prefix = preparedState.activeFaction.usesNapoleonicLogisticsVocabulary ? "Order rejected" : "Command rejected"
             return CommandResult(
                 command: command,
                 validation: validation,
                 state: preparedState,
-                message: "Command rejected: \(errorMessage)."
+                message: "\(prefix): \(errorMessage)."
             )
         }
 
         let nextState = executor.execute(command, in: preparedState)
+        let prefix = preparedState.activeFaction.usesNapoleonicLogisticsVocabulary ? "Order executed" : "Command executed"
         return CommandResult(
             command: command,
             validation: validation,
             state: nextState,
-            message: "Command executed: \(command.displayName)."
+            message: "\(prefix): \(command.displayName(for: preparedState.activeFaction))."
         )
     }
 

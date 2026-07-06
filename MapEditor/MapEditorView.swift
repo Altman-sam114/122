@@ -194,10 +194,10 @@ struct MapEditorView: View {
 
     private var dataPanel: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("游戏资源")
+            Text("Legacy 阿登资源")
                 .font(.headline)
-            Button("读取默认游戏资源", action: viewModel.loadDefaultGameResources)
-            Button("覆盖保存为游戏资源", action: viewModel.overwriteDefaultGameResources)
+            Button("读取 Legacy 阿登资源", action: viewModel.loadLegacyArdennesGameResources)
+            Button("覆盖 Legacy 阿登资源", action: viewModel.overwriteLegacyArdennesGameResources)
                 .buttonStyle(.borderedProminent)
             Button("导出 JSON 到内存") {
                 _ = viewModel.export()
@@ -451,6 +451,20 @@ private extension Faction {
             return "德军"
         case .allies:
             return "盟军"
+        case .france:
+            return "法军"
+        case .angloAllied:
+            return "英荷联军"
+        case .prussia:
+            return "普军"
+        case .austria:
+            return "奥军"
+        case .russia:
+            return "俄军"
+        case .spain:
+            return "西班牙"
+        case .neutral:
+            return "中立"
         }
     }
 }

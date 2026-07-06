@@ -85,12 +85,14 @@ struct WarDeploymentState: Codable, Equatable {
         from theaterState: TheaterState,
         map: MapState,
         divisions: [Division],
+        diplomacyState: DiplomacyState = .empty,
         turn: Int? = nil
     ) -> WarDeploymentState {
         WarDeploymentManager().makeInitialState(
             map: map,
             theaterState: theaterState,
             divisions: divisions,
+            diplomacyState: diplomacyState,
             turn: turn
         )
     }

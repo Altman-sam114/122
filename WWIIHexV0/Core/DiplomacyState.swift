@@ -283,6 +283,116 @@ struct DiplomacyState: Codable, Equatable {
             )
         }
 
+        if factions.contains(.france) {
+            countries.append(
+                CountryProfile(
+                    id: "france",
+                    name: "France",
+                    faction: .france,
+                    blocId: "french_empire",
+                    rulerAgentId: "ruler_napoleon",
+                    isPrimaryBelligerent: true,
+                    warSupport: 84
+                )
+            )
+            blocs.append(DiplomaticBloc(id: "french_empire", name: "French Empire", faction: .france, memberCountryIds: ["france"]))
+        }
+
+        if factions.contains(.angloAllied) {
+            countries.append(
+                CountryProfile(
+                    id: "anglo_allied_army",
+                    name: "Anglo-Allied Army",
+                    faction: .angloAllied,
+                    blocId: "seventh_coalition",
+                    rulerAgentId: "ruler_wellington",
+                    isPrimaryBelligerent: true,
+                    warSupport: 76
+                )
+            )
+        }
+
+        if factions.contains(.prussia) {
+            countries.append(
+                CountryProfile(
+                    id: "prussia",
+                    name: "Prussia",
+                    faction: .prussia,
+                    blocId: "seventh_coalition",
+                    rulerAgentId: "ruler_prussia",
+                    isPrimaryBelligerent: true,
+                    warSupport: 79
+                )
+            )
+        }
+
+        if factions.contains(.austria) {
+            countries.append(
+                CountryProfile(
+                    id: "austria",
+                    name: "Austria",
+                    faction: .austria,
+                    blocId: "seventh_coalition",
+                    rulerAgentId: "ruler_austria",
+                    warSupport: 72
+                )
+            )
+        }
+
+        if factions.contains(.russia) {
+            countries.append(
+                CountryProfile(
+                    id: "russia",
+                    name: "Russia",
+                    faction: .russia,
+                    blocId: "seventh_coalition",
+                    rulerAgentId: "ruler_russia",
+                    warSupport: 73
+                )
+            )
+        }
+
+        if factions.contains(.spain) {
+            countries.append(
+                CountryProfile(
+                    id: "spain",
+                    name: "Spain",
+                    faction: .spain,
+                    blocId: "seventh_coalition",
+                    rulerAgentId: "ruler_spain",
+                    warSupport: 64
+                )
+            )
+        }
+
+        let coalitionMembers = countries
+            .filter { $0.faction.isNapoleonicCoalitionMember }
+            .map(\.id)
+        if !coalitionMembers.isEmpty {
+            blocs.append(
+                DiplomaticBloc(
+                    id: "seventh_coalition",
+                    name: "Seventh Coalition",
+                    faction: coalitionMembers.contains("anglo_allied_army") ? .angloAllied : (countries.first { $0.faction.isNapoleonicCoalitionMember }?.faction ?? .angloAllied),
+                    memberCountryIds: coalitionMembers
+                )
+            )
+        }
+
+        if factions.contains(.neutral) {
+            countries.append(
+                CountryProfile(
+                    id: "neutral",
+                    name: "Neutral Powers",
+                    faction: .neutral,
+                    blocId: "neutral_powers",
+                    rulerAgentId: "ruler_neutral",
+                    warSupport: 50
+                )
+            )
+            blocs.append(DiplomaticBloc(id: "neutral_powers", name: "Neutral Powers", faction: .neutral, memberCountryIds: ["neutral"]))
+        }
+
         return DiplomacyState(
             countries: countries,
             blocs: blocs,
@@ -293,7 +403,7 @@ struct DiplomacyState: Codable, Equatable {
 
     static func initial(from factionStrings: [String], turn: Int) -> DiplomacyState {
         let factions = factionStrings.compactMap(Faction.init(rawValue:))
-        return initial(for: factions.isEmpty ? Faction.allCases : factions, turn: turn)
+        return initial(for: factions.isEmpty ? Faction.legacyWorldWarIIFactions : factions, turn: turn)
     }
 
     var latestRulerRecord: RulerDecisionRecord? {
@@ -311,6 +421,65 @@ struct DiplomacyState: Codable, Equatable {
     func relation(between lhs: CountryId, and rhs: CountryId) -> DiplomaticRelation? {
         let key = DiplomaticRelation(firstCountryId: lhs, secondCountryId: rhs, status: .neutral).id
         return relations.first { $0.id == key }
+    }
+
+    func isHostile(_ lhs: Faction, to rhs: Faction) -> Bool {
+        guard lhs != rhs else {
+            return false
+        }
+        guard !lhs.isNeutral, !rhs.isNeutral else {
+            return false
+        }
+
+        let lhsCountries = countries(for: lhs)
+        let rhsCountries = countries(for: rhs)
+        guard !lhsCountries.isEmpty, !rhsCountries.isEmpty else {
+            return lhs != rhs
+        }
+
+        var sawRelation = false
+        for lhsCountry in lhsCountries {
+            for rhsCountry in rhsCountries {
+                guard let status = relation(between: lhsCountry.id, and: rhsCountry.id)?.status else {
+                    continue
+                }
+                sawRelation = true
+                if status.isHostile {
+                    return true
+                }
+            }
+        }
+        return sawRelation ? false : lhs != rhs
+    }
+
+    func isFriendly(_ lhs: Faction, to rhs: Faction) -> Bool {
+        if lhs == rhs {
+            return true
+        }
+
+        let lhsCountries = countries(for: lhs)
+        let rhsCountries = countries(for: rhs)
+        guard !lhsCountries.isEmpty, !rhsCountries.isEmpty else {
+            return false
+        }
+
+        for lhsCountry in lhsCountries {
+            for rhsCountry in rhsCountries {
+                guard let status = relation(between: lhsCountry.id, and: rhsCountry.id)?.status else {
+                    continue
+                }
+                if status == .allied || status == .coBelligerent {
+                    return true
+                }
+            }
+        }
+        return false
+    }
+
+    func hostileFactions(to faction: Faction, among candidates: [Faction] = Faction.allCases) -> [Faction] {
+        candidates
+            .filter { $0 != faction && isHostile(faction, to: $0) }
+            .sorted { $0.rawValue < $1.rawValue }
     }
 
     func hostileCountryIds(to faction: Faction) -> [CountryId] {
@@ -352,7 +521,7 @@ struct DiplomacyState: Codable, Equatable {
             for rhsIndex in countries.indices where rhsIndex > lhsIndex {
                 let lhs = countries[lhsIndex]
                 let rhs = countries[rhsIndex]
-                let status: DiplomaticStatus = lhs.faction == rhs.faction ? .allied : .atWar
+                let status = defaultInitialStatus(between: lhs.faction, and: rhs.faction)
                 relations.append(
                     DiplomaticRelation(
                         firstCountryId: lhs.id,
@@ -365,5 +534,18 @@ struct DiplomacyState: Codable, Equatable {
             }
         }
         return relations
+    }
+
+    private static func defaultInitialStatus(between lhs: Faction, and rhs: Faction) -> DiplomaticStatus {
+        if lhs == rhs {
+            return .allied
+        }
+        if lhs.isNeutral || rhs.isNeutral {
+            return .neutral
+        }
+        if lhs.isNapoleonicCoalitionMember && rhs.isNapoleonicCoalitionMember {
+            return .coBelligerent
+        }
+        return .atWar
     }
 }

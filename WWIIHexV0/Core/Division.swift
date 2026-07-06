@@ -5,6 +5,12 @@ enum ComponentType: String, Codable, Equatable, CaseIterable {
     case motorizedInfantry
     case infantry
     case artillery
+    case lineInfantry
+    case lightInfantry
+    case cavalry
+    case guardInfantry = "guard"
+    case engineer
+    case supplyTrain
 
     var baseStats: EffectiveStats {
         switch self {
@@ -16,6 +22,44 @@ enum ComponentType: String, Codable, Equatable, CaseIterable {
             return EffectiveStats(attack: 4, defense: 5, movement: 3, range: 1, vision: 2)
         case .artillery:
             return EffectiveStats(attack: 7, defense: 2, movement: 2, range: 2, vision: 2)
+        case .lineInfantry:
+            return EffectiveStats(attack: 4, defense: 5, movement: 3, range: 1, vision: 2)
+        case .lightInfantry:
+            return EffectiveStats(attack: 3, defense: 4, movement: 4, range: 1, vision: 3)
+        case .cavalry:
+            return EffectiveStats(attack: 6, defense: 3, movement: 5, range: 1, vision: 3)
+        case .guardInfantry:
+            return EffectiveStats(attack: 5, defense: 6, movement: 3, range: 1, vision: 2)
+        case .engineer:
+            return EffectiveStats(attack: 3, defense: 4, movement: 3, range: 1, vision: 2)
+        case .supplyTrain:
+            return EffectiveStats(attack: 1, defense: 2, movement: 3, range: 1, vision: 2)
+        }
+    }
+
+    var isInfantryLike: Bool {
+        switch self {
+        case .infantry, .lineInfantry, .lightInfantry, .guardInfantry, .engineer:
+            return true
+        case .tank, .motorizedInfantry, .artillery, .cavalry, .supplyTrain:
+            return false
+        }
+    }
+
+    var isArtilleryLike: Bool {
+        self == .artillery
+    }
+
+    var isCavalryLike: Bool {
+        self == .cavalry
+    }
+
+    var isMobileLike: Bool {
+        switch self {
+        case .tank, .motorizedInfantry, .lightInfantry, .cavalry:
+            return true
+        case .infantry, .artillery, .lineInfantry, .guardInfantry, .engineer, .supplyTrain:
+            return false
         }
     }
 }
@@ -66,6 +110,21 @@ struct Division: Identifiable, Codable, Equatable {
             retreatTurnsRemaining = max(0, retreatTurnsRemaining)
         }
     }
+    var fatigue: Int {
+        didSet {
+            fatigue = Self.clamp(fatigue, min: 0, max: Self.maximumFatigue)
+        }
+    }
+    var ammunition: Int {
+        didSet {
+            ammunition = Self.clamp(ammunition, min: 0, max: maxAmmunition)
+        }
+    }
+    var morale: Int {
+        didSet {
+            morale = Self.clamp(morale, min: 0, max: Self.maximumMorale)
+        }
+    }
 
     private enum CodingKeys: String, CodingKey {
         case id
@@ -84,6 +143,9 @@ struct Division: Identifiable, Codable, Equatable {
         case isRetreating
         case retreatTarget
         case retreatTurnsRemaining
+        case fatigue
+        case ammunition
+        case morale
     }
 
     init(
@@ -102,7 +164,10 @@ struct Division: Identifiable, Codable, Equatable {
         retreatMode: RetreatMode = .retreatable,
         isRetreating: Bool = false,
         retreatTarget: HexCoord? = nil,
-        retreatTurnsRemaining: Int = 0
+        retreatTurnsRemaining: Int = 0,
+        fatigue: Int = 0,
+        ammunition: Int? = nil,
+        morale: Int? = nil
     ) {
         self.id = id
         self.name = name
@@ -120,6 +185,17 @@ struct Division: Identifiable, Codable, Equatable {
         self.isRetreating = isRetreating
         self.retreatTarget = retreatTarget
         self.retreatTurnsRemaining = max(0, retreatTurnsRemaining)
+        self.fatigue = Self.clamp(fatigue, min: 0, max: Self.maximumFatigue)
+        self.ammunition = Self.clamp(
+            ammunition ?? Self.defaultAmmunition(for: components),
+            min: 0,
+            max: Self.maximumAmmunition(for: components)
+        )
+        self.morale = Self.clamp(
+            morale ?? Self.defaultMorale(for: components),
+            min: 0,
+            max: Self.maximumMorale
+        )
     }
 
     var hp: Int {
@@ -216,7 +292,10 @@ struct Division: Identifiable, Codable, Equatable {
             retreatMode: try container.decodeIfPresent(RetreatMode.self, forKey: .retreatMode) ?? .retreatable,
             isRetreating: try container.decodeIfPresent(Bool.self, forKey: .isRetreating) ?? false,
             retreatTarget: try container.decodeIfPresent(HexCoord.self, forKey: .retreatTarget),
-            retreatTurnsRemaining: try container.decodeIfPresent(Int.self, forKey: .retreatTurnsRemaining) ?? 0
+            retreatTurnsRemaining: try container.decodeIfPresent(Int.self, forKey: .retreatTurnsRemaining) ?? 0,
+            fatigue: try container.decodeIfPresent(Int.self, forKey: .fatigue) ?? 0,
+            ammunition: try container.decodeIfPresent(Int.self, forKey: .ammunition),
+            morale: try container.decodeIfPresent(Int.self, forKey: .morale)
         )
     }
 
@@ -238,6 +317,9 @@ struct Division: Identifiable, Codable, Equatable {
         try container.encode(isRetreating, forKey: .isRetreating)
         try container.encodeIfPresent(retreatTarget, forKey: .retreatTarget)
         try container.encode(retreatTurnsRemaining, forKey: .retreatTurnsRemaining)
+        try container.encode(fatigue, forKey: .fatigue)
+        try container.encode(ammunition, forKey: .ammunition)
+        try container.encode(morale, forKey: .morale)
     }
 
     var componentWeightTotal: Double {
@@ -260,12 +342,13 @@ struct Division: Identifiable, Codable, Equatable {
 
     var effectiveStats: EffectiveStats {
         let stats = baseStats
+        let suppliedStats: EffectiveStats
 
         switch supplyState {
         case .supplied:
-            return stats
+            suppliedStats = stats
         case .lowSupply:
-            return EffectiveStats(
+            suppliedStats = EffectiveStats(
                 attack: max(1, Int(Double(stats.attack) * 0.75)),
                 defense: max(1, stats.defense - 1),
                 movement: max(1, stats.movement - 1),
@@ -273,7 +356,7 @@ struct Division: Identifiable, Codable, Equatable {
                 vision: stats.vision
             )
         case .encircled:
-            return EffectiveStats(
+            suppliedStats = EffectiveStats(
                 attack: max(1, Int(Double(stats.attack) * 0.5)),
                 defense: max(1, stats.defense - 2),
                 movement: max(1, stats.movement - 2),
@@ -281,6 +364,14 @@ struct Division: Identifiable, Codable, Equatable {
                 vision: stats.vision
             )
         }
+
+        return EffectiveStats(
+            attack: max(1, suppliedStats.attack - fatigueAttackPenalty - moraleAttackPenalty),
+            defense: max(1, suppliedStats.defense - fatigueDefensePenalty - moraleDefensePenalty),
+            movement: max(1, suppliedStats.movement - fatigueMovementPenalty),
+            range: suppliedStats.range,
+            vision: suppliedStats.vision
+        )
     }
 
     var attack: Int {
@@ -307,8 +398,114 @@ struct Division: Identifiable, Codable, Equatable {
         components.contains { $0.type == .tank && $0.weight >= 0.25 }
     }
 
+    var isCavalry: Bool {
+        components.contains { $0.type.isCavalryLike && $0.weight >= 0.25 }
+    }
+
     var isArtillery: Bool {
-        components.contains { $0.type == .artillery && $0.weight >= 0.50 }
+        components.contains { $0.type.isArtilleryLike && $0.weight >= 0.50 }
+    }
+
+    var isMobileFormation: Bool {
+        isArmor
+            || isCavalry
+            || movement >= 5
+            || components.contains { $0.type.isMobileLike && $0.weight >= 0.25 }
+    }
+
+    static let maximumFatigue = 100
+    static let maximumMorale = 100
+    static let shakenMoraleThreshold = 40
+    static let brokenMoraleThreshold = 25
+
+    var maxAmmunition: Int {
+        Self.maximumAmmunition(for: components)
+    }
+
+    var isAmmunitionSensitive: Bool {
+        isArtillery || range > 1
+    }
+
+    var isLowAmmunition: Bool {
+        ammunition <= max(1, maxAmmunition / 3)
+    }
+
+    var isLowMorale: Bool {
+        morale <= Self.shakenMoraleThreshold
+    }
+
+    mutating func addFatigue(_ amount: Int) {
+        guard amount > 0 else {
+            return
+        }
+        fatigue = Self.clamp(fatigue + amount, min: 0, max: Self.maximumFatigue)
+    }
+
+    mutating func recoverFatigue(_ amount: Int) {
+        guard amount > 0 else {
+            return
+        }
+        fatigue = Self.clamp(fatigue - amount, min: 0, max: Self.maximumFatigue)
+    }
+
+    mutating func consumeAmmunition(_ amount: Int) {
+        guard amount > 0 else {
+            return
+        }
+        ammunition = Self.clamp(ammunition - amount, min: 0, max: maxAmmunition)
+    }
+
+    mutating func recoverAmmunition(_ amount: Int) {
+        guard amount > 0 else {
+            return
+        }
+        ammunition = Self.clamp(ammunition + amount, min: 0, max: maxAmmunition)
+    }
+
+    mutating func loseMorale(_ amount: Int) {
+        guard amount > 0 else {
+            return
+        }
+        morale = Self.clamp(morale - amount, min: 0, max: Self.maximumMorale)
+    }
+
+    mutating func recoverMorale(_ amount: Int) {
+        guard amount > 0 else {
+            return
+        }
+        morale = Self.clamp(morale + amount, min: 0, max: Self.maximumMorale)
+    }
+
+    private var fatigueAttackPenalty: Int {
+        if fatigue >= 70 {
+            return 2
+        }
+        if fatigue >= 40 {
+            return 1
+        }
+        return 0
+    }
+
+    private var fatigueDefensePenalty: Int {
+        fatigue >= 70 ? 1 : 0
+    }
+
+    private var fatigueMovementPenalty: Int {
+        fatigue >= 60 ? 1 : 0
+    }
+
+    private var moraleAttackPenalty: Int {
+        if morale <= Self.brokenMoraleThreshold {
+            return 2
+        }
+        if morale <= Self.shakenMoraleThreshold {
+            return 1
+        }
+        return 0
+    }
+
+    private var moraleDefensePenalty: Int {
+        morale <= Self.brokenMoraleThreshold ? 2 : (morale <= Self.shakenMoraleThreshold ? 1 : 0)
     }
 
     private func weightedStat(_ keyPath: KeyPath<EffectiveStats, Int>) -> Int {
@@ -326,6 +523,24 @@ struct Division: Identifiable, Codable, Equatable {
 
     private static func clamp(_ value: Int, min minimum: Int, max maximum: Int) -> Int {
         Swift.max(minimum, Swift.min(value, maximum))
+    }
+
+    private static func defaultAmmunition(for components: [DivisionComponent]) -> Int {
+        maximumAmmunition(for: components)
+    }
+
+    private static func maximumAmmunition(for components: [DivisionComponent]) -> Int {
+        let artilleryWeight = components
+            .filter { $0.type.isArtilleryLike }
+            .reduce(0.0) { $0 + $1.weight }
+        return artilleryWeight >= 0.25 ? 6 : 3
+    }
+
+    private static func defaultMorale(for components: [DivisionComponent]) -> Int {
+        let guardWeight = components
+            .filter { $0.type == .guardInfantry }
+            .reduce(0.0) { $0 + $1.weight }
+        return guardWeight >= 0.25 ? 90 : 80
     }
 }
 

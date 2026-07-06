@@ -67,7 +67,8 @@ private extension RegionOccupationRules {
         var weights: [Faction: Int] = [:]
 
         for hex in region.displayHexes {
-            guard let controller = map.tile(at: hex)?.controller else { continue }
+            guard let controller = map.tile(at: hex)?.controller,
+                  !controller.isNeutral else { continue }
             weights[controller, default: 0] += hexWeight(hex, in: region, map: map)
         }
 

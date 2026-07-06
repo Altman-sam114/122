@@ -1,8 +1,11 @@
 flowchart TD
     ME["MapEditor<br/>编辑 hex / region / theater / unit"]:::editor
     JSON["ScenarioDefinition.json<br/>RegionDataSet.json"]:::data
-    DL["DataLoader.loadInitialGameState<br/>loadGameState"]:::loader
+    SCAT["ScenarioCatalog<br/>defaultPlayable = Waterloo 1815<br/>Ardennes legacy 可选"]:::loader
+    DL["DataLoader.loadGameState(ScenarioCatalogEntry)<br/>主 app 默认 Waterloo；legacy probe 仍可用 loadInitialGameState"]:::loader
     GS["GameState<br/>运行时总状态"]:::state
+    TERR["TerrainRuleSet<br/>GameState.terrainRules<br/>Waterloo 读取 napoleonic_terrain_rules<br/>旧存档 fallback legacy"]:::rules
+    VCOND["ScenarioVictoryCondition<br/>GameState.victoryConditions<br/>Waterloo 从 scenario JSON 注入<br/>旧存档 fallback 内置条件"]:::rules
 
     HEX["Hex 战术层<br/>HexTile.controller<br/>Division.coord"]:::authority
     REGION["Region 省份层<br/>controller 由 hex 聚合<br/>资源 / 补给 / VP"]:::derived
@@ -11,31 +14,42 @@ flowchart TD
     H2T["hexToTheater<br/>运行时动态战区权威"]:::authority
     FRONT["FrontLine / FrontSegment<br/>按动态 theater 的真实 hex 邻接生成"]:::derived
     DEPLOY["WarDeploymentState<br/>hexToFrontZone 权威<br/>FRONT / DEPTH / GARRISON"]:::derived
+    ECO["EconomyState / ReinforcementState<br/>faction 级账本、预备队和 delayed reinforcement"]:::rules
+    DIP["DiplomacyState<br/>hostile / friendly 敌我查询"]:::rules
 
     PLAYER["玩家操作<br/>tap / move / attack / endTurn"]:::input
-    AI["AI / 将领<br/>TheaterCommanderPool<br/>ZoneCommanderAgent"]:::input
+    AI["AI / 将领<br/>RulerAgent -> MarshalAgent<br/>TheaterCommanderPool / ZoneCommanderAgent"]:::input
     ZD["ZoneDirective<br/>attack / defend<br/>category / tactic / target"]:::command
     WCE["WarCommandExecutor<br/>directive -> Command"]:::command
     CMD["Command<br/>move / attack / hold / resupply / endTurn"]:::command
     RE["RuleEngine<br/>CommandValidator -> CommandExecutor"]:::rules
     SYNC["StrategicStateSynchronizer<br/>Region -> Theater -> Front -> Deploy"]:::rules
+    VICTORY["VictoryRules<br/>legacy Ardennes / Waterloo runtime conditions"]:::rules
 
     UI["UI / SpriteKit Overlay<br/>hex / province / initial / dynamic / front / deploy"]:::ui
     LOG["EventLog<br/>WarDirectiveRecord<br/>AgentDecisionRecord"]:::ui
 
-    ME --> JSON --> DL --> GS
+    ME --> JSON --> SCAT --> DL --> GS
+    DL --> TERR --> GS
+    DL --> VCOND --> GS
     GS --> HEX
     HEX --> REGION
+    HEX --> ECO
     REGION --> INIT
+    REGION --> ECO
     INIT --> R2T
     R2T -.-> H2T
     HEX --> H2T
     H2T --> FRONT --> DEPLOY
+    GS --> DIP
 
     PLAYER --> CMD
     AI --> ZD --> WCE --> CMD
     CMD --> RE --> HEX
+    TERR --> RE
     RE --> SYNC
+    RE --> VICTORY
+    VCOND --> VICTORY
     SYNC --> REGION
     SYNC --> H2T
     SYNC --> FRONT
@@ -48,7 +62,10 @@ flowchart TD
     H2T --> UI
     FRONT --> UI
     DEPLOY --> UI
+    ECO --> UI
+    DIP --> UI
     RE --> LOG
+    VICTORY --> LOG
     WCE --> LOG
 
     classDef editor fill:#f6d365,stroke:#8a5a00,color:#1f1b10
