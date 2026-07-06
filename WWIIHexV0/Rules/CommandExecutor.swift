@@ -182,7 +182,7 @@ struct CommandExecutor {
         if let currentIndex = turnOrder.firstIndex(of: state.activeFaction), !turnOrder.isEmpty {
             let nextIndex = (currentIndex + 1) % turnOrder.count
             state.activeFaction = turnOrder[nextIndex]
-            state.phase = GamePhase.legacyCompatibleCommandPhase(for: state.activeFaction)
+            state.phase = GamePhase.commandPhase(for: state.activeFaction)
             if nextIndex == 0 {
                 state.turn += 1
             }
@@ -445,10 +445,48 @@ struct CommandExecutor {
 
     private func theaterAdvanceMessage(hex: HexCoord, theaterId: TheaterId, in state: GameState) -> String {
         if state.activeFaction.usesNapoleonicLogisticsVocabulary {
-            return "Hex \(hex.q),\(hex.r) reassigned to active wing \(theaterId.rawValue)."
+            let wingName = state.theaterState.theaters[theaterId]?.name ?? identifierDisplayText(
+                theaterId.rawValue,
+                fallback: "active wing",
+                suffix: " wing"
+            )
+            return "Hex \(hex.q),\(hex.r) reassigned to active wing \(wingName)."
         }
 
         return "Hex \(hex.q),\(hex.r) reassigned to dynamic theater \(theaterId.rawValue)."
+    }
+
+    private func identifierDisplayText(
+        _ rawValue: String,
+        fallback: String,
+        suffix: String? = nil
+    ) -> String {
+        let stopWords: Set<String> = [
+            "region", "front", "frontzone", "zone", "theater", "sector",
+            "legacy", "mock", "ai", "commander", "marshal", "directive",
+            "power", "faction", "global", "ruler"
+        ]
+        let words = rawValue
+            .replacingOccurrences(of: "-", with: "_")
+            .split(separator: "_")
+            .map { String($0) }
+            .filter { !stopWords.contains($0.lowercased()) }
+
+        guard !words.isEmpty else {
+            return fallback
+        }
+
+        let display = words
+            .map { word in
+                word.count <= 3 ? word.uppercased() : word.capitalized
+            }
+            .joined(separator: " ")
+
+        if let suffix,
+           !display.lowercased().hasSuffix(suffix.trimmingCharacters(in: .whitespaces).lowercased()) {
+            return display + suffix
+        }
+        return display
     }
 
     private func moraleDamage(for strengthDamage: Int) -> Int {

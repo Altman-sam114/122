@@ -1152,7 +1152,12 @@ struct WarCommandExecutor {
                 continue
             }
             state.appendEvent(
-                "Region \(regionId.rawValue) controller changed to \(region.controller.displayName) via \(command.displayName).",
+                regionControllerChangedMessage(
+                    regionId: regionId,
+                    controller: region.controller,
+                    command: command,
+                    state: state
+                ),
                 category: .regionOwnerChange,
                 relatedRecordId: relatedRecordId
             )
@@ -1251,12 +1256,12 @@ struct WarCommandExecutor {
             )
         }
         state.appendEvent(
-            strategicAdvanceMessage(hex: hex, theaterId: advancingTheaterId, faction: advancingFaction),
+            strategicAdvanceMessage(hex: hex, theaterId: advancingTheaterId, faction: advancingFaction, state: state),
             category: .theaterChange,
             relatedRecordId: relatedRecordId
         )
         state.appendEvent(
-            frontChangedMessage(regionId: regionId, faction: advancingFaction),
+            frontChangedMessage(regionId: regionId, faction: advancingFaction, state: state),
             category: .frontChange,
             relatedRecordId: relatedRecordId
         )
@@ -1286,20 +1291,82 @@ struct WarCommandExecutor {
         return false
     }
 
-    private func strategicAdvanceMessage(hex: HexCoord, theaterId: TheaterId, faction: Faction) -> String {
+    private func regionControllerChangedMessage(
+        regionId: RegionId,
+        controller: Faction,
+        command: Command,
+        state: GameState
+    ) -> String {
+        if state.activeFaction.usesNapoleonicLogisticsVocabulary {
+            return "Sector \(regionDisplayName(regionId, in: state)) control changed to \(controller.displayName) via \(command.displayName(for: state.activeFaction))."
+        }
+
+        return "Region \(regionId.rawValue) controller changed to \(controller.displayName) via \(command.displayName)."
+    }
+
+    private func strategicAdvanceMessage(hex: HexCoord, theaterId: TheaterId, faction: Faction, state: GameState) -> String {
         if faction.usesNapoleonicLogisticsVocabulary {
-            return "Hex \(hex.q),\(hex.r) reassigned to active wing \(theaterId.rawValue)."
+            return "Hex \(hex.q),\(hex.r) reassigned to active wing \(theaterDisplayName(theaterId, in: state))."
         }
 
         return "Hex \(hex.q),\(hex.r) reassigned to dynamic theater \(theaterId.rawValue)."
     }
 
-    private func frontChangedMessage(regionId: RegionId, faction: Faction) -> String {
+    private func frontChangedMessage(regionId: RegionId, faction: Faction, state: GameState) -> String {
         if faction.usesNapoleonicLogisticsVocabulary {
-            return "Contact changed around sector \(regionId.rawValue)."
+            return "Contact changed around sector \(regionDisplayName(regionId, in: state))."
         }
 
         return "Front changed around region \(regionId.rawValue)."
+    }
+
+    private func regionDisplayName(_ regionId: RegionId, in state: GameState) -> String {
+        if let name = state.map.region(id: regionId)?.name,
+           !name.isEmpty {
+            return name
+        }
+        return identifierDisplayText(regionId.rawValue, fallback: "sector", suffix: " sector")
+    }
+
+    private func theaterDisplayName(_ theaterId: TheaterId, in state: GameState) -> String {
+        if let name = state.theaterState.theaters[theaterId]?.name,
+           !name.isEmpty {
+            return name
+        }
+        return identifierDisplayText(theaterId.rawValue, fallback: "active wing", suffix: " wing")
+    }
+
+    private func identifierDisplayText(
+        _ rawValue: String,
+        fallback: String,
+        suffix: String? = nil
+    ) -> String {
+        let stopWords: Set<String> = [
+            "region", "front", "frontzone", "zone", "theater", "sector",
+            "legacy", "mock", "ai", "commander", "marshal", "directive",
+            "power", "faction", "global", "ruler"
+        ]
+        let words = rawValue
+            .replacingOccurrences(of: "-", with: "_")
+            .split(separator: "_")
+            .map { String($0) }
+            .filter { !stopWords.contains($0.lowercased()) }
+
+        guard !words.isEmpty else {
+            return fallback
+        }
+
+        let display = words
+            .map { word in
+                word.count <= 3 ? word.uppercased() : word.capitalized
+            }
+            .joined(separator: " ")
+
+        if let suffix,
+           !display.lowercased().hasSuffix(suffix.trimmingCharacters(in: .whitespaces).lowercased()) {
+            return display + suffix
+        }
+        return display
     }
 
     private func actingDivisionId(for command: Command) -> String? {

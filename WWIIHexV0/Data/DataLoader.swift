@@ -85,6 +85,7 @@ struct DataLoader {
         self.init(bundle: .main, resourceDirectory: resourceDirectory)
     }
 
+    /// Legacy Ardennes/probe fallback. Main app startup must use `ScenarioCatalog.defaultPlayable`.
     func loadInitialGameState() -> GameState {
         if let state = try? loadGameState(ScenarioCatalog.ardennesLegacy) {
             return state
@@ -139,6 +140,7 @@ struct DataLoader {
         return state
     }
 
+    /// Legacy Ardennes data set loader. New playable scenarios should use `loadGameState(_:)`.
     func loadArdennesDataSet() throws -> ScenarioDataSet {
         let dataSet = ScenarioDataSet(
             scenario: try loadScenarioDefinition(),
@@ -150,6 +152,7 @@ struct DataLoader {
         return dataSet
     }
 
+    /// Legacy no-argument scenario loader for Ardennes compatibility tests.
     func loadScenarioDefinition() throws -> ScenarioDefinition {
         try loadJSON(ScenarioDefinition.self, named: "ardennes_v0_scenario")
     }

@@ -15,6 +15,7 @@ enum Faction: String, Codable, Equatable, Hashable, CaseIterable, Identifiable {
         rawValue
     }
 
+    @available(*, deprecated, message: "Legacy two-sided helper. Use DiplomacyState.isHostile/isFriendly or hostileFactions(to:) for runtime relations.")
     var opponent: Faction {
         switch self {
         case .germany:

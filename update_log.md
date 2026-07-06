@@ -1806,6 +1806,9 @@ guerrillaWarfare 额外参考 infrastructure
 - `TurnManager` 默认 staff 失败、end orders 失败、空 directive、directive 拒绝和缺失 corps sector 诊断改写为 Staff / Corps / End Orders 口径，`WarCommandExecutor` 写入 event log 的 directive 拒绝原因改用 `CommandValidationError.displayName(for:)` 和 `Command.displayName(for:)`；`DataLoader` 初始日志只写 `Campaign loaded.` / `Archived campaign loaded.`，不再暴露 scenario id 或 MapEditor-compatible JSON 来源。
 - `AppContainer.recoveryState` 的默认加载失败恢复态继续保留 1x1 inert 地图，并把 `victoryState` 固定为 `.ongoing`，避免恢复态误触发胜负状态。
 - `AgentPanelView`、`DiplomacyPanelView` 和 `AppContainer` 继续收口默认拿战可见 raw id：ruler/focus sector 与玩家 corps order interaction log 会显示为可读 commander / sector 文案，不再直接暴露 `ruler_*` 或 raw `zoneId`；`GeneralCommandPanelView` 和 `GeneralProfileView` 在拿战 faction 下把 VoiceOver profile / portrait placeholder 文案收口为 Commander profile / commander portrait placeholder；legacy faction 保持原文。
+- 并发子 Agent 继续扫描默认 Waterloo 玩家可见 raw id、legacy fallback 和回合控制边界后，本轮补齐 display-only 收口：`RegionInspectorView` / `UnitInspectorView` 的 Sector、Active Wing、Corps Sector、Contact Line 不再直接显示 raw region/theater/front-zone/front-line id；`AppContainer` 选中 sector 的 interaction log 不再显示 raw `regionId`；`CommandExecutor`、`WarCommandExecutor` 和 `StrategicStateSynchronizer` 的拿战动态推进、front change 和 region controller event log 会优先显示 region/theater/front-zone 名称或格式化 sector/wing 文案，legacy 路径继续保留 raw id 调试口径。
+- `Faction.opponent` 已标记为 legacy 二元兼容 helper，新运行时敌我关系应继续使用 `DiplomacyState.isHostile/isFriendly` 或 `hostileFactions(to:)`；`GamePhase.commandPhase(for:)` 成为当前通用 command phase helper，`legacyCompatibleCommandPhase(for:)` 只保留为旧命名包装，现有 App / Rule 层调用已切到新 helper。
+- 默认入口隔离继续加固：`availablePlayerFactions` 读取场景 faction 失败时只让阿登 legacy fallback 到 Germany / Allies，未知或后续非 legacy 场景优先使用 catalog `defaultPlayerFaction`；非阿登 scenario 中即使出现 `.germany` active faction，也不会自动创建 Guderian agent，而是走普通 sample command staff；`DataLoader.loadInitialGameState()`、无参阿登 loader 和 MapEditor `Default` wrapper 已补 legacy-only 注释，避免被误解为当前 playable 默认入口。
 - `DiplomacyState.isHostile/isFriendly` 的缺国家/缺关系 fallback 改为拿战联军成员之间 friendly、France 与联军成员 hostile、neutral 不 hostile，避免坏快照或半迁移状态把 Anglo-Allied / Prussia 等 co-belligerent 误当敌军。
 - `VictoryRules` 的 Waterloo 分支不再只认裸 `scenarioId == "waterloo_1815"`；现在通过 `ScenarioCatalog.napoleonicTarget.matches(state.scenarioId)` 或 Waterloo victory condition id 进入最小 Waterloo 胜利节奏，降低后续 Waterloo 变体 / 数据切片掉回 Bastogne legacy 逻辑的风险。
 - `md/flow/01_overall_core_flow.mermaid` 补充 `ScenarioCatalog`、`TerrainRuleSet / GameState.terrainRules`、`ScenarioVictoryCondition / GameState.victoryConditions`、`DiplomacyState` 与经济/增援节点；`md/flow/flow.md` 修正过期的“terrain 未注入运行时规则”描述，明确 v3.8 起 Waterloo 主路径读取运行时地形规则。
@@ -1814,6 +1817,8 @@ guerrillaWarfare 额外参考 infrastructure
 关键文件：
 
 - `WWIIHexV0/Data/DataLoader.swift`
+- `WWIIHexV0/Core/Faction.swift`
+- `WWIIHexV0/Core/GamePhase.swift`
 - `WWIIHexV0/Core/Terrain.swift`
 - `WWIIHexV0/Core/GameState.swift`
 - `WWIIHexV0/App/AppContainer.swift`
@@ -1832,6 +1837,8 @@ guerrillaWarfare 额外参考 infrastructure
 - `WWIIHexV0/Commands/WarDirective.swift`
 - `WWIIHexV0/Turn/TurnManager.swift`
 - `WWIIHexV0/Core/StrategicStateBootstrapper.swift`
+- `WWIIHexV0/Rules/StrategicStateSynchronizer.swift`
+- `WWIIHexV0/SpriteKit/MapDisplayAdapter.swift`
 - `WWIIHexV0/SpriteKit/HexNode.swift`
 - `WWIIHexV0/UI/AgentPanelView.swift`
 - `WWIIHexV0/UI/GeneralCommandPanelView.swift`

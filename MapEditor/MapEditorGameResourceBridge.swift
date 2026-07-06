@@ -18,6 +18,7 @@ enum MapEditorGameResourceBridge {
     static let legacyArdennesScenarioResourceName = "ardennes_v0_scenario"
     static let legacyArdennesRegionResourceName = "ardennes_v02_regions"
 
+    // Legacy compatibility aliases for older MapEditor callers. The main game default is ScenarioCatalog.defaultPlayable.
     static let scenarioResourceName = legacyArdennesScenarioResourceName
     static let regionResourceName = legacyArdennesRegionResourceName
 
@@ -29,6 +30,7 @@ enum MapEditorGameResourceBridge {
             .appending(path: "Data")
     }
 
+    /// Legacy wrapper. MapEditor's editable bundled resources are Ardennes compatibility data, not the main playable default.
     static func loadDefaultDocument() throws -> MapEditorDocument {
         try loadLegacyArdennesDocument()
     }
@@ -49,6 +51,7 @@ enum MapEditorGameResourceBridge {
         return try makeDocument(scenario: scenario, regionData: regionData)
     }
 
+    /// Legacy wrapper. Writes the archived Ardennes resources only.
     static func overwriteDefaultGameResources(document: MapEditorDocument) throws -> MapEditorExportResult {
         try overwriteLegacyArdennesGameResources(document: document)
     }

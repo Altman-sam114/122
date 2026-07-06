@@ -31,7 +31,7 @@ enum GamePhase: String, Codable, Equatable, CaseIterable {
         }
     }
 
-    static func legacyCompatibleCommandPhase(for faction: Faction) -> GamePhase {
+    static func commandPhase(for faction: Faction) -> GamePhase {
         switch faction {
         case .allies:
             return .alliedPlayer
@@ -42,5 +42,9 @@ enum GamePhase: String, Codable, Equatable, CaseIterable {
         case .france, .angloAllied, .prussia, .austria, .russia, .spain:
             return .aiCommand
         }
+    }
+
+    static func legacyCompatibleCommandPhase(for faction: Faction) -> GamePhase {
+        commandPhase(for: faction)
     }
 }

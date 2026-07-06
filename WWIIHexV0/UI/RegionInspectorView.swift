@@ -38,11 +38,11 @@ struct RegionInspectorView: View {
                 }
 
                 LabeledContent(label("Hex Dynamic Theater")) {
-                    Text(state.selectedHexDynamicTheaterId?.rawValue ?? "None")
+                    Text(state.selectedHexDynamicTheaterDisplayName)
                 }
 
                 LabeledContent(label("Hex FrontZone")) {
-                    Text(state.selectedHexFrontZoneId?.rawValue ?? "None")
+                    Text(state.selectedHexFrontZoneDisplayName)
                 }
             }
 
@@ -80,11 +80,11 @@ struct RegionInspectorView: View {
             }
 
             LabeledContent(label("Theater")) {
-                Text(state.theaterId?.rawValue ?? "None")
+                Text(state.theaterDisplayName)
             }
 
             LabeledContent(label("FrontZone")) {
-                Text(state.frontZoneId?.rawValue ?? "None")
+                Text(state.frontZoneDisplayName)
             }
 
             LabeledContent(label("Front Pressure")) {

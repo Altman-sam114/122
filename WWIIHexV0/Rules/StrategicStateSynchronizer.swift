@@ -64,7 +64,7 @@ struct StrategicStateSynchronizer {
             for regionId in changedRegionIds {
                 guard let region = state.map.region(id: regionId) else { continue }
                 state.appendEvent(
-                    "Region \(regionId.rawValue) controller changed to \(region.controller.displayName).",
+                    regionControllerChangedMessage(regionId: regionId, controller: region.controller, state: state),
                     category: .regionOwnerChange,
                     relatedRecordId: relatedRecordId
                 )
@@ -88,5 +88,57 @@ struct StrategicStateSynchronizer {
             result.append(value)
         }
         return result.sorted { $0.rawValue < $1.rawValue }
+    }
+
+    private func regionControllerChangedMessage(
+        regionId: RegionId,
+        controller: Faction,
+        state: GameState
+    ) -> String {
+        if state.activeFaction.usesNapoleonicLogisticsVocabulary {
+            let sectorName: String
+            if let name = state.map.region(id: regionId)?.name,
+               !name.isEmpty {
+                sectorName = name
+            } else {
+                sectorName = identifierDisplayText(regionId.rawValue, fallback: "sector", suffix: " sector")
+            }
+            return "Sector \(sectorName) control changed to \(controller.displayName)."
+        }
+
+        return "Region \(regionId.rawValue) controller changed to \(controller.displayName)."
+    }
+
+    private func identifierDisplayText(
+        _ rawValue: String,
+        fallback: String,
+        suffix: String? = nil
+    ) -> String {
+        let stopWords: Set<String> = [
+            "region", "front", "frontzone", "zone", "theater", "sector",
+            "legacy", "mock", "ai", "commander", "marshal", "directive",
+            "power", "faction", "global", "ruler"
+        ]
+        let words = rawValue
+            .replacingOccurrences(of: "-", with: "_")
+            .split(separator: "_")
+            .map { String($0) }
+            .filter { !stopWords.contains($0.lowercased()) }
+
+        guard !words.isEmpty else {
+            return fallback
+        }
+
+        let display = words
+            .map { word in
+                word.count <= 3 ? word.uppercased() : word.capitalized
+            }
+            .joined(separator: " ")
+
+        if let suffix,
+           !display.lowercased().hasSuffix(suffix.trimmingCharacters(in: .whitespaces).lowercased()) {
+            return display + suffix
+        }
+        return display
     }
 }

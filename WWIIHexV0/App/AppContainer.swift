@@ -193,7 +193,7 @@ final class AppContainer: ObservableObject {
             turn: 1,
             maxTurns: 1,
             activeFaction: scenario.defaultPlayerFaction,
-            phase: GamePhase.legacyCompatibleCommandPhase(for: scenario.defaultPlayerFaction),
+            phase: GamePhase.commandPhase(for: scenario.defaultPlayerFaction),
             map: recoveryMap(),
             terrainRules: .legacy,
             theaterState: .empty,
@@ -210,7 +210,7 @@ final class AppContainer: ObservableObject {
                 GameLogEntry(
                     turn: 1,
                     faction: scenario.defaultPlayerFaction,
-                    phase: GamePhase.legacyCompatibleCommandPhase(for: scenario.defaultPlayerFaction),
+                    phase: GamePhase.commandPhase(for: scenario.defaultPlayerFaction),
                     message: errorMessage
                 )
             ],
@@ -766,7 +766,11 @@ final class AppContainer: ObservableObject {
             return Faction.waterlooFactions.filter { !$0.isNeutral }
         }
 
-        return Faction.legacyWorldWarIIFactions
+        if scenario.id == ScenarioCatalog.ardennesLegacy.id {
+            return Faction.legacyWorldWarIIFactions
+        }
+
+        return scenario.defaultPlayerFaction.isNeutral ? [] : [scenario.defaultPlayerFaction]
     }
 
     private func stateStartingAtPlayerFaction(_ faction: Faction, from state: GameState) -> GameState {
@@ -1421,20 +1425,14 @@ final class AppContainer: ObservableObject {
         let agent: GameAgent
         switch faction {
         case .germany:
-            agent = GameAgent.guderian(from: dataLoader, state: state)
+            if currentScenario.id == ScenarioCatalog.ardennesLegacy.id,
+               ScenarioCatalog.ardennesLegacy.matches(state.scenarioId) {
+                agent = GameAgent.guderian(from: dataLoader, state: state)
+            } else {
+                agent = sampleCommandStaff(for: faction, state: state)
+            }
         case .allies, .france, .angloAllied, .prussia, .austria, .russia, .spain, .neutral:
-            let assignedIds = state.divisions
-                .filter { $0.faction == faction && !$0.isDestroyed }
-                .map(\.id)
-            agent = GameAgent.sample(
-                id: "\(faction.rawValue)_mock_commander",
-                name: faction.usesNapoleonicLogisticsVocabulary
-                    ? "\(faction.displayName) Command Staff"
-                    : "\(faction.displayName) Mock Commander",
-                faction: faction,
-                role: .armyCommander,
-                assignedDivisionIds: assignedIds
-            )
+            agent = sampleCommandStaff(for: faction, state: state)
         }
 
         return TurnManager(
@@ -1444,6 +1442,21 @@ final class AppContainer: ObservableObject {
             commandHandler: commandHandler,
             commanderPool: Self.buildCommanderPool(state: state, registry: generalRegistry),
             marshalAgent: Self.buildMarshalAgent(faction: faction, state: state)
+        )
+    }
+
+    private func sampleCommandStaff(for faction: Faction, state: GameState) -> GameAgent {
+        let assignedIds = state.divisions
+            .filter { $0.faction == faction && !$0.isDestroyed }
+            .map(\.id)
+        return GameAgent.sample(
+            id: "\(faction.rawValue)_mock_commander",
+            name: faction.usesNapoleonicLogisticsVocabulary
+                ? "\(faction.displayName) Command Staff"
+                : "\(faction.displayName) Mock Commander",
+            faction: faction,
+            role: .armyCommander,
+            assignedDivisionIds: assignedIds
         )
     }
 
@@ -1745,8 +1758,13 @@ final class AppContainer: ObservableObject {
               let region = gameState.map.region(id: selectedRegionId) else {
             return "Selected hex \(coord.q),\(coord.r)."
         }
-        let noun = interactionUsesNapoleonicVocabulary ? "sector" : "region"
-        return "Selected \(noun): \(region.name) (\(selectedRegionId.rawValue))."
+        if interactionUsesNapoleonicVocabulary {
+            let sectorName = region.name.isEmpty
+                ? identifierDisplayText(selectedRegionId.rawValue, fallback: "sector", suffix: " sector")
+                : region.name
+            return "Selected sector: \(sectorName)."
+        }
+        return "Selected region: \(region.name) (\(selectedRegionId.rawValue))."
     }
 
     private func appendInteractionEvent(_ message: String) {

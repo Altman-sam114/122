@@ -48,15 +48,15 @@ struct UnitInspectorView: View {
                 }
 
                 LabeledContent(label("Region")) {
-                    Text(strategicState.regionId?.rawValue ?? "None")
+                    Text(strategicState.regionDisplayName)
                 }
 
                 LabeledContent(label("Dynamic Theater")) {
-                    Text(strategicState.dynamicTheaterId?.rawValue ?? "None")
+                    Text(strategicState.dynamicTheaterDisplayName)
                 }
 
                 LabeledContent(label("FrontZone")) {
-                    Text(strategicState.frontZoneId?.rawValue ?? "None")
+                    Text(strategicState.frontZoneDisplayName)
                 }
 
                 LabeledContent(label("Deploy")) {
@@ -178,7 +178,12 @@ struct UnitInspectorView: View {
     }
 
     private func frontLineSummary(_ ids: [FrontLineId]) -> String {
-        ids.isEmpty ? "None" : ids.map(\.rawValue).joined(separator: ", ")
+        guard let strategicState else {
+            return ids.isEmpty ? "None" : ids.map(\.rawValue).joined(separator: ", ")
+        }
+        return strategicState.frontLineDisplayNames.isEmpty
+            ? "None"
+            : strategicState.frontLineDisplayNames.joined(separator: ", ")
     }
 
     private func statusValue(_ text: String, systemImage: String, tone: Color) -> some View {

@@ -42,8 +42,8 @@ MapEditor / JSON 数据
 - `hexToFrontZone` 是部署层动态归属权威。
 - `EconomyState` 是 faction 级经济总账；收入来自受控 region、城市、工厂、基础设施和补给值，但战术占领仍以 hex 为准。
 - `Faction` 当前是兼容层：旧 `.germany/.allies` 仍可加载，新 v3.1 已加入 `.france/.angloAllied/.prussia/.austria/.russia/.spain/.neutral`，为滑铁卢和后续拿战势力迁移做基础。
-- `DiplomacyState` 当前提供国家/集团记录和敌我关系查询 helper；补给、region pressure、AI 摘要、战术目标排序、攻击校验、ZOC/路径阻挡、占领、前线邻接、部署分类、战区压力和 HQ 威胁已可通过它判断 hostile / friendly，而不再全部依赖 `Faction.opponent` 或 `faction != otherFaction`。
-- `GamePhase` 仍保留 `.germanAI/.alliedPlayer` raw value 兼容旧数据，同时新增 `.aiCommand/.playerCommand` 和 `allowsCommands` helper。命令校验和 AI 触发已开始从具体 Germany/Allies phase 脱钩。
+- `DiplomacyState` 当前提供国家/集团记录和敌我关系查询 helper；补给、region pressure、AI 摘要、战术目标排序、攻击校验、ZOC/路径阻挡、占领、前线邻接、部署分类、战区压力和 HQ 威胁已可通过它判断 hostile / friendly，而不再全部依赖 `Faction.opponent` 或 `faction != otherFaction`。`Faction.opponent` 仍作为 legacy 二元兼容 helper 保留，但已标记 deprecated，新运行时关系应改用 `DiplomacyState`。
+- `GamePhase` 仍保留 `.germanAI/.alliedPlayer` raw value 兼容旧数据，同时新增 `.aiCommand/.playerCommand`、`allowsCommands` 和 `commandPhase(for:)` helper。`legacyCompatibleCommandPhase(for:)` 只保留为旧命名包装；命令校验和 AI 触发已开始从具体 Germany/Allies phase 脱钩。
 - 玩家、AI、后续聊天命令最终都必须经过 `Command` / `ZoneDirective -> WarCommandExecutor -> RuleEngine`，不能直接改 `GameState`。
 - v3.4 起默认战争 AI 上游是 `RulerAgent -> StrategicPostureEnvelope -> StrategicPostureDecoder -> MarshalAgent -> TheaterDirective JSON -> TheaterDirectiveDecoder -> TheaterDirectiveCompiler`，下游执行收口到 `ZoneDirective -> WarCommandExecutor -> RuleEngine`。
 - `RulerAgent` 只生成国家/联军级姿态、元帅上下文和 `RulerDecisionRecord`，不得直接生成底层 `Command` 或修改 `GameState` 的战术权威状态。
@@ -710,7 +710,7 @@ NewGameSetupView Settings
 
 v3.8 默认拿战 replay 展示继续收口：`MockAI+MarshalDirective` 等 provider 也按 `Simulated Staff` 展示，Standard context summary 使用 staff display name 而不是 raw `*_mock_commander` id，EventLog phase metadata 在拿战 faction 下显示 `Orders` / `Staff Dispatch`，DataLoader 初始日志只写 `Campaign loaded.` / `Archived campaign loaded.`，EventLog / AgentPanel / AppContainer interaction log 的 Standard / Concise 层会净化 raw diagnostic、legacy pipeline、front zone / region / theater id 和 WWII faction 名；Full raw JSON 仍保留底层审计内容。
 
-v3.8 后续收口还覆盖 ruler/focus raw id：`AgentPanelView` 和 `DiplomacyPanelView` 在 Standard / Concise 层把 `ruler_*`、front zone id 等 schema id 显示成可读 commander / sector 文案；`AppContainer` 的玩家 corps order interaction log 也会优先显示 front zone 名称或可读 sector 名，而不是 raw `zoneId`。
+v3.8 后续收口还覆盖 ruler/focus raw id：`AgentPanelView` 和 `DiplomacyPanelView` 在 Standard / Concise 层把 `ruler_*`、front zone id 等 schema id 显示成可读 commander / sector 文案；`AppContainer` 的玩家 corps order interaction log 和选中 sector interaction log 也会优先显示 front zone / region 名称或可读 sector 名，而不是 raw `zoneId` / `regionId`。`CommandExecutor` 的拿战动态推进事件会优先显示 theater name 或格式化 wing 名，legacy 路径仍保留 raw dynamic theater id 便于兼容调试。
 
 v3.7 短引导同样只走本地 interaction log：
 
@@ -1485,7 +1485,7 @@ turnOrderFactions:
   回到 turnOrder 第一个 faction 时 turn += 1
 
 phase:
-  GamePhase.legacyCompatibleCommandPhase(for:)
+  GamePhase.commandPhase(for:)
   旧 Germany -> germanAI，旧 Allies -> alliedPlayer
   新拿战势力 -> aiCommand；玩家控制权由 AppContainer.playerFaction 决定
   AppContainer.normalizeCommandPhase 在试玩 runtime / save 边界将拿战玩家 active faction 归一为 playerCommand，非玩家拿战 active faction 归一为 aiCommand
