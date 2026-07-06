@@ -637,7 +637,7 @@ struct DataLoader {
         var errors: [DataValidationError] = []
         let declaredFactionIds = Set(scenario.factions)
         let declaredFactions = Set(scenario.factions.compactMap(Faction.init(rawValue:)))
-        let tileCoords = Set(scenario.map.tiles.map(\.coord))
+        let tileCoords: Set<HexCoord> = Set(scenario.map.tiles.map { HexCoord(q: $0.q, r: $0.r) })
         let regionIds = Set(regionData.regions.map(\.id))
         let regionHexToRegion = regionData.toHexToRegion()
         var parsedRegionCoords: Set<HexCoord> = []
