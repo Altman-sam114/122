@@ -419,7 +419,7 @@
   "initialUnits": [
     {
       "id": "fr_napoleon_center",
-      "name": "French I Corps",
+      "name": "French I Corps Detachment",
       "faction": "france",
       "templateId": "line_infantry_brigade",
       "coord": {
@@ -607,7 +607,7 @@
     },
     {
       "id": "pr_bulow_iv_corps",
-      "name": "Prussian IV Corps",
+      "name": "Prussian IV Corps Vanguard",
       "faction": "prussia",
       "templateId": "prussian_vanguard",
       "arrivalTurn": 4,
@@ -663,6 +663,9 @@
     "Uses napoleonic_unit_templates.json through ScenarioCatalog.unitTemplateName.",
     "Napoleonic templates use v3.3 ComponentType cases; morale now has a minimal formation-level model, while explicit formation stance, cavalry charge, and artillery preparation rules remain future work.",
     "v3.5 adds delayed French and Prussian reinforcement schedule entries; runtime deployment waits for safe controlled entry hexes.",
+    "Scenario displayName is release-facing; this file remains a small data slice as recorded in dataNotes, not the final full Waterloo campaign.",
+    "French I Corps Detachment and Prussian IV Corps Vanguard are abstract playable formations using existing templates, not full corps-scale orders of battle.",
+    "Current Waterloo runtime victory conditions read Mont-Saint-Jean, Hougoumont, and Prussian Arrival Road; La Haye Sainte, Papelotte, and Plancenoit are map objectives, region summaries, and AI sorting targets unless later victory data expands them.",
     "v3 data follow-up adds Plancenoit as a French-held objective and adds minimal La Haye Sainte / Papelotte garrisons plus Lobau's Plancenoit detachment without changing the current Waterloo victory conditions.",
     "v3 data follow-up adds q5,r1 Wavre Road as an abstract Prussian rear road, supply, and reinforcement entry hex; Prussian Arrival Road at q4,r1 remains the objective trigger and victory-condition member.",
     "v3 data follow-up adds an Anglo-Allied left reserve at Papelotte to make the coalition left wing less skeletal without changing objective or victory-condition data.",

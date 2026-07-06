@@ -213,6 +213,8 @@ struct RegionInspectorView: View {
         guard !divisions.isEmpty else {
             return emptyDisplayText("None", napoleonic: napoleonicEmpty)
         }
-        return divisions.map(\.name).joined(separator: ", ")
+        return divisions
+            .map { NapoleonicMessageSanitizer.displayText($0.name, for: activeFaction) }
+            .joined(separator: ", ")
     }
 }

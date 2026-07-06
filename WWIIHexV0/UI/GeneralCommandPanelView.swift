@@ -90,7 +90,7 @@ struct GeneralCommandPanelView: View {
                     .foregroundStyle(.secondary)
                 VStack(alignment: .leading, spacing: 4) {
                     ForEach(Array(assignedDivisions.prefix(5)), id: \.id) { division in
-                        Label(division.name, systemImage: unitIcon(for: division))
+                        Label(displayDivisionName(division), systemImage: unitIcon(for: division))
                             .font(.caption)
                             .lineLimit(1)
                     }
@@ -219,6 +219,10 @@ struct GeneralCommandPanelView: View {
         case .cautious:
             return "Cautious"
         }
+    }
+
+    private func displayDivisionName(_ division: Division) -> String {
+        NapoleonicMessageSanitizer.displayText(division.name, for: activeFaction)
     }
 
     private func unitIcon(for division: Division) -> String {
