@@ -114,7 +114,7 @@ struct GameSaveSnapshot: Codable, Equatable {
                 return "Current: \(activeFaction.displayName), Your Power: \(playerFaction.displayName)"
             }
 
-            "Active: \(activeFaction.displayName), Player: \(playerFaction.displayName)"
+            return "Active: \(activeFaction.displayName), Player: \(playerFaction.displayName)"
         }
     }
 
