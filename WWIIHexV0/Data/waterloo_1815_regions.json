@@ -341,12 +341,28 @@
       "mainObjective": true
     },
     {
+      "id": "region_objective_hougoumont",
+      "name": "Hougoumont",
+      "regionId": "region_hougoumont",
+      "type": "fortress",
+      "victoryPoints": 3,
+      "mainObjective": true
+    },
+    {
       "id": "region_objective_mont_saint_jean",
       "name": "Mont-Saint-Jean",
       "regionId": "region_mont_saint_jean",
       "type": "city",
       "victoryPoints": 5,
       "mainObjective": true
+    },
+    {
+      "id": "region_objective_papelotte",
+      "name": "Papelotte",
+      "regionId": "region_papelotte",
+      "type": "city",
+      "victoryPoints": 2,
+      "mainObjective": false
     },
     {
       "id": "region_objective_prussian_approach",

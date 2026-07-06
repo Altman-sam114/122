@@ -452,8 +452,8 @@
       "retreatMode": "retreatable",
       "supplyState": "supplied",
       "assignedAgentId": "commander_blucher",
-      "triggerObjectiveId": null,
-      "triggerController": null
+      "triggerObjectiveId": "objective_prussian_arrival",
+      "triggerController": "prussia"
     }
   ],
   "victoryConditions": [

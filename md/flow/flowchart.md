@@ -238,7 +238,7 @@ flowchart TD
     LOW["战略补给短缺<br/>supplied 单位降为 lowSupply"]:::rules
     REINF["自动补员<br/>安全后方 supplied 非敌邻单位<br/>每回合最多 +2 strength"]:::rules
     PROD["推进生产/预备队队列<br/>remainingTurns - 1<br/>legacy 部署旧单位<br/>拿战部署拿战 component formation"]:::economy
-    SCHED["延迟增援表<br/>ReinforcementState.pending<br/>按 turn / objective trigger 到期"]:::economy
+    SCHED["延迟增援表<br/>ReinforcementState.pending<br/>按 turn / objective trigger 到期<br/>Waterloo 普军 IV Corps 绑定 Prussian Arrival Road 控制权"]:::economy
     ENTRY["安全入口检查<br/>entryCoord 2 格内<br/>己控、空置、非敌邻"]:::rules
     DEPLOY{"有合格后方部署点吗?"}:::decision
     SPAWN["部署新单位<br/>首都/城镇/工厂/高基建/高补给或 supply source<br/>必须己控、空置、非敌邻"]:::rules
@@ -247,7 +247,7 @@ flowchart TD
     RWAIT["保留增援<br/>无安全入口时等待后续回合"]:::economy
     REST["战术休整<br/>SupplyRules.applyResupplyRest<br/>恢复 strength / morale / fatigue / ammunition"]:::rules
     WEAR["行动消耗<br/>move / attack / counterattack / hold<br/>改变 Division morale / fatigue / ammunition"]:::rules
-    VICTORY["胜负节奏<br/>VictoryRules<br/>legacy Ardennes / Waterloo runtime JSON conditions"]:::rules
+    VICTORY["胜负节奏<br/>VictoryRules<br/>legacy Ardennes / Waterloo runtime JSON conditions<br/>Waterloo scenario objectives 与 region objectives 保持目标点口径同步"]:::rules
     NEXT["切换阵营并刷新运行时层<br/>StrategicStateBootstrapper.refreshRuntimeState"]:::rules
 
     BOOT --> LEDGER
