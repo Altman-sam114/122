@@ -53,7 +53,7 @@ struct HUDView: View {
             Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 8) {
                 GridRow {
                     metric("Turn", "\(gameState.turn) / \(gameState.maxTurns)")
-                    metric("Faction", gameState.activeFaction.displayName)
+                    metric(label("Faction"), gameState.activeFaction.displayName)
                 }
 
                 GridRow {
@@ -130,6 +130,8 @@ struct HUDView: View {
             return "End Orders"
         case "Reinforcements":
             return "Reserve Arrivals"
+        case "Faction":
+            return "Active Power"
         default:
             return legacy
         }

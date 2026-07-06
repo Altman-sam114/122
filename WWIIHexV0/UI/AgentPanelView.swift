@@ -231,11 +231,11 @@ struct AgentPanelView: View {
             }
 
             if replayDetailLevel.showsRawJSON {
-                Text("Raw JSON")
+                Text(activeFaction.usesNapoleonicLogisticsVocabulary ? "Dispatch Audit" : "Raw JSON")
                     .font(playtestTextSize.captionFont)
                     .foregroundStyle(.secondary)
 
-                Text(record?.rawJSON ?? rawJSONPlaceholder)
+                Text(dispatchAuditText)
                     .font(playtestTextSize.rawJSONFont)
                     .foregroundStyle(.secondary)
                     .textSelection(.enabled)
@@ -908,13 +908,24 @@ struct AgentPanelView: View {
     }
 
     private var rawJSONPlaceholder: String {
-        """
+        if activeFaction.usesNapoleonicLogisticsVocabulary {
+            return "No dispatch audit recorded."
+        }
+
+        return """
         {
           "agentId": null,
           "status": "no_decision",
           "orders": []
         }
         """
+    }
+
+    private var dispatchAuditText: String {
+        guard let rawJSON = record?.rawJSON else {
+            return rawJSONPlaceholder
+        }
+        return activeFaction.usesNapoleonicLogisticsVocabulary ? diagnosticDisplayText(rawJSON) : rawJSON
     }
 }
 

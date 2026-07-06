@@ -110,6 +110,10 @@ struct GameSaveSnapshot: Codable, Equatable {
         }
 
         var detail: String {
+            if activeFaction.usesNapoleonicLogisticsVocabulary || playerFaction.usesNapoleonicLogisticsVocabulary {
+                return "Current: \(activeFaction.displayName), Your Power: \(playerFaction.displayName)"
+            }
+
             "Active: \(activeFaction.displayName), Player: \(playerFaction.displayName)"
         }
     }
