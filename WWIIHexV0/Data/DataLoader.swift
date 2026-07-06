@@ -496,7 +496,7 @@ struct DataLoader {
             }
         }
 
-        let tileCoords = Set(scenario.map.tiles.map { HexCoord(q: $0.q, r: $0.r) })
+        let tileCoords: Set<HexCoord> = Set(scenario.map.tiles.map { HexCoord(q: $0.q, r: $0.r) })
         if tileCoords.count != scenario.map.tiles.count {
             errors.append(DataValidationError(message: "Map contains duplicate tile coordinates."))
         }
@@ -509,7 +509,7 @@ struct DataLoader {
             errors.append(DataValidationError(message: "Initial units contain overlapping coordinates."))
         }
 
-        for unit in scenario.initialUnits where !tileCoords.contains(unit.coord) {
+        for unit in scenario.initialUnits where !tileCoords.contains(HexCoord(q: unit.coord.q, r: unit.coord.r)) {
             errors.append(
                 DataValidationError(
                     message: "Initial unit \(unit.id) references missing tile (\(unit.coord.q),\(unit.coord.r))."
@@ -724,7 +724,7 @@ struct DataLoader {
             }
 
             let coord = HexCoord(q: tile.q, r: tile.r)
-            if let regionId = tile.regionId.map(RegionId.init) {
+            if let regionId = tile.regionId.map({ RegionId(rawValue: $0) }) {
                 if !regionIds.contains(regionId) {
                     errors.append(
                         DataValidationError(
