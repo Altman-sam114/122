@@ -576,7 +576,7 @@
         "r": 2
       },
       "facing": "east",
-      "hp": 10,
+      "hp": 9,
       "retreatMode": "retreatable",
       "supplyState": "supplied",
       "assignedAgentId": "commander_napoleon",
@@ -645,6 +645,7 @@
     "v3 data follow-up adds q5,r1 Wavre Road as an abstract Prussian rear road, supply, and reinforcement entry hex; Prussian Arrival Road at q4,r1 remains the objective trigger and victory-condition member.",
     "v3 data follow-up adds an Anglo-Allied left reserve at Papelotte to make the coalition left wing less skeletal without changing objective or victory-condition data.",
     "v3 data follow-up adds a Prussian Approach screen at q4,r0 to make Blucher's arrival axis visible without changing objective, victory-condition, or reinforcement trigger data.",
+    "v3 data follow-up aligns French Cavalry Reserve reinforcement hp with the cavalry_reserve template maxHP without changing reinforcement timing or trigger data.",
     "Not the final 80-160 hex Waterloo campaign map."
   ]
 }
