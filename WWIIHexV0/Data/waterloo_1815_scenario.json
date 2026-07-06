@@ -14,7 +14,7 @@
   "playerFaction": "france",
   "aiFaction": "angloAllied",
   "map": {
-    "width": 5,
+    "width": 6,
     "height": 3,
     "coordinateSystem": "axial",
     "isSparse": true,
@@ -214,6 +214,20 @@
         "supplyFaction": "prussia",
         "objectiveId": "objective_prussian_arrival",
         "regionId": "region_prussian_approach"
+      },
+      {
+        "q": 5,
+        "r": 1,
+        "terrain": "plain",
+        "hasRoad": true,
+        "riverEdges": [],
+        "controller": "prussia",
+        "cityName": null,
+        "fortressName": null,
+        "isSupplySource": true,
+        "supplyFaction": "prussia",
+        "objectiveId": null,
+        "regionId": "region_wavre_road"
       }
     ]
   },
@@ -305,6 +319,17 @@
       },
       "faction": "prussia",
       "objectiveId": "objective_prussian_arrival"
+    },
+    {
+      "id": "key_wavre_road",
+      "name": "Wavre Road",
+      "kind": "reinforcement_entry",
+      "coord": {
+        "q": 5,
+        "r": 1
+      },
+      "faction": "prussia",
+      "objectiveId": null
     }
   ],
   "objectives": [
@@ -535,14 +560,14 @@
       "templateId": "prussian_vanguard",
       "arrivalTurn": 4,
       "entryCoord": {
-        "q": 4,
+        "q": 5,
         "r": 1
       },
       "facing": "west",
       "hp": 10,
       "retreatMode": "retreatable",
       "supplyState": "supplied",
-      "assignedAgentId": "commander_blucher",
+      "assignedAgentId": "commander_bulow",
       "triggerObjectiveId": "objective_prussian_arrival",
       "triggerController": "prussia"
     }
@@ -587,6 +612,7 @@
     "Napoleonic templates use v3.3 ComponentType cases; morale now has a minimal Division-level model, while formation, cavalry charge, and artillery preparation rules remain future work.",
     "v3.5 adds delayed French and Prussian reinforcement schedule entries; runtime deployment waits for safe controlled entry hexes.",
     "v3 data follow-up adds Plancenoit as a French-held objective and adds minimal La Haye Sainte / Papelotte garrisons without changing the current Waterloo victory conditions.",
+    "v3 data follow-up adds q5,r1 Wavre Road as an abstract Prussian rear road, supply, and reinforcement entry hex; Prussian Arrival Road at q4,r1 remains the objective trigger and victory-condition member.",
     "Not the final 80-160 hex Waterloo campaign map."
   ]
 }

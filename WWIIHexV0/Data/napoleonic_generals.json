@@ -78,6 +78,31 @@
       ],
       "baseLoyalty": 84,
       "baseSatisfaction": 78
+    },
+    {
+      "id": "commander_bulow",
+      "name": "Friedrich Wilhelm von Bulow",
+      "localizedName": "比洛",
+      "rank": "General",
+      "faction": "prussia",
+      "commandStyle": "balanced",
+      "skills": [
+        "forced_march",
+        "coalition_relief",
+        "flank_pressure"
+      ],
+      "portrait": "portrait_bulow_generated",
+      "biography": "A Prussian corps commander focused on timely arrival, road discipline, and pressure against the French right flank.",
+      "preferredTheaterIds": [
+        "zone_prussian_vanguard"
+      ],
+      "preferredRegionIds": [
+        "region_wavre_road",
+        "region_prussian_approach",
+        "region_plancenoit"
+      ],
+      "baseLoyalty": 82,
+      "baseSatisfaction": 76
     }
   ]
 }

@@ -203,8 +203,14 @@ private enum LogDisplayCategory {
     func displayName(for faction: Faction) -> String {
         if faction.usesNapoleonicLogisticsVocabulary {
             switch self {
+            case .combat:
+                return "Engagement"
+            case .retreat:
+                return "Withdrawal"
             case .reinforcement:
                 return "Reserve"
+            case .supply:
+                return "Logistics"
             case .frontChange:
                 return "Contact"
             case .theaterChange:
@@ -213,6 +219,8 @@ private enum LogDisplayCategory {
                 return "Sector"
             case .diplomacy:
                 return "Coalition"
+            case .event:
+                return "Dispatch"
             default:
                 break
             }

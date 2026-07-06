@@ -16,7 +16,8 @@
     "3,1": "region_papelotte",
     "3,2": "region_plancenoit",
     "4,0": "region_prussian_approach",
-    "4,1": "region_prussian_approach"
+    "4,1": "region_prussian_approach",
+    "5,1": "region_wavre_road"
   },
   "regions": [
     {
@@ -277,7 +278,8 @@
       "terrain": "hill",
       "neighbors": [
         "region_papelotte",
-        "region_plancenoit"
+        "region_plancenoit",
+        "region_wavre_road"
       ],
       "displayHexes": [
         {
@@ -291,6 +293,38 @@
       ],
       "representativeHex": {
         "q": 4,
+        "r": 1
+      },
+      "city": null,
+      "infrastructure": 1,
+      "supplyValue": 3,
+      "factories": 0,
+      "resources": [],
+      "coreOf": [
+        "prussia"
+      ],
+      "occupationState": null,
+      "isPassable": true
+    },
+    {
+      "id": "region_wavre_road",
+      "name": "Wavre Road",
+      "owner": "prussia",
+      "controller": "prussia",
+      "theaterId": "zone_prussian_vanguard",
+      "assignedGeneralId": "commander_bulow",
+      "terrain": "plain",
+      "neighbors": [
+        "region_prussian_approach"
+      ],
+      "displayHexes": [
+        {
+          "q": 5,
+          "r": 1
+        }
+      ],
+      "representativeHex": {
+        "q": 5,
         "r": 1
       },
       "city": null,
@@ -375,6 +409,13 @@
       "hasRoad": true,
       "hasRiverCrossing": false,
       "movementCostModifier": 0
+    },
+    {
+      "from": "region_prussian_approach",
+      "to": "region_wavre_road",
+      "hasRoad": true,
+      "hasRiverCrossing": false,
+      "movementCostModifier": 0
     }
   ],
   "supplySources": [
@@ -392,6 +433,11 @@
       "id": "supply_prussian_approach",
       "faction": "prussia",
       "regionId": "region_prussian_approach"
+    },
+    {
+      "id": "supply_wavre_road",
+      "faction": "prussia",
+      "regionId": "region_wavre_road"
     }
   ],
   "objectives": [
