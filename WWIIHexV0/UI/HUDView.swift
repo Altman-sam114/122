@@ -141,7 +141,11 @@ struct HUDView: View {
         guard let winner = gameState.victoryState.winner else {
             return "Ongoing"
         }
-        return "\(winner.displayName) Victory"
+        let winnerName = NapoleonicMessageSanitizer.displayText(
+            winner.displayName,
+            for: gameState.activeFaction
+        )
+        return "\(winnerName) Victory"
     }
 
     private var activeLedger: FactionEconomyLedger {

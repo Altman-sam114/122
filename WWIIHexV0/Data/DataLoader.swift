@@ -37,7 +37,7 @@ enum ScenarioCatalog {
         unitTemplateName: "napoleonic_unit_templates",
         generalCatalogName: "napoleonic_generals",
         defaultPlayerFaction: .france,
-        migrationStage: "v3.2_data_slice"
+        migrationStage: "v3.8_default_playable_slice"
     )
 
     static let defaultPlayable = waterloo1815DataSlice

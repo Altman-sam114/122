@@ -56,7 +56,15 @@ struct TurnManager {
         self.warCommandExecutor = warCommandExecutor ?? WarCommandExecutor(commandHandler: commandHandler)
     }
 
+    @available(*, deprecated, message: "Legacy Ardennes/Germany helper. Use runAITurn(state:faction:pipelineMode:) or runLegacyGermanAITurn only for Ardennes compatibility.")
     func runGermanAITurn(
+        state: GameState,
+        pipelineMode: WarPipelineMode = .marshalDirective
+    ) async -> AgentTurnOutcome {
+        await runLegacyGermanAITurn(state: state, pipelineMode: pipelineMode)
+    }
+
+    func runLegacyGermanAITurn(
         state: GameState,
         pipelineMode: WarPipelineMode = .marshalDirective
     ) async -> AgentTurnOutcome {

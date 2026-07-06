@@ -110,11 +110,23 @@ enum NapoleonicMessageSanitizer {
         }
 
         var displayText = text
+        for (protected, token) in protectedTerms {
+            displayText = displayText.replacingOccurrences(of: protected, with: token)
+        }
         for (raw, replacement) in replacements {
             displayText = displayText.replacingOccurrences(of: raw, with: replacement)
         }
+        for (protected, token) in protectedTerms {
+            displayText = displayText.replacingOccurrences(of: token, with: protected)
+        }
         return displayText
     }
+
+    private static let protectedTerms: [(String, String)] = [
+        ("Anglo-Allied", "__NAPOLEONIC_ANGLO_ALLIED__"),
+        ("angloAllied", "__NAPOLEONIC_ANGLO_ALLIED_RAW__"),
+        ("anglo_allied", "__NAPOLEONIC_ANGLO_ALLIED_ID__")
+    ]
 
     private static let replacements: [(String, String)] = [
         ("Command directive pipeline selected but deployment sectors are missing; legacy pipeline was not invoked.", "Staff dispatch unavailable: corps sectors are missing."),
@@ -159,16 +171,40 @@ enum NapoleonicMessageSanitizer {
         ("Ardennes", "Archived Campaign"),
         ("bastogne", "archived objective"),
         ("Bastogne", "Archived Objective"),
+        ("St. Vith", "Archived Objective"),
         ("germanAI", "staff dispatch"),
         ("alliedPlayer", "orders"),
         ("germany", "archived force"),
         ("allies", "coalition"),
         ("Germany", "Archived Force"),
         ("Allies", "Coalition"),
+        ("german", "archived"),
+        ("allied", "coalition"),
         ("German", "Archived"),
         ("Allied", "Coalition"),
+        ("Guderian", "Archived Commander"),
+        ("Montgomery", "Archived Commander"),
+        ("panzerDivision", "reserveFormation"),
+        ("motorizedDivision", "mobileReserve"),
+        ("motorizedInfantry", "mobile infantry"),
+        ("Panzer Division", "Reserve Formation"),
+        ("Motorized Division", "Mobile Reserve"),
+        ("Infantry Division", "Infantry Formation"),
+        ("Artillery Division", "Artillery Formation"),
+        ("Anti-Tank Division", "Defensive Formation"),
+        ("Garrison Division", "Garrison Formation"),
+        ("panzer divisions", "reserve formations"),
+        ("Panzer Divisions", "Reserve Formations"),
+        ("motorized divisions", "mobile reserves"),
+        ("Motorized Divisions", "Mobile Reserves"),
+        ("divisions", "formations"),
+        ("Divisions", "Formations"),
+        ("division", "formation"),
+        ("Division", "Formation"),
         ("panzer", "reserve"),
         ("Panzer", "Reserve"),
+        ("tanks", "formations"),
+        ("Tanks", "Formations"),
         ("tank", "formation"),
         ("Tank", "Formation"),
         ("motorized", "mobile"),

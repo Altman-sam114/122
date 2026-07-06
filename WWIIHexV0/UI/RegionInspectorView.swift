@@ -34,7 +34,7 @@ struct RegionInspectorView: View {
                 }
 
                 LabeledContent(label("Hex Controller")) {
-                    Text(state.selectedHexController?.displayName ?? emptyDisplayText("None", napoleonic: "Uncontrolled"))
+                    Text(factionDisplayName(state.selectedHexController) ?? emptyDisplayText("None", napoleonic: "Uncontrolled"))
                 }
 
                 LabeledContent(label("Hex Dynamic Theater")) {
@@ -47,7 +47,7 @@ struct RegionInspectorView: View {
             }
 
             LabeledContent(label("Controller")) {
-                Text(state.region.controller.displayName)
+                Text(factionDisplayName(state.region.controller) ?? emptyDisplayText("None", napoleonic: "Uncontrolled"))
             }
 
             LabeledContent(label("Terrain")) {
@@ -188,6 +188,13 @@ struct RegionInspectorView: View {
 
     private func emptyDisplayText(_ legacy: String, napoleonic: String) -> String {
         activeFaction.usesNapoleonicLogisticsVocabulary ? napoleonic : legacy
+    }
+
+    private func factionDisplayName(_ faction: Faction?) -> String? {
+        guard let faction else {
+            return nil
+        }
+        return NapoleonicMessageSanitizer.displayText(faction.displayName, for: activeFaction)
     }
 
     private func cityLevelDisplayName(_ cityLevel: CityLevel) -> String {

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "id": "waterloo_1815",
-  "displayName": "Waterloo 1815 Data Slice",
+  "displayName": "Waterloo 1815",
   "factions": [
     "france",
     "angloAllied",
@@ -661,7 +661,7 @@
   "dataNotes": [
     "v3.2 minimal Waterloo data slice for JSON/schema integration.",
     "Uses napoleonic_unit_templates.json through ScenarioCatalog.unitTemplateName.",
-    "Napoleonic templates use v3.3 ComponentType cases; morale now has a minimal Division-level model, while formation, cavalry charge, and artillery preparation rules remain future work.",
+    "Napoleonic templates use v3.3 ComponentType cases; morale now has a minimal formation-level model, while explicit formation stance, cavalry charge, and artillery preparation rules remain future work.",
     "v3.5 adds delayed French and Prussian reinforcement schedule entries; runtime deployment waits for safe controlled entry hexes.",
     "v3 data follow-up adds Plancenoit as a French-held objective and adds minimal La Haye Sainte / Papelotte garrisons plus Lobau's Plancenoit detachment without changing the current Waterloo victory conditions.",
     "v3 data follow-up adds q5,r1 Wavre Road as an abstract Prussian rear road, supply, and reinforcement entry hex; Prussian Arrival Road at q4,r1 remains the objective trigger and victory-condition member.",

@@ -396,7 +396,7 @@ flowchart TD
 flowchart TD
     TARGET["macOS 主游戏 target<br/>WWIIHexV0Mac<br/>独立于 iOS target 和 MapEditorMac"]:::platform
     APP["macOS App 入口<br/>WWIIHexV0MacApp<br/>WindowGroup + Game 菜单"]:::platform
-    BOOT["游戏容器<br/>AppContainer.bootstrap<br/>优先 Waterloo；失败时同步降级 Ardennes legacy 并提示；初始化规则/AI"]:::state
+    BOOT["游戏容器<br/>AppContainer.bootstrap<br/>优先 Waterloo；失败时保留 Waterloo 元数据并进入 1x1 inert 恢复态；初始化规则/AI"]:::state
     ROOT["主游戏界面<br/>RootGameView<br/>HUD、图层、Info、棋盘"]:::ui
     BRIDGE["macOS SpriteKit 桥<br/>BoardSceneView + BoardEventSKView<br/>NSViewRepresentable 承载 SKView"]:::platform
     SCENE["棋盘场景<br/>BoardScene<br/>鼠标点击、拖拽、滚轮/触控板缩放"]:::ui

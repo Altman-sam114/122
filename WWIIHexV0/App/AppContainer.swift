@@ -168,7 +168,11 @@ final class AppContainer: ObservableObject {
         do {
             return (try dataLoader.loadGeneralRegistry(scenario), nil)
         } catch {
-            let message = "\(operation) commander catalog \(scenario.generalCatalogName).json failed to load. Campaign continues without assigned commanders. \(error.localizedDescription)"
+            let detail = NapoleonicMessageSanitizer.displayText(
+                error.localizedDescription,
+                for: scenario.defaultPlayerFaction
+            )
+            let message = "\(operation) commander catalog could not be loaded. Recovery mode opened without assigned commanders. \(detail)"
             return (.empty, message)
         }
     }
@@ -181,7 +185,11 @@ final class AppContainer: ObservableObject {
             let state = try dataLoader.loadGameState(defaultScenario)
             return (state, defaultScenario, defaultScenario.defaultPlayerFaction, nil)
         } catch {
-            let recoveryMessage = "Default scenario \(defaultScenario.displayName) failed to load. Open New Campaign to choose a playable scenario. \(error.localizedDescription)"
+            let detail = NapoleonicMessageSanitizer.displayText(
+                error.localizedDescription,
+                for: defaultScenario.defaultPlayerFaction
+            )
+            let recoveryMessage = "Default scenario \(defaultScenario.displayName) failed to load. Open New Campaign to choose a playable scenario. \(detail)"
             return (
                 recoveryState(for: defaultScenario, errorMessage: recoveryMessage),
                 defaultScenario,
@@ -616,7 +624,7 @@ final class AppContainer: ObservableObject {
         do {
             nextRegistry = try dataLoader.loadGeneralRegistry(scenario)
         } catch {
-            let recoveryMessage = "Commander catalog \(scenario.generalCatalogName).json failed to load. Saved campaign was not opened. \(error.localizedDescription)"
+            let recoveryMessage = "Commander catalog could not be loaded. Saved campaign was not opened. \(NapoleonicMessageSanitizer.displayText(error.localizedDescription, for: scenario.defaultPlayerFaction))"
             let message = "Continue failed: \(recoveryMessage)"
             lastCommandMessage = message
             appendInteractionEvent(message)
@@ -720,7 +728,7 @@ final class AppContainer: ObservableObject {
         do {
             nextRegistry = try dataLoader.loadGeneralRegistry(scenario)
         } catch {
-            let message = "New game failed: commander catalog \(scenario.generalCatalogName).json could not be loaded. \(error.localizedDescription)"
+            let message = "New game failed: commander catalog could not be loaded. \(NapoleonicMessageSanitizer.displayText(error.localizedDescription, for: scenario.defaultPlayerFaction))"
             lastCommandMessage = message
             appendInteractionEvent(message)
             return false
@@ -821,7 +829,7 @@ final class AppContainer: ObservableObject {
     }
 
     private static func unavailableScenarioMessage(_ scenarioId: String) -> String {
-        "Saved campaign references scenario '\(scenarioId)' that is not available in this build."
+        "Saved campaign references an archived or unavailable campaign."
     }
 
     private static func continueFailureMessage(for status: GameSaveSnapshot.LoadResult) -> String {
@@ -1431,7 +1439,7 @@ final class AppContainer: ObservableObject {
         case .germany:
             if currentScenario.id == ScenarioCatalog.ardennesLegacy.id,
                ScenarioCatalog.ardennesLegacy.matches(state.scenarioId) {
-                agent = GameAgent.guderian(from: dataLoader, state: state)
+                agent = GameAgent.legacyGuderian(from: dataLoader, state: state)
             } else {
                 agent = sampleCommandStaff(for: faction, state: state)
             }

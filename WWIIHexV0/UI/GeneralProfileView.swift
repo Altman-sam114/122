@@ -54,7 +54,7 @@ struct GeneralProfileView: View {
             Text(general.rank)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
-            Text(general.faction.displayName)
+            Text(displayText(general.faction.displayName))
                 .font(.caption.weight(.semibold))
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
@@ -136,7 +136,7 @@ struct GeneralProfileView: View {
                     .foregroundStyle(.secondary)
             } else {
                 ForEach(assignedDivisions, id: \.id) { division in
-                    LabeledContent(division.name) {
+                    LabeledContent(displayText(division.name)) {
                         Text("\(division.strength)/\(division.maxStrength)")
                     }
                     .font(.caption)
@@ -224,5 +224,9 @@ struct GeneralProfileView: View {
         case .cautious:
             return "Cautious"
         }
+    }
+
+    private func displayText(_ text: String) -> String {
+        NapoleonicMessageSanitizer.displayText(text, for: activeFaction)
     }
 }

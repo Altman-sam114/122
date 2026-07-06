@@ -34,9 +34,9 @@ struct DiplomacyPanelView: View {
             ForEach(diplomacyState.countries) { country in
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(country.name)
+                        Text(displayText(country.name))
                             .font(.caption.weight(.semibold))
-                        Text("\(country.faction.displayName) | \(blocDisplayName(country.blocId))")
+                        Text("\(displayText(country.faction.displayName)) | \(blocDisplayName(country.blocId))")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -172,7 +172,7 @@ struct DiplomacyPanelView: View {
 
     private func blocDisplayName(_ blocId: DiplomaticBlocId) -> String {
         if let bloc = diplomacyState.blocs.first(where: { $0.id == blocId }) {
-            return bloc.name
+            return displayText(bloc.name)
         }
         guard activeFaction.usesNapoleonicLogisticsVocabulary else {
             return blocId.rawValue
@@ -182,7 +182,7 @@ struct DiplomacyPanelView: View {
 
     private func countryDisplayName(_ countryId: CountryId) -> String {
         if let country = diplomacyState.countries.first(where: { $0.id == countryId }) {
-            return country.name
+            return displayText(country.name)
         }
         guard activeFaction.usesNapoleonicLogisticsVocabulary else {
             return countryId.rawValue
@@ -194,6 +194,10 @@ struct DiplomacyPanelView: View {
         activeFaction.usesNapoleonicLogisticsVocabulary
             ? NapoleonicMessageSanitizer.displayText(text, for: activeFaction)
             : text
+    }
+
+    private func displayText(_ text: String) -> String {
+        NapoleonicMessageSanitizer.displayText(text, for: activeFaction)
     }
 
     private func identifierDisplayText(

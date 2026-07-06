@@ -1,13 +1,18 @@
 import Foundation
 
 extension GameAgent {
+    @available(*, deprecated, message: "Legacy Ardennes/Guderian helper. Use legacyGuderian(from:state:) only behind an Ardennes scenario guard.")
     static func guderian(from loader: DataLoader, state: GameState) -> GameAgent {
+        legacyGuderian(from: loader, state: state)
+    }
+
+    static func legacyGuderian(from loader: DataLoader, state: GameState) -> GameAgent {
         if let definition = try? loader.loadGeneralAgents().first(where: { $0.id == "guderian" }),
            let agent = GameAgent(definition: definition) {
             return agent
         }
 
-        return guderianFallback(
+        return legacyGuderianFallback(
             assignedDivisionIds: state.divisions
                 .filter { $0.faction == .germany }
                 .map(\.id)
@@ -38,7 +43,12 @@ extension GameAgent {
         )
     }
 
+    @available(*, deprecated, message: "Legacy Ardennes/Guderian fallback. Use legacyGuderianFallback only in legacy tests or Ardennes compatibility code.")
     static func guderianFallback(assignedDivisionIds: [String]) -> GameAgent {
+        legacyGuderianFallback(assignedDivisionIds: assignedDivisionIds)
+    }
+
+    static func legacyGuderianFallback(assignedDivisionIds: [String]) -> GameAgent {
         GameAgent(
             id: "guderian",
             name: "Heinz Guderian",
