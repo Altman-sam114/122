@@ -57,7 +57,7 @@ struct EconomyPanelView: View {
     private var productionControls: some View {
         let faction = gameState.activeFaction
 
-        VStack(alignment: .leading, spacing: 8) {
+        return VStack(alignment: .leading, spacing: 8) {
             Text(productionTitle(for: faction))
                 .font(.subheadline.weight(.semibold))
 

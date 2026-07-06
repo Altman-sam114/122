@@ -207,7 +207,12 @@ final class AppContainer: ObservableObject {
             victoryState: VictoryState(),
             selectedUnitSummary: nil,
             eventLog: [
-                GameLogEntry(message: errorMessage, category: .system)
+                GameLogEntry(
+                    turn: 1,
+                    faction: scenario.defaultPlayerFaction,
+                    phase: GamePhase.legacyCompatibleCommandPhase(for: scenario.defaultPlayerFaction),
+                    message: errorMessage
+                )
             ],
             warDirectiveRecords: [],
             playerCommandState: .empty

@@ -798,7 +798,6 @@ struct DataLoader {
         for template in unitTemplates where templatesById[template.id] == nil {
             templatesById[template.id] = template
         }
-        let templateIds = Set(templatesById.keys)
         appendDuplicateErrors(unitTemplates.map(\.id), label: "unit template id", to: &errors)
         for template in unitTemplates {
             if template.maxHP <= 0 {
