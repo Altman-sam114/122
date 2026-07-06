@@ -420,6 +420,24 @@
       "triggerController": null
     },
     {
+      "id": "fr_cavalry_reserve",
+      "name": "French Cavalry Reserve",
+      "faction": "france",
+      "templateId": "cavalry_reserve",
+      "arrivalTurn": 3,
+      "entryCoord": {
+        "q": 0,
+        "r": 2
+      },
+      "facing": "east",
+      "hp": 10,
+      "retreatMode": "retreatable",
+      "supplyState": "supplied",
+      "assignedAgentId": "commander_napoleon",
+      "triggerObjectiveId": null,
+      "triggerController": null
+    },
+    {
       "id": "pr_bulow_iv_corps",
       "name": "Prussian IV Corps",
       "faction": "prussia",

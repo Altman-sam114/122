@@ -259,7 +259,7 @@ final class AppContainer: ObservableObject {
         lastCommandMessage = result.message
 
         let status = result.succeeded ? "accepted" : "rejected"
-        appendInteractionEvent(commandInteractionMessage(status: status, command: command, resultMessage: result.message))
+        appendInteractionEvent(commandInteractionMessage(status: status, command: command, state: stateBeforeCommand, resultMessage: result.message))
         refreshSelectionAfterStateChange()
         runAIIfNeeded()
     }
@@ -1220,7 +1220,8 @@ final class AppContainer: ObservableObject {
                 directive: directive,
                 command: execution.generatedCommands[index],
                 result: result,
-                faction: playerFaction
+                faction: playerFaction,
+                state: result.state
             )
         }
         var diagnostics: [String] = []
@@ -1501,17 +1502,17 @@ final class AppContainer: ObservableObject {
         faction.usesNapoleonicLogisticsVocabulary ? "formation" : "unit"
     }
 
-    private func commandInteractionMessage(status: String, command: Command, resultMessage: String) -> String {
+    private func commandInteractionMessage(status: String, command: Command, state: GameState, resultMessage: String) -> String {
         guard interactionUsesNapoleonicVocabulary else {
             return "Command \(status): \(command.displayName). \(resultMessage)"
         }
 
-        return "Order \(status): \(command.displayName(for: gameState.activeFaction)). \(resultMessage)"
+        return "Order \(status): \(command.displayName(for: state.activeFaction, in: state)). \(resultMessage)"
     }
 
     private func observerCommandRejectedMessage(for command: Command) -> String {
         if interactionUsesNapoleonicVocabulary {
-            return "Order rejected: \(command.displayName(for: gameState.activeFaction)) unavailable in observer mode."
+            return "Order rejected: \(command.displayName(for: gameState.activeFaction, in: gameState)) unavailable in observer mode."
         }
 
         return "Command rejected: \(command.displayName) unavailable in observer mode."
@@ -1640,7 +1641,8 @@ final class AppContainer: ObservableObject {
         includeFirstError: Bool = true
     ) -> String? {
         let nonEndTurnResults = record.commandResults.filter {
-            $0.commandDisplayName != Command.endTurn.displayName
+            let commandDisplayName = $0.commandDisplayName?.lowercased()
+            return commandDisplayName != "end turn" && commandDisplayName != "end orders"
         }
         let executedOrders = nonEndTurnResults.filter(\.executed)
         guard executedOrders.isEmpty else {

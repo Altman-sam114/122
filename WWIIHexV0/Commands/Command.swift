@@ -59,6 +59,33 @@ enum Command: Codable, Equatable {
         }
     }
 
+    func displayName(for faction: Faction, in state: GameState) -> String {
+        guard faction.usesNapoleonicLogisticsVocabulary else {
+            return displayName
+        }
+
+        switch self {
+        case .move(let divisionId, let destination):
+            return "Move \(formationDisplayName(divisionId, in: state)) to \(destination.q),\(destination.r)"
+        case .attack(let attackerId, let targetId):
+            return "Attack \(formationDisplayName(targetId, in: state)) with \(formationDisplayName(attackerId, in: state))"
+        case .hold(let divisionId):
+            return "Hold Line with \(formationDisplayName(divisionId, in: state))"
+        case .allowRetreat(let divisionId):
+            return "Authorize Withdrawal for \(formationDisplayName(divisionId, in: state))"
+        case .resupply(let divisionId):
+            return "Rest & Supply \(formationDisplayName(divisionId, in: state))"
+        case .queueProduction(let kind):
+            return "Reserve Order(\(kind.displayName(for: faction)))"
+        case .endTurn:
+            return "End Orders"
+        }
+    }
+
+    private func formationDisplayName(_ divisionId: String, in state: GameState) -> String {
+        state.division(id: divisionId)?.name ?? "Formation"
+    }
+
     var actingDivisionId: String? {
         switch self {
         case .move(let divisionId, _),

@@ -1109,7 +1109,7 @@ struct WarCommandExecutor {
                 .map { $0.displayName(for: state.activeFaction) }
                 .joined(separator: ", ")
             state.appendEvent(
-                "Corps directive order refused: \(rejectionReasons) for \(command.displayName(for: state.activeFaction)).",
+                "Corps directive order refused: \(rejectionReasons) for \(command.displayName(for: state.activeFaction, in: state)).",
                 category: .frontChange,
                 relatedRecordId: relatedRecordId
             )
@@ -1298,7 +1298,7 @@ struct WarCommandExecutor {
         state: GameState
     ) -> String {
         if state.activeFaction.usesNapoleonicLogisticsVocabulary {
-            return "Sector \(regionDisplayName(regionId, in: state)) control changed to \(controller.displayName) via \(command.displayName(for: state.activeFaction))."
+            return "Sector \(regionDisplayName(regionId, in: state)) control changed to \(controller.displayName) via \(command.displayName(for: state.activeFaction, in: state))."
         }
 
         return "Region \(regionId.rawValue) controller changed to \(controller.displayName) via \(command.displayName)."

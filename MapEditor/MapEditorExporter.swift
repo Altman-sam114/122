@@ -92,22 +92,21 @@ enum MapEditorExporter {
             return $0.turnOrderPriority < $1.turnOrderPriority
         }
         if unique.filter({ !$0.isNeutral }).isEmpty {
-            let includesNeutral = hasNeutralData || unique.contains(.neutral)
-            return includesNeutral
-                ? Faction.legacyWorldWarIIFactions + [.neutral]
-                : Faction.legacyWorldWarIIFactions
+            return [.neutral]
         }
-        return unique.isEmpty ? Faction.legacyWorldWarIIFactions : unique
+        return unique
     }
 
     private static func initialRuntimeFields(
         for factions: [Faction]
     ) -> (phase: GamePhase, playerFaction: Faction, aiFaction: Faction) {
         let commandFactions = factions.filter { !$0.isNeutral }
+        guard !commandFactions.isEmpty else {
+            return (.resolution, .neutral, .neutral)
+        }
         let playerFaction = commandFactions.first { $0 == .allies }
             ?? commandFactions.first { $0 == .france }
-            ?? commandFactions.first
-            ?? .allies
+            ?? commandFactions[0]
         let aiFaction = commandFactions.first { $0 != playerFaction } ?? playerFaction
         let initialPhase = playerFaction.usesNapoleonicLogisticsVocabulary
             ? GamePhase.playerCommand

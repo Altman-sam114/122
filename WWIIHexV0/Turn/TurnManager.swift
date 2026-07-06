@@ -139,7 +139,8 @@ struct TurnManager {
                             order: order,
                             command: issuedCommand.command,
                             result: result,
-                            faction: agent.faction
+                            faction: agent.faction,
+                            state: nextState
                         )
                     )
 
@@ -326,7 +327,8 @@ struct TurnManager {
                     directive: directive,
                     command: pair.0,
                     result: pair.1,
-                    faction: faction
+                    faction: faction,
+                    state: pair.1.state
                 )
                 commandResults.append(summary)
                 perDirectiveResults.append(summary)

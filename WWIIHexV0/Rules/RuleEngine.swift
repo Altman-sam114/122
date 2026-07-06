@@ -26,7 +26,7 @@ struct RuleEngine {
             command: command,
             validation: validation,
             state: nextState,
-            message: "\(prefix): \(command.displayName(for: preparedState.activeFaction))."
+            message: "\(prefix): \(command.displayName(for: preparedState.activeFaction, in: preparedState))."
         )
     }
 
