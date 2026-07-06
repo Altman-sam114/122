@@ -47,7 +47,7 @@ struct GeneralProfileView: View {
                 .frame(width: 112, height: 144)
                 .background(PlatformStyles.selectionTint)
                 .clipShape(RoundedRectangle(cornerRadius: 8))
-                .accessibilityLabel("\(general.localizedName) portrait placeholder")
+                .accessibilityLabel(portraitAccessibilityLabel)
 
             Text(general.localizedName)
                 .font(.title3.weight(.semibold))
@@ -205,6 +205,14 @@ struct GeneralProfileView: View {
         let words = general.localizedName.split(separator: " ")
         let letters = words.prefix(2).compactMap(\.first)
         return letters.isEmpty ? String(general.name.prefix(2)).uppercased() : String(letters).uppercased()
+    }
+
+    private var portraitAccessibilityLabel: String {
+        if activeFaction.usesNapoleonicLogisticsVocabulary {
+            return "\(general.localizedName) commander portrait placeholder"
+        }
+
+        return "\(general.localizedName) portrait placeholder"
     }
 
     private func styleLabel(_ style: ZoneCommanderAgentConfig.CommandStyle) -> String {

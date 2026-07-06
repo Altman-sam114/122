@@ -94,14 +94,14 @@ struct DiplomacyPanelView: View {
             Text(label("Ruler"))
                 .font(.subheadline.weight(.semibold))
             LabeledContent(label("Agent")) {
-                Text(record.rulerAgentId)
+                Text(staffIdentifierDisplayText(record.rulerAgentId))
             }
             LabeledContent(label("Posture")) {
                 Text(record.posture.displayName)
             }
             if let zoneId = record.preferredFrontZoneId {
                 LabeledContent(label("Focus")) {
-                    Text(zoneId.rawValue)
+                    Text(frontZoneDisplayText(zoneId.rawValue))
                 }
             }
             Text(record.rationale)
@@ -142,5 +142,64 @@ struct DiplomacyPanelView: View {
         activeFaction.usesNapoleonicLogisticsVocabulary
             ? "\(count) power(s)"
             : "\(count) member(s)"
+    }
+
+    private func staffIdentifierDisplayText(_ identifier: String) -> String {
+        guard activeFaction.usesNapoleonicLogisticsVocabulary else {
+            return identifier
+        }
+
+        let normalized = identifier.lowercased()
+        if normalized.contains("mockai") ||
+            normalized.contains("mock_commander") ||
+            normalized.contains("legacy") ||
+            normalized.contains("_ai") ||
+            normalized.contains("ai_") ||
+            normalized == "ai" {
+            return "\(activeFaction.displayName) Command Staff"
+        }
+
+        return identifierDisplayText(identifier, fallback: "\(activeFaction.displayName) Command Staff")
+    }
+
+    private func frontZoneDisplayText(_ rawValue: String) -> String {
+        guard activeFaction.usesNapoleonicLogisticsVocabulary else {
+            return rawValue
+        }
+
+        return identifierDisplayText(rawValue, fallback: "corps sector", suffix: " sector")
+    }
+
+    private func identifierDisplayText(
+        _ rawValue: String,
+        fallback: String,
+        suffix: String? = nil
+    ) -> String {
+        let stopWords: Set<String> = [
+            "region", "front", "frontzone", "zone", "theater", "sector",
+            "legacy", "mock", "ai", "commander", "marshal", "directive",
+            "power", "faction", "global", "ruler"
+        ]
+        let words = rawValue
+            .replacingOccurrences(of: "-", with: "_")
+            .split(separator: "_")
+            .map { String($0) }
+            .filter { !stopWords.contains($0.lowercased()) }
+
+        guard !words.isEmpty else {
+            return fallback
+        }
+
+        let display = words
+            .map { word in
+                word.count <= 3 ? word.uppercased() : word.capitalized
+            }
+            .joined(separator: " ")
+
+        if let suffix,
+           !display.lowercased().hasSuffix(suffix.trimmingCharacters(in: .whitespaces).lowercased()) {
+            return display + suffix
+        }
+        return display
     }
 }

@@ -1522,10 +1522,23 @@ final class AppContainer: ObservableObject {
 
     private func generalOrderSubmittedMessage(for directive: ZoneDirective) -> String {
         if interactionUsesNapoleonicVocabulary {
-            return "Corps order submitted: \(directiveTypeDisplayName(directive.type)) \(directive.zoneId.rawValue)."
+            return "Corps order submitted: \(directiveTypeDisplayName(directive.type)) \(frontZoneDisplayName(directive.zoneId))."
         }
 
         return "General order submitted: \(directive.type.rawValue) \(directive.zoneId.rawValue)."
+    }
+
+    private func frontZoneDisplayName(_ zoneId: FrontZoneId) -> String {
+        guard interactionUsesNapoleonicVocabulary else {
+            return zoneId.rawValue
+        }
+
+        if let zoneName = gameState.warDeploymentState.frontZones[zoneId]?.name,
+           !zoneName.isEmpty {
+            return zoneName
+        }
+
+        return identifierDisplayText(zoneId.rawValue, fallback: "corps sector", suffix: " sector")
     }
 
     private func directiveTypeDisplayName(_ type: DirectiveType) -> String {
@@ -1539,6 +1552,39 @@ final class AppContainer: ObservableObject {
         case .defend:
             return "Hold Contact Line"
         }
+    }
+
+    private func identifierDisplayText(
+        _ rawValue: String,
+        fallback: String,
+        suffix: String? = nil
+    ) -> String {
+        let stopWords: Set<String> = [
+            "region", "front", "frontzone", "zone", "theater", "sector",
+            "legacy", "mock", "ai", "commander", "marshal", "directive",
+            "power", "faction", "global", "ruler"
+        ]
+        let words = rawValue
+            .replacingOccurrences(of: "-", with: "_")
+            .split(separator: "_")
+            .map { String($0) }
+            .filter { !stopWords.contains($0.lowercased()) }
+
+        guard !words.isEmpty else {
+            return fallback
+        }
+
+        let display = words
+            .map { word in
+                word.count <= 3 ? word.uppercased() : word.capitalized
+            }
+            .joined(separator: " ")
+
+        if let suffix,
+           !display.lowercased().hasSuffix(suffix.trimmingCharacters(in: .whitespaces).lowercased()) {
+            return display + suffix
+        }
+        return display
     }
 
     private func aiTurnMessage(errorCount: Int) -> String {

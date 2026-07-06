@@ -17,7 +17,7 @@ struct VictoryRules {
             return
         }
 
-        if state.scenarioId == "waterloo_1815" {
+        if isWaterlooScenario(state) {
             updateWaterlooVictoryState(in: &state)
             return
         }
@@ -131,6 +131,14 @@ struct VictoryRules {
         let explicitConditionIds = Set(state.victoryConditions.map(\.id))
         let activeConditions = state.victoryConditions.filter(\.isActive)
         return activeConditions + fallbackConditions.filter { !explicitConditionIds.contains($0.id) }
+    }
+
+    private func isWaterlooScenario(_ state: GameState) -> Bool {
+        ScenarioCatalog.napoleonicTarget.matches(state.scenarioId) ||
+            state.victoryConditions.contains { condition in
+                condition.id == WaterlooConditionId.frenchBreakCenter ||
+                    condition.id == WaterlooConditionId.coalitionHoldUntilPrussia
+            }
     }
 
     private func defaultWaterlooVictoryConditions(maxTurns: Int) -> [ScenarioVictoryCondition] {

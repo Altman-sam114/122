@@ -434,7 +434,7 @@ struct DiplomacyState: Codable, Equatable {
         let lhsCountries = countries(for: lhs)
         let rhsCountries = countries(for: rhs)
         guard !lhsCountries.isEmpty, !rhsCountries.isEmpty else {
-            return lhs != rhs
+            return fallbackHostility(lhs, rhs)
         }
 
         var sawRelation = false
@@ -449,7 +449,7 @@ struct DiplomacyState: Codable, Equatable {
                 }
             }
         }
-        return sawRelation ? false : lhs != rhs
+        return sawRelation ? false : fallbackHostility(lhs, rhs)
     }
 
     func isFriendly(_ lhs: Faction, to rhs: Faction) -> Bool {
@@ -460,7 +460,7 @@ struct DiplomacyState: Codable, Equatable {
         let lhsCountries = countries(for: lhs)
         let rhsCountries = countries(for: rhs)
         guard !lhsCountries.isEmpty, !rhsCountries.isEmpty else {
-            return false
+            return fallbackFriendliness(lhs, rhs)
         }
 
         for lhsCountry in lhsCountries {
@@ -473,7 +473,30 @@ struct DiplomacyState: Codable, Equatable {
                 }
             }
         }
-        return false
+        return fallbackFriendliness(lhs, rhs)
+    }
+
+    private func fallbackHostility(_ lhs: Faction, _ rhs: Faction) -> Bool {
+        guard lhs != rhs else {
+            return false
+        }
+        guard !lhs.isNeutral, !rhs.isNeutral else {
+            return false
+        }
+        if lhs.isNapoleonicCoalitionMember && rhs.isNapoleonicCoalitionMember {
+            return false
+        }
+        if lhs == .france && rhs.isNapoleonicCoalitionMember {
+            return true
+        }
+        if rhs == .france && lhs.isNapoleonicCoalitionMember {
+            return true
+        }
+        return lhs != rhs
+    }
+
+    private func fallbackFriendliness(_ lhs: Faction, _ rhs: Faction) -> Bool {
+        lhs == rhs || (lhs.isNapoleonicCoalitionMember && rhs.isNapoleonicCoalitionMember)
     }
 
     func hostileFactions(to faction: Faction, among candidates: [Faction] = Faction.allCases) -> [Faction] {

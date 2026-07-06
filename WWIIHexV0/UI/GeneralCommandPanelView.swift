@@ -39,7 +39,7 @@ struct GeneralCommandPanelView: View {
                         Button(action: onShowProfile) {
                             portraitBadge(for: general)
                         }
-                            .accessibilityLabel("Open profile for \(general.localizedName)")
+                            .accessibilityLabel(profileAccessibilityLabel(for: general))
                             .buttonStyle(.plain)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(general.localizedName)
@@ -172,7 +172,23 @@ struct GeneralCommandPanelView: View {
             .frame(width: 40, height: 40)
             .background(PlatformStyles.selectionTint)
             .clipShape(RoundedRectangle(cornerRadius: 8))
-            .accessibilityLabel("\(general.localizedName) portrait placeholder")
+            .accessibilityLabel(portraitAccessibilityLabel(for: general))
+    }
+
+    private func profileAccessibilityLabel(for general: GeneralData) -> String {
+        if activeFaction.usesNapoleonicLogisticsVocabulary {
+            return "Open commander profile for \(general.localizedName)"
+        }
+
+        return "Open profile for \(general.localizedName)"
+    }
+
+    private func portraitAccessibilityLabel(for general: GeneralData) -> String {
+        if activeFaction.usesNapoleonicLogisticsVocabulary {
+            return "\(general.localizedName) commander portrait placeholder"
+        }
+
+        return "\(general.localizedName) portrait placeholder"
     }
 
     private func metricBar(title: String, value: Int) -> some View {

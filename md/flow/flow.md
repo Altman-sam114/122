@@ -118,7 +118,7 @@ playerCommandState
 - `economyState` 保存 manpower、industry、supplies、生产队列、上回合收入/维护费/补员消耗，不直接改变战术占领权。
 - `reinforcementState` 保存 scenario delayed reinforcement 的 pending schedule 和已到场 id。它不直接改变战术状态；只有 `EconomyRules.resolveScheduledReinforcements` 在回合结算中找到安全己控入口 hex 后，才把 reinforcement division 加入 `divisions`。
 - v3.5 起 `EconomyState` 的底层 schema 仍保持 manpower / industry / supplies 兼容，但 France / Anglo-Allied / Prussia 等拿战 faction 的 UI 和日志会把它展示为 Recruits / Ammunition/Horses / Supplies，并把生产队列展示为 Reserves / Reserve Orders。
-- `diplomacyState` 保存国家、集团、国家间关系和统治者记录；当前核心用途是 `isHostile` / `isFriendly` 敌我查询。旧二元数据缺关系时仍兼容回退到不同 faction 敌对，但 `.neutral` 不会因为缺 relation 被当作 hostile。
+- `diplomacyState` 保存国家、集团、国家间关系和统治者记录；当前核心用途是 `isHostile` / `isFriendly` 敌我查询。旧二元数据缺关系时仍兼容回退到不同 faction 敌对，但 `.neutral` 不会因为缺 relation 被当作 hostile；缺国家记录或缺关系时，拿战联军成员之间 fallback 为 friendly，France 与联军成员 fallback 为 hostile。
 - `victoryConditions` 保存 scenario JSON 中的胜利条件运行时副本。旧存档缺该字段时 decode 为 `[]`，Waterloo 分支会使用内置 fallback；新 Waterloo 加载路径会从 JSON 注入 objective id、目标 faction 和决定回合。
 - `eventLog` 给 UI 和调试看。
 - `warDirectiveRecords` 记录战争指令执行回放，供 v0.36+ 后续接 LLM / 聊天命令审计。
@@ -632,6 +632,7 @@ resupply/rest:
 AppContainer.bootstrap()
   -> DataLoader().loadGameState(ScenarioCatalog.defaultPlayable)
      - 默认 Waterloo 加载失败时保留 Waterloo 元数据，构造 1x1 inert 恢复地图并提示从 New Campaign 手动选择
+     - 恢复态使用 1 回合、1x1 inert 地图和 VictoryState.ongoing，避免加载失败时误进入胜负态
   -> RuleEngine()
   -> startup.scenario.defaultPlayerFaction
   -> StrategicStateBootstrapper().bootstrapIfNeeded(...)
@@ -708,6 +709,8 @@ NewGameSetupView Settings
 `PlaytestSessionSettings` 当前持久化 observer mode、map layer、`ReplayDetailLevel`、`AICommandPace`、`PlaytestAIControlMode`、Guide Notes、Reduce Motion 和 `PlaytestTextSize`，仍只影响本地 UI / replay / simulated staff 触发与节奏，不写入 `GameState` 或存档。`PlaytestSessionSettings.loadResult` 会区分 missing / loaded / resetToStandard；偏好数据无法解码时移除损坏的 `UserDefaults` 值、恢复标准设置，并通过 `AppContainer.sessionSettingsRecoveryMessage` 写入 interaction log 和 `NewGameSetupView` Settings 区块。`ReplayDetailLevel` 有 Concise / Standard / Full 三档，控制 `AppContainer.displayEventLog` 的日志条数、`EventLogView` 的 metadata 粒度、`AgentPanelView` 的 directive 条数、可读 Staff Summary、Issue Preview、Recent Dispatch Timeline、context summary、逐条命令/directive 明细和 raw JSON 显示。`PlaytestAIControlMode` 有 Staff / Manual 两档，默认 Staff 保持旧行为：非 observer 下玩家所选 faction 手动，其它非 neutral faction 自动触发 simulated staff；observer mode 下 Staff 可让玩家所选 faction 也自动触发，并可用 End Orders / End Turn 触发 staff dispatch。Manual 只关闭自动 dispatch 触发；非 observer 下人工仍通过 HUD / CommandPanel 的 End Orders 发送 `Command.endTurn` 推进当前 active faction，包括非玩家 faction；observer + Manual 保持只读，End Orders disabled，`AppContainer.submit(_:)` 拒绝 observer 直接命令，不允许绕过 `WarCommandExecutor`、`RuleEngine` 或直接操控其它 faction 单位。`PlaytestTextSize` 有 Compact / Standard / Large 三档，使用 Dynamic Type 字体样式调整 `EventLogView` 与 `AgentPanelView` 的标题、metadata、正文、raw JSON 和行距，不改变日志内容、AI 输出或规则执行。`TurnManager` 生成的默认 staff 失败、end orders 失败、空 directive、directive 拒绝和缺少 corps sector 诊断已改为 Staff / Corps / End Orders 文案，并通过 `CommandValidationError.displayName(for:)` 显示拿战校验原因；`AppContainer` 在把连续 staff errors 写入 interaction log 前会净化 faction 名、MockAI、legacy pipeline 和 validation rawValue，避免 CommandPanel / EventLog 的玩家可见消息绕过 UI sanitizer。`EventLogView` 在拿战 faction 下会把 Standard / Concise 事件正文和 metadata 中的 raw AI、MockAI、legacy pipeline、Germany / Allies 等审计词转成 Staff / Simulated Staff / Archived Campaigns / Coalition 口径；底层 `GameLogEntry.message` 不被改写。`AgentPanelView` 的摘要只读聚合当前 `AgentDecisionRecord` 与最近 `WarDirectiveRecord`，显示执行数、拒绝数、问题数、focus sector / target 和最新 tactic；拿战 faction 下 raw `*_mock_commander` agent id、marshal id、`MockAI` provider、front zone / region / theater raw id、普通 tactic/category、deployment role、record error 和 directive diagnostic 会包装为 Command Staff / Marshal / Simulated Staff / 可读命令名 / sector / wing / staff note 展示，raw schema 只留在 Full raw JSON 或底层记录中；Issue Preview 只读 `AgentDecisionRecord.errors`、`CommandResultSummary.errors` 和 `WarDirectiveRecord.diagnostics`，Concise 只显示一条全局原因，Standard 显示前几条，Full 不限制并可看明细；Recent Dispatch Timeline 只读最近 directive 的 turn、scope、target、tactic、执行/拒绝/问题数和最多两条 directive-level 拒绝/诊断原因，帮助玩家理解 AI 回合节奏；Concise 下保留摘要、时间线与问题反馈，隐藏逐条 command / directive 明细。`AICommandPace` 只在 `runAISequence` 调用 simulated staff 前插入短延迟，不改变 AI 输出、命令校验或规则执行；Reduce Motion 开启时跳过这段本地等待；Guide Notes 关闭时 `PlaytestGuideCue` 不再写入首次选择/结束命令的短提示。
 
 v3.8 默认拿战 replay 展示继续收口：`MockAI+MarshalDirective` 等 provider 也按 `Simulated Staff` 展示，Standard context summary 使用 staff display name 而不是 raw `*_mock_commander` id，EventLog phase metadata 在拿战 faction 下显示 `Orders` / `Staff Dispatch`，DataLoader 初始日志只写 `Campaign loaded.` / `Archived campaign loaded.`，EventLog / AgentPanel / AppContainer interaction log 的 Standard / Concise 层会净化 raw diagnostic、legacy pipeline、front zone / region / theater id 和 WWII faction 名；Full raw JSON 仍保留底层审计内容。
+
+v3.8 后续收口还覆盖 ruler/focus raw id：`AgentPanelView` 和 `DiplomacyPanelView` 在 Standard / Concise 层把 `ruler_*`、front zone id 等 schema id 显示成可读 commander / sector 文案；`AppContainer` 的玩家 corps order interaction log 也会优先显示 front zone 名称或可读 sector 名，而不是 raw `zoneId`。
 
 v3.7 短引导同样只走本地 interaction log：
 
@@ -845,7 +848,7 @@ loadGameState(ScenarioCatalogEntry)
 
 DEBUG 下资源读取优先源码目录 `WWIIHexV0/Data/*.json`，不是旧 bundle。旧 simulator 进程不会自动重载，改默认地图后需要重新运行 app。
 
-v3.8 起 `AppContainer.bootstrap()` 不再通过 `DataLoader.loadInitialGameState()` 静默回退默认入口；它先尝试 `ScenarioCatalog.defaultPlayable`，成功时同步使用 Waterloo 场景、France 默认玩家阵营和 Waterloo 将领目录。若默认场景加载失败，会保留 Waterloo 场景元数据、构造 1x1 inert 恢复地图，并在 interaction log 写入提示，要求玩家打开 `New Campaign` 切换到可用 scenario，避免默认发布候选入口静默暴露阿登 legacy 内容。启动恢复态若将领目录也加载失败，只降为空 registry 并写入诊断；`startNewGame` 和 `continueSavedGame` 的将领目录失败会保留当前状态并返回失败，继续 slot 仍保留摘要并显示 recovery message。继续存档和 slot summary 使用 `ScenarioCatalog.entry(for:)`，因此 legacy 快照中无论记录 `ardennes_v0` 还是 `mapeditor_scenario` 都会回到同一阿登 legacy entry。`DataLoader.loadGameState` 会复用已加载并校验过的 `GeneralRegistry` 分配部署层将领，不再在 `assignGenerals` 内二次 `try?` 读取。默认 stored Guderian `TurnManager` 会同时校验当前 scenario 与 runtime `GameState.scenarioId` 都匹配 Ardennes legacy，避免外部注入状态误触发 legacy manager。`DataLoader.loadInitialGameState()` 仍作为 legacy 兼容 API 保留给旧探针/测试路径。
+v3.8 起 `AppContainer.bootstrap()` 不再通过 `DataLoader.loadInitialGameState()` 静默回退默认入口；它先尝试 `ScenarioCatalog.defaultPlayable`，成功时同步使用 Waterloo 场景、France 默认玩家阵营和 Waterloo 将领目录。若默认场景加载失败，会保留 Waterloo 场景元数据、构造 1x1 inert 恢复地图，并在 interaction log 写入提示，要求玩家打开 `New Campaign` 切换到可用 scenario，避免默认发布候选入口静默暴露阿登 legacy 内容；该恢复态的 `victoryState` 固定为 `.ongoing`，不触发胜负态。启动恢复态若将领目录也加载失败，只降为空 registry 并写入诊断；`startNewGame` 和 `continueSavedGame` 的将领目录失败会保留当前状态并返回失败，继续 slot 仍保留摘要并显示 recovery message。继续存档和 slot summary 使用 `ScenarioCatalog.entry(for:)`，因此 legacy 快照中无论记录 `ardennes_v0` 还是 `mapeditor_scenario` 都会回到同一阿登 legacy entry。`DataLoader.loadGameState` 会复用已加载并校验过的 `GeneralRegistry` 分配部署层将领，不再在 `assignGenerals` 内二次 `try?` 读取。默认 stored Guderian `TurnManager` 会同时校验当前 scenario 与 runtime `GameState.scenarioId` 都匹配 Ardennes legacy，避免外部注入状态误触发 legacy manager。`DataLoader.loadInitialGameState()` 仍作为 legacy 兼容 API 保留给旧探针/测试路径。
 
 ### 2.3 StrategicStateBootstrapper
 
@@ -1494,10 +1497,10 @@ appendEvent("Turn advanced ...")
 
 `SupplyRules` 的补给路径穿越和敌方 ZOC 例外读取 `DiplomacyState.isHostile` / `isFriendly`：敌对 formation 阻断补给，co-belligerent / allied formation 不阻断补给，并且可作为敌方 ZOC 中的友军占位例外。
 
-`VictoryRules` 当前按 `scenarioId` 分流：
+`VictoryRules` 当前按 scenario catalog / victory condition 分流：
 
 - `ardennes_v0` 等 legacy 路径继续使用 Bastogne / St. Vith / unit elimination / German armor supply 条件。
-- `waterloo_1815` 路径使用最小 Waterloo 节奏：
+- `ScenarioCatalog.napoleonicTarget.matches(state.scenarioId)` 或存在 Waterloo victory condition id 时，使用最小 Waterloo 节奏：
   - `GameState.victoryConditions` 中的 `french_break_center` 提供 objective id 和 winner faction；France 控制 `objective_mont_saint_jean` 时立即以 `waterlooFrenchBreakthrough` 获胜。
   - `coalition_hold_until_prussia` 提供 objective id 列表、target faction 和决定回合；到该回合时，如果 Hougoumont、Mont-Saint-Jean 和 Prussian Arrival Road 都未被 France 控制，则 Anglo-Allied 以 `waterlooCoalitionLineHeld` 获胜。
   - 旧存档或半迁移状态缺少 runtime condition 时，Waterloo 分支会补内置 fallback 条件；这只是兼容保护，不代表通用 victory condition DSL 已完成。

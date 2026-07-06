@@ -155,7 +155,7 @@ struct AgentPanelView: View {
             if let rulerRecord {
                 Divider()
                 LabeledContent(label("Ruler")) {
-                    Text(rulerRecord.rulerAgentId)
+                    Text(staffIdentifierDisplayText(rulerRecord.rulerAgentId, faction: activeFaction))
                 }
                 .font(playtestTextSize.valueFont)
                 LabeledContent(label("Posture")) {
@@ -792,7 +792,7 @@ struct AgentPanelView: View {
         let stopWords: Set<String> = [
             "region", "front", "frontzone", "zone", "theater", "sector",
             "legacy", "mock", "ai", "commander", "marshal", "directive",
-            "power", "faction", "global"
+            "power", "faction", "global", "ruler"
         ]
         let words = rawValue
             .replacingOccurrences(of: "-", with: "_")
