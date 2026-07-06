@@ -231,15 +231,21 @@ struct MockAIClient: DecisionProvider {
     }
 
     private func preferredObjective(in context: AgentContext) -> ObjectiveSummary? {
-        let sortedObjectives = context.objectives.sorted(by: objectivePrioritySort)
+        let sortedObjectives = context.objectives.sorted {
+            objectivePrioritySort($0, $1, faction: context.faction)
+        }
         return sortedObjectives.first { objective in
             objective.controller != context.faction
         } ?? sortedObjectives.first
     }
 
-    private func objectivePrioritySort(_ lhs: ObjectiveSummary, _ rhs: ObjectiveSummary) -> Bool {
-        let lhsPriority = objectivePriority(lhs)
-        let rhsPriority = objectivePriority(rhs)
+    private func objectivePrioritySort(
+        _ lhs: ObjectiveSummary,
+        _ rhs: ObjectiveSummary,
+        faction: Faction
+    ) -> Bool {
+        let lhsPriority = objectivePriority(lhs, faction: faction)
+        let rhsPriority = objectivePriority(rhs, faction: faction)
         if lhsPriority != rhsPriority {
             return lhsPriority < rhsPriority
         }
@@ -249,7 +255,14 @@ struct MockAIClient: DecisionProvider {
         return lhs.id < rhs.id
     }
 
-    private func objectivePriority(_ objective: ObjectiveSummary) -> Int {
+    private func objectivePriority(_ objective: ObjectiveSummary, faction: Faction) -> Int {
+        if let waterlooPriority = waterlooObjectivePriority(objective.id, faction: faction) {
+            return waterlooPriority
+        }
+        return 100 + objectiveTypePriority(objective)
+    }
+
+    private func objectiveTypePriority(_ objective: ObjectiveSummary) -> Int {
         switch objective.type {
         case .city:
             return 0
@@ -257,6 +270,81 @@ struct MockAIClient: DecisionProvider {
             return 1
         case .supply:
             return 2
+        }
+    }
+
+    private func waterlooObjectivePriority(_ objectiveId: String, faction: Faction) -> Int? {
+        switch faction {
+        case .france:
+            switch objectiveId {
+            case "objective_mont_saint_jean":
+                return 0
+            case "objective_la_haye_sainte":
+                return 1
+            case "objective_hougoumont":
+                return 2
+            case "objective_papelotte":
+                return 3
+            case "objective_prussian_arrival":
+                return 4
+            case "objective_plancenoit":
+                return 5
+            default:
+                return nil
+            }
+        case .angloAllied:
+            switch objectiveId {
+            case "objective_mont_saint_jean":
+                return 0
+            case "objective_hougoumont":
+                return 1
+            case "objective_la_haye_sainte":
+                return 2
+            case "objective_papelotte":
+                return 3
+            case "objective_prussian_arrival":
+                return 4
+            case "objective_plancenoit":
+                return 5
+            default:
+                return nil
+            }
+        case .prussia:
+            switch objectiveId {
+            case "objective_prussian_arrival":
+                return 0
+            case "objective_plancenoit":
+                return 1
+            case "objective_papelotte":
+                return 2
+            case "objective_mont_saint_jean":
+                return 3
+            case "objective_la_haye_sainte":
+                return 4
+            case "objective_hougoumont":
+                return 5
+            default:
+                return nil
+            }
+        case .austria, .russia, .spain:
+            switch objectiveId {
+            case "objective_mont_saint_jean":
+                return 0
+            case "objective_prussian_arrival":
+                return 1
+            case "objective_hougoumont":
+                return 2
+            case "objective_la_haye_sainte":
+                return 3
+            case "objective_papelotte":
+                return 4
+            case "objective_plancenoit":
+                return 5
+            default:
+                return nil
+            }
+        case .germany, .allies, .neutral:
+            return nil
         }
     }
 

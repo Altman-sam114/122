@@ -12,7 +12,7 @@ v3.2 已起步建立 `ScenarioCatalog` 场景目录：`defaultPlayable` 和 `nap
 
 最新数据切片已新增 q5,r1 Wavre Road，作为普军来援方向的抽象后方 road / supply / reinforcement entry hex；`napoleonic_generals` 同步新增 Bulow，将 `pr_bulow_iv_corps` 归属给 Bulow。Wavre Road 不代表完整 Wavre 后方地图，Bulow 当前也只是将领目录、展示、偏好和增援归属数据，不代表完整 CorpsCommander Agent。
 
-Waterloo 初始部队也补入 `aa_papelotte_left_reserve`，复用现有 line infantry 模板和 Wellington 归属，表达 Anglo-Allied 左翼在 Papelotte 一线的预备队；La Haye Sainte 的 region 将领种子已对齐 `commander_wellington`，初始守军复用 `strongpoint_guard` 模板以匹配该据点 / fortress 口径；`pr_blucher_approach_screen` 复用 `prussian_vanguard` 模板和 Blucher 归属，表达 Prussian Approach q4,r0 的前卫 screen。Prussian Approach region 保持后方轴线名称，q4,r0 另有非 objective 的 Prussian Approach road marker；Mont-Saint-Jean 后方 q2,r1 另有非 objective 的 Anglo-Allied Rear Road marker；q4,r1 的 key location / region objective 显示名与 scenario objective 统一为 Prussian Arrival Road。上述改动不新增 objective、region、template、胜负条件或独立 AI Agent。
+Waterloo 初始部队也补入 `aa_papelotte_left_reserve`，复用现有 line infantry 模板和 Wellington 归属，表达 Anglo-Allied 左翼在 Papelotte 一线的预备队；La Haye Sainte 的 region 将领种子已对齐 `commander_wellington`，初始守军复用 `strongpoint_guard` 模板以匹配该据点 / fortress 口径；`pr_blucher_approach_screen` 复用 `prussian_vanguard` 模板和 Blucher 归属，表达 Prussian Approach q4,r0 的前卫 screen。Prussian Approach region 保持后方轴线名称，q4,r0 另有非 objective 的 Prussian Approach road marker；Mont-Saint-Jean 后方 q2,r1 另有非 objective 的 Anglo-Allied Rear Road marker；q4,r1 的 key location / region objective 显示名与 scenario objective 统一为 Prussian Arrival Road。MockAI fallback 可使用这些已对齐的 Waterloo objective id 做目标排序信号，但不新增或修改 Waterloo victoryConditions / VictoryRules。上述改动不新增 objective、region、template、胜负条件或独立 AI Agent。
 
 拿战 interaction log 的自动 AI 可见文案继续收口为 Staff 口径：完成、resolved、issue 和 guard paused 提示在拿战路径显示为 Staff dispatch；连续 AI faction 的诊断正文按实际 acting faction 做 sanitizer，避免多势力连跑后受当前 active faction 影响。`NapoleonicMessageSanitizer` 也继续覆盖 Full 详情和诊断中可能出现的 raw JSON / raw command / pipeline / schemaVersion / snapshot 等工程词，底层字段和保存格式不改写。
 
@@ -175,7 +175,7 @@ WWIIHexV0/
 | `UI/RootGameView.swift` | 回合触发 | HUD / CommandPanel 调用 `advanceOrRunAI()`；玩家命令提交后 `AppContainer.submit` 也会调用 `runAIIfNeeded()` |
 
 **MockAI 行为（legacy 兼容 / simulated staff fallback）：**
-跳过已行动单位 → 低补给/包围优先 resupply → 射程内低 hp 敌军优先 attack（炮兵优先打城市/要塞）→ 向当前未控制目标 move → 否则 hold；未控制目标会按 city、fortress、supply 稳定排序，Waterloo 下会优先朝 Mont-Saint-Jean 这类 city 关键点推进；Waterloo / 拿战 faction 输出 formations、可读 contact sector 和 corps deployment 口径，legacy 阿登仍按旧数据目标推进。
+跳过已行动单位 → 低补给/包围优先 resupply → 射程内低 hp 敌军优先 attack（炮兵优先打城市/要塞）→ 向当前未控制目标 move → 否则 hold；Waterloo 下的未控制目标会按已知 objective id 和当前 faction 做 deterministic objective-aware sorting，再以 kind / name / id 稳定排序作为 fallback，France 优先朝 Mont-Saint-Jean / La Haye Sainte 推进，Prussia 优先朝 Prussian Arrival Road / Plancenoit 推进；该排序只影响 MockAI fallback move 的目标候选顺序，生成行动仍走既有 Command / RuleEngine 管线，legacy 阿登仍按旧数据目标推进。
 
 **v0.7 ZoneDirective 战术行为：**
 `ZoneCommanderAgent` 读取所属 `FrontZone` 的前线/部署摘要，`BinaryTacticClassifier` 会结合兵力比、机动兵力、炮兵支援、纵深预备队、压力和补给警告，在 `standardAttack`、`blitzkrieg`、`spearhead`、`breakthrough`、`pincerMovement`、`fireCoverage`、`feint`、`guerrillaWarfare`、`holdPosition`、`elasticDefense`、`defenseInDepth`、`lastStand` 之间分类；`WarCommandExecutor` 将这些战术降级为 `move / attack / hold / allowRetreat`，仍统一交给 `RuleEngine` 校验执行。`WarDirectiveRecord` 记录 `category` / `tactic` / `commanderAgentId` / `commandTarget`，便于后续接真 LLM 回放与审计。

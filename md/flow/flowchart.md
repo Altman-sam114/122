@@ -434,7 +434,7 @@ flowchart TD
     LOG["日志面板<br/>EventLogView<br/>最近 60 条 LogDisplayEntry<br/>拿战分类显示 Engagement / Withdrawal / Logistics / Isolation / Dispatch；事件显示 active wing / Contact sector<br/>Standard / Concise 复用 NapoleonicMessageSanitizer 净化 raw AI、MockAI、legacy pipeline、validation rawValue 和 WWII faction 名；Full 保留 raw 审计值"]:::ui
     AIUI["AI / 外交 / 将军面板<br/>AgentPanelView + DiplomacyPanelView + GeneralCommandPanelView<br/>Staff Summary + Issue Preview + Recent Dispatch Timeline + corps order target + relations<br/>拿战显示 Command Dispatch / Staff Summary / Dispatch Issues / Corps Directives<br/>Standard / Concise 净化 raw id / diagnostic / country-bloc id；Full 保留 raw JSON 审计"]:::ui
     BOARD["地图场景<br/>BoardScene + UnitNode<br/>缓存 unit display hex 后排序绘制<br/>拿战单位棋子显示 formation symbols<br/>pending 增援入口显示 RES marker<br/>目标点显示村庄/据点/道路 marker<br/>WarDirectiveRecord 显示 recent replay 线与 tactic marker"]:::ui
-    MARSHAL["模拟元帅 / MockAI<br/>MarshalAgent + SimulatedMarshalLLMClient"]:::ai
+    MARSHAL["模拟元帅 / MockAI<br/>MarshalAgent + SimulatedMarshalLLMClient<br/>Waterloo fallback 目标按 objective-aware sorting 排序，只输出指令/命令意图"]:::ai
     ZD["战区指令<br/>ZoneDirective<br/>tactic / focus / intensity"]:::command
     WCE["执行解释<br/>WarCommandExecutor<br/>infiltration 限制默认投入"]:::command
     RULE["规则权威<br/>RuleEngine<br/>唯一修改 GameState"]:::rules
