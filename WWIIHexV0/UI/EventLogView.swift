@@ -211,6 +211,8 @@ private enum LogDisplayCategory {
                 return "Reserve"
             case .supply:
                 return "Logistics"
+            case .encirclement:
+                return "Isolation"
             case .frontChange:
                 return "Contact"
             case .theaterChange:
