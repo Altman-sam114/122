@@ -1450,6 +1450,8 @@ Region controller 聚合权重：
 ```text
 CommandValidator.validateAttack
   -> attacker morale 必须高于 broken threshold，否则 moraleBroken
+WarCommandExecutor 的 staff offensive dispatch
+  -> broken morale formation 先降级为 Command.hold 休整，不生成 attack / move
 计算 attackDamage
   -> effectiveAttack 叠加 supply / morale / fatigue / ammunition 与轻量骑兵/炮兵地形修正
   -> effectiveDefense 叠加 terrain / river / infantry strongpoint / HOLD

@@ -323,6 +323,18 @@ struct WarCommandExecutor {
                 continue
             }
 
+            if division.morale <= Division.brokenMoraleThreshold {
+                run(
+                    .hold(divisionId: division.id),
+                    fallback: .hold(divisionId: division.id),
+                    commands: &commands,
+                    results: &results,
+                    state: &nextState,
+                    relatedRecordId: relatedRecordId
+                )
+                continue
+            }
+
             guard let targetRegionId = targetEnemyRegion(
                 for: division,
                 zone: zone,
