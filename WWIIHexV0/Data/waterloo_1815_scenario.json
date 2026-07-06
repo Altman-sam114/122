@@ -459,7 +459,7 @@
       "id": "aa_la_haye_sainte_garrison",
       "name": "La Haye Sainte Garrison",
       "faction": "angloAllied",
-      "templateId": "line_infantry_brigade",
+      "templateId": "strongpoint_guard",
       "coord": {
         "q": 1,
         "r": 0

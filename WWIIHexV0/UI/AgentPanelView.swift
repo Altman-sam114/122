@@ -358,7 +358,9 @@ struct AgentPanelView: View {
             regionDisplayText($0.rawValue, faction: directive.faction)
         }.joined(separator: ", ")
         let targetText = targets.isEmpty ? noTargetText(faction: directive.faction) : targets
-        return "\(type) / \(tactic) / \(executed) ok, \(rejected) rejected / \(targetText)"
+        let executedLabel = directive.faction.usesNapoleonicLogisticsVocabulary ? "carried out" : "ok"
+        let rejectedLabel = directive.faction.usesNapoleonicLogisticsVocabulary ? "refused" : "rejected"
+        return "\(type) / \(tactic) / \(executed) \(executedLabel), \(rejected) \(rejectedLabel) / \(targetText)"
     }
 
     private var displayedDirectiveRecords: [WarDirectiveRecord] {

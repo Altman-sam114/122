@@ -665,7 +665,7 @@ final class AppContainer: ObservableObject {
             UserDefaults.standard.removeObject(forKey: legacyDefaultsKey)
         }
         setSavedGameStatus(summary: nil, recoveryMessage: nil, for: targetSlot)
-        let message = "\(saveSlotDisplayName(targetSlot)) campaign snapshot cleared."
+        let message = "\(saveSlotDisplayName(targetSlot)) saved campaign cleared."
         lastCommandMessage = message
         appendInteractionEvent(message)
     }

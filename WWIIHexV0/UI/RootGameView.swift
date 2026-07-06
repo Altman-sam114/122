@@ -164,7 +164,7 @@ struct RootGameView: View {
 
     private func clearSavedGame(slot: GameSaveSlot) -> (succeeded: Bool, message: String) {
         container.clearSavedGame(slot: slot)
-        return operationResult(succeeded: true, fallbackMessage: "\(slot.displayName(using: container.saveSlotLabels)) campaign snapshot cleared.")
+        return operationResult(succeeded: true, fallbackMessage: "\(slot.displayName(using: container.saveSlotLabels)) saved campaign cleared.")
     }
 
     private func renameSaveSlot(
