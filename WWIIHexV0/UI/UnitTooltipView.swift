@@ -2,18 +2,19 @@ import SwiftUI
 
 struct UnitTooltipView: View {
     let division: Division?
+    let activeFaction: Faction
 
     var body: some View {
         if let division {
             VStack(alignment: .leading, spacing: 6) {
-                Text(division.name)
+                Text(displayDivisionName(division))
                     .font(.subheadline.weight(.semibold))
                     .lineLimit(2)
 
                 Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 4) {
                     GridRow {
                         label(label("Type", for: division))
-                        value(division.tooltipTypeCode)
+                        value(division.tooltipTypeCode(for: displayFaction(for: division)))
                     }
                     GridRow {
                         label(label("Strength", for: division))
@@ -25,7 +26,7 @@ struct UnitTooltipView: View {
                     }
                     GridRow {
                         label(label("Supply", for: division))
-                        value(division.supplyState.tooltipDisplayName(for: division.faction))
+                        value(division.supplyState.tooltipDisplayName(for: displayFaction(for: division)))
                     }
                     GridRow {
                         label("Fatigue")
@@ -59,7 +60,7 @@ struct UnitTooltipView: View {
     }
 
     private func label(_ legacy: String, for division: Division) -> String {
-        guard division.faction.usesNapoleonicLogisticsVocabulary else {
+        guard displayFaction(for: division).usesNapoleonicLogisticsVocabulary else {
             return legacy
         }
 
@@ -80,15 +81,15 @@ struct UnitTooltipView: View {
     }
 
     private func accessibilitySummary(for division: Division) -> String {
-        if division.faction.usesNapoleonicLogisticsVocabulary {
-            return "\(division.name), \(division.tooltipTypeCode), formation strength \(division.strength) of \(division.maxStrength)"
+        if displayFaction(for: division).usesNapoleonicLogisticsVocabulary {
+            return "\(displayDivisionName(division)), \(division.tooltipTypeCode(for: displayFaction(for: division))), formation strength \(division.strength) of \(division.maxStrength)"
         }
 
-        return "\(division.name), \(division.tooltipTypeCode), strength \(division.strength) of \(division.maxStrength)"
+        return "\(division.name), \(division.tooltipTypeCode(for: displayFaction(for: division))), strength \(division.strength) of \(division.maxStrength)"
     }
 
     private func retreatModeDisplayName(for division: Division) -> String {
-        guard division.faction.usesNapoleonicLogisticsVocabulary else {
+        guard displayFaction(for: division).usesNapoleonicLogisticsVocabulary else {
             return division.retreatMode.tooltipDisplayName
         }
 
@@ -101,11 +102,19 @@ struct UnitTooltipView: View {
     }
 
     private func actionStateText(for division: Division) -> String {
-        if division.faction.usesNapoleonicLogisticsVocabulary {
+        if displayFaction(for: division).usesNapoleonicLogisticsVocabulary {
             return division.hasActed ? "Spent" : "Available"
         }
 
         return division.hasActed ? "Yes" : "No"
+    }
+
+    private func displayFaction(for division: Division) -> Faction {
+        activeFaction.usesNapoleonicLogisticsVocabulary ? activeFaction : division.faction
+    }
+
+    private func displayDivisionName(_ division: Division) -> String {
+        NapoleonicMessageSanitizer.displayText(division.name, for: displayFaction(for: division))
     }
 
     private func label(_ text: String) -> some View {
@@ -124,8 +133,8 @@ struct UnitTooltipView: View {
 }
 
 private extension Division {
-    var tooltipTypeCode: String {
-        if faction.usesNapoleonicLogisticsVocabulary {
+    func tooltipTypeCode(for displayFaction: Faction) -> String {
+        if displayFaction.usesNapoleonicLogisticsVocabulary {
             return napoleonicTooltipTypeCode
         }
 

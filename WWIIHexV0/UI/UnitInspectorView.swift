@@ -31,11 +31,11 @@ struct UnitInspectorView: View {
 
     private func unitDetails(_ division: Division) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(division.name)
+            Text(displayDivisionName(division))
                 .font(.subheadline.weight(.semibold))
 
             LabeledContent(label("Faction")) {
-                Text(division.faction.displayName)
+                Text(displayFactionName(division.faction))
             }
 
             LabeledContent(label("Mode")) {
@@ -172,18 +172,31 @@ struct UnitInspectorView: View {
     }
 
     private func componentSummary(for division: Division) -> String {
-        division.components
-            .map { "\($0.type.displayCode) \(Int(($0.weight * 100).rounded()))%" }
+        let summary = division.components
+            .map { "\($0.type.displayCode(for: inspectionFaction)) \(Int(($0.weight * 100).rounded()))%" }
             .joined(separator: " / ")
+        if summary.isEmpty {
+            return usesNapoleonicVocabulary ? "No composition listed" : "None"
+        }
+        return summary
     }
 
     private func frontLineSummary(_ ids: [FrontLineId]) -> String {
+        let emptyText = usesNapoleonicVocabulary ? "No contact line" : "None"
         guard let strategicState else {
-            return ids.isEmpty ? "None" : ids.map(\.rawValue).joined(separator: ", ")
+            return ids.isEmpty ? emptyText : ids.map(\.rawValue).joined(separator: ", ")
         }
         return strategicState.frontLineDisplayNames.isEmpty
-            ? "None"
+            ? emptyText
             : strategicState.frontLineDisplayNames.joined(separator: ", ")
+    }
+
+    private func displayDivisionName(_ division: Division) -> String {
+        NapoleonicMessageSanitizer.displayText(division.name, for: inspectionFaction)
+    }
+
+    private func displayFactionName(_ faction: Faction) -> String {
+        NapoleonicMessageSanitizer.displayText(faction.displayName, for: inspectionFaction)
     }
 
     private func statusValue(_ text: String, systemImage: String, tone: Color) -> some View {
@@ -327,7 +340,32 @@ private extension RetreatMode {
 }
 
 private extension ComponentType {
-    var displayCode: String {
+    func displayCode(for faction: Faction) -> String {
+        if faction.usesNapoleonicLogisticsVocabulary {
+            switch self {
+            case .tank:
+                return "LINE"
+            case .motorizedInfantry:
+                return "MOBILE"
+            case .infantry:
+                return "LINE"
+            case .artillery:
+                return "ART"
+            case .lineInfantry:
+                return "LINE"
+            case .lightInfantry:
+                return "LIGHT"
+            case .cavalry:
+                return "CAV"
+            case .guardInfantry:
+                return "GUARD"
+            case .engineer:
+                return "ENG"
+            case .supplyTrain:
+                return "SUP"
+            }
+        }
+
         switch self {
         case .tank:
             return "ARM"

@@ -211,7 +211,7 @@ struct MapDisplayAdapter {
             .map(\.name)
         let objectiveStatus = objectiveNames.isEmpty
             ? emptyInspectorText("None", napoleonic: "No listed objectives", for: viewerFaction)
-            : "\(region.controller.displayName) controlled"
+            : factionControlDisplayText(region.controller, for: viewerFaction)
 
         let cityLevel = EconomyRules().cityLevel(for: region, map: state.map)
         let economicOutput = regionalEconomicOutput(for: region, cityLevel: cityLevel)
@@ -332,6 +332,15 @@ struct MapDisplayAdapter {
         faction.usesNapoleonicLogisticsVocabulary ? napoleonic : legacy
     }
 
+    private func factionDisplayName(_ faction: Faction, for viewerFaction: Faction) -> String {
+        NapoleonicMessageSanitizer.displayText(faction.displayName, for: viewerFaction)
+    }
+
+    private func factionControlDisplayText(_ faction: Faction, for viewerFaction: Faction) -> String {
+        let name = factionDisplayName(faction, for: viewerFaction)
+        return viewerFaction.usesNapoleonicLogisticsVocabulary ? "\(name) held" : "\(name) controlled"
+    }
+
     private func frontLineDisplayNames(_ ids: [FrontLineId], for faction: Faction) -> [String] {
         let sortedIds = ids.sorted { $0.rawValue < $1.rawValue }
         guard faction.usesNapoleonicLogisticsVocabulary else {
@@ -350,7 +359,9 @@ struct MapDisplayAdapter {
         let stopWords: Set<String> = [
             "region", "front", "frontzone", "zone", "theater", "sector",
             "legacy", "mock", "ai", "commander", "marshal", "directive",
-            "power", "faction", "global", "ruler"
+            "power", "faction", "global", "ruler", "germany", "german",
+            "allies", "allied", "panzer", "tank", "motorized", "division",
+            "wwii", "ardennes", "bastogne"
         ]
         let words = rawValue
             .replacingOccurrences(of: "-", with: "_")
