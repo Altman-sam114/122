@@ -788,7 +788,7 @@ final class AppContainer: ObservableObject {
         for index in next.divisions.indices where next.divisions[index].faction == faction {
             next.divisions[index].hasActed = false
         }
-        next.appendEvent("Opening command assigned to \(faction.displayName).")
+        next.appendEvent("Opening orders assigned to \(faction.displayName).")
         return StrategicStateBootstrapper().refreshRuntimeState(next)
     }
 

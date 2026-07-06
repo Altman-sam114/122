@@ -141,7 +141,7 @@ struct NewGameSetupView: View {
                             .foregroundStyle(.secondary)
                         Button("Clear Saved", systemImage: "trash", role: .destructive, action: clearSavedGame)
                     } else {
-                        Text("No saved campaign snapshot in \(saveSlotDisplayName(selectedSaveSlot)).")
+                        Text("No saved campaign in \(saveSlotDisplayName(selectedSaveSlot)).")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
@@ -225,7 +225,7 @@ struct NewGameSetupView: View {
                 }
 
                 Section("Reset") {
-                    Text("Starting a campaign reloads campaign data, clears selections and dispatch history, then keeps all orders inside the normal rules path.")
+                    Text("Starting a campaign reloads campaign data, clears selections and dispatch history, then keeps every order inside the rules-guided orders path.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
