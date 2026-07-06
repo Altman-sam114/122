@@ -122,12 +122,45 @@ enum StrategicPostureDecoderError: Error, Equatable, LocalizedError {
         case .factionMismatch(let expected, let actual):
             return "Strategic posture faction mismatch. Expected \(expected.displayName), got \(actual.displayName)."
         case .missingZone(let zoneId):
-            return "Strategic posture references missing corps sector \(zoneId.rawValue)."
+            return "Strategic posture references missing corps sector \(Self.identifierDisplayText(zoneId.rawValue, fallback: "corps sector", suffix: " sector"))."
         case .zoneFactionMismatch(let zoneId, let expected, let actual):
-            return "Strategic posture sector \(zoneId.rawValue) belongs to \(actual.displayName), expected \(expected.displayName)."
+            return "Strategic posture sector \(Self.identifierDisplayText(zoneId.rawValue, fallback: "corps sector", suffix: " sector")) belongs to \(actual.displayName), expected \(expected.displayName)."
         case .missingRegion(let regionId):
-            return "Strategic posture references missing region \(regionId.rawValue)."
+            return "Strategic posture references missing sector \(Self.identifierDisplayText(regionId.rawValue, fallback: "sector", suffix: " sector"))."
         }
+    }
+
+    private static func identifierDisplayText(
+        _ rawValue: String,
+        fallback: String,
+        suffix: String? = nil
+    ) -> String {
+        let stopWords: Set<String> = [
+            "region", "front", "frontzone", "zone", "theater", "sector",
+            "legacy", "mock", "ai", "commander", "marshal", "directive",
+            "power", "faction", "global", "ruler"
+        ]
+        let words = rawValue
+            .replacingOccurrences(of: "-", with: "_")
+            .split(separator: "_")
+            .map { String($0) }
+            .filter { !stopWords.contains($0.lowercased()) }
+
+        guard !words.isEmpty else {
+            return fallback
+        }
+
+        let display = words
+            .map { word in
+                word.count <= 3 ? word.uppercased() : word.capitalized
+            }
+            .joined(separator: " ")
+
+        if let suffix,
+           !display.lowercased().hasSuffix(suffix.trimmingCharacters(in: .whitespaces).lowercased()) {
+            return display + suffix
+        }
+        return display
     }
 }
 

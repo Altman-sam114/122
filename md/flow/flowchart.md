@@ -352,7 +352,7 @@ flowchart TD
     SCEN["场景 JSON<br/>ScenarioDefinition<br/>保存 hex 地形、控制方、补给、目标、初始单位"]:::data
     REG["省份 JSON<br/>RegionDataSet<br/>保存 hexToRegion、省份、边、初始 theaterId"]:::data
     NEI["自动推导省份邻接<br/>真实 hex 邻接 -> Region.neighbors / RegionEdge<br/>避免手写邻接出错"]:::derived
-    BRIDGE["Legacy 阿登资源桥<br/>MapEditorGameResourceBridge<br/>读取或覆盖 legacy Ardennes 地图资源"]:::loader
+    BRIDGE["Legacy 阿登资源桥<br/>MapEditorGameResourceBridge<br/>读取或覆盖 legacy Ardennes 地图资源<br/>未知 unit faction 抛错，不再兜底 Allies"]:::loader
     FILES["MapEditor legacy 默认资源<br/>WWIIHexV0/Data<br/>ardennes_v0_scenario.json + ardennes_v02_regions.json<br/>不等于当前 playable 默认入口"]:::data
     LOAD["游戏启动加载<br/>DataLoader.loadGameState<br/>DEBUG 下优先读源码 JSON"]:::loader
     MAP["地图状态<br/>MapState<br/>tiles + hexToRegion + RegionGraph"]:::state
@@ -432,7 +432,7 @@ flowchart TD
     STATE["运行时状态<br/>GameState + EventLog + WarDirectiveRecord"]:::state
     ROOT["主界面<br/>RootGameView + AppContainer interactionLog + CommandPanelView<br/>HUD + map layers + Info tabs<br/>拿战 faction 显示 Sector / Formation / Corps Order / Order result / Command Dispatch<br/>lastCommandMessage 走 NapoleonicMessageSanitizer"]:::ui
     LOG["日志面板<br/>EventLogView<br/>最近 60 条 LogDisplayEntry<br/>拿战事件显示 active wing / Contact sector / Withdrawal<br/>Standard / Concise 复用 NapoleonicMessageSanitizer 净化 raw AI、MockAI、legacy pipeline、validation rawValue 和 WWII faction 名"]:::ui
-    AIUI["AI 面板<br/>AgentPanelView<br/>Staff Summary + Issue Preview + Recent Dispatch Timeline + command results + zone directives + raw JSON<br/>拿战显示 Command Dispatch / Staff Summary / Dispatch Issues / Corps Directives<br/>Standard / Concise 复用 NapoleonicMessageSanitizer 净化 raw id / diagnostic；Full 保留 raw JSON 审计"]:::ui
+    AIUI["AI / 外交 / 将军面板<br/>AgentPanelView + DiplomacyPanelView + GeneralCommandPanelView<br/>Staff Summary + Issue Preview + Recent Dispatch Timeline + corps order target + relations<br/>拿战显示 Command Dispatch / Staff Summary / Dispatch Issues / Corps Directives<br/>Standard / Concise 净化 raw id / diagnostic / country-bloc id；Full 保留 raw JSON 审计"]:::ui
     BOARD["地图场景<br/>BoardScene + UnitNode<br/>缓存 unit display hex 后排序绘制<br/>拿战单位棋子显示 formation symbols<br/>pending 增援入口显示 RES marker<br/>目标点显示村庄/据点/道路 marker<br/>WarDirectiveRecord 显示 recent replay 线与 tactic marker"]:::ui
     MARSHAL["模拟元帅 / MockAI<br/>MarshalAgent + SimulatedMarshalLLMClient"]:::ai
     ZD["战区指令<br/>ZoneDirective<br/>tactic / focus / intensity"]:::command

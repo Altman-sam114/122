@@ -144,7 +144,7 @@ struct TurnManager {
                     )
 
                     if !result.succeeded {
-                        errors.append("Order \(index) rejected: \(result.validation.errors.map(\.rawValue).joined(separator: ", ")).")
+                        errors.append("Order \(index) rejected: \(validationSummary(result.validation.errors, faction: agent.faction)).")
                     }
                 } catch {
                     errors.append("Order \(index) mapping failed: \(error.localizedDescription)")

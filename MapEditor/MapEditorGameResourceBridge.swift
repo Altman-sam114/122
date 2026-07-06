@@ -2,12 +2,15 @@ import Foundation
 
 enum MapEditorGameResourceBridgeError: Error, CustomStringConvertible {
     case missingTerrain(String)
+    case unknownFaction(String, unitId: String)
     case missingResource(URL)
 
     var description: String {
         switch self {
         case .missingTerrain(let terrain):
             return "Unknown terrain in game data: \(terrain)."
+        case .unknownFaction(let faction, let unitId):
+            return "Unknown faction \(faction) for unit \(unitId)."
         case .missingResource(let url):
             return "Missing resource: \(url.path)."
         }
@@ -113,11 +116,14 @@ enum MapEditorGameResourceBridge {
         let theaters = Dictionary(uniqueKeysWithValues: Set(regionTheaterAssignments.values).map { theaterId in
             (theaterId, MapEditorTheaterDraft(id: theaterId))
         })
-        let units = scenario.initialUnits.map { unit in
-            MapEditorUnitDraft(
+        let units = try scenario.initialUnits.map { unit in
+            guard let faction = Faction(rawValue: unit.faction) else {
+                throw MapEditorGameResourceBridgeError.unknownFaction(unit.faction, unitId: unit.id)
+            }
+            return MapEditorUnitDraft(
                 id: unit.id,
                 name: unit.name,
-                faction: Faction(rawValue: unit.faction) ?? .allies,
+                faction: faction,
                 templateId: unit.templateId,
                 coord: HexCoord(q: unit.coord.q, r: unit.coord.r),
                 facing: HexDirection(rawValue: unit.facing) ?? .west,

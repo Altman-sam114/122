@@ -1807,6 +1807,7 @@ guerrillaWarfare 额外参考 infrastructure
 - `AppContainer.recoveryState` 的默认加载失败恢复态继续保留 1x1 inert 地图，并把 `victoryState` 固定为 `.ongoing`，避免恢复态误触发胜负状态。
 - `AgentPanelView`、`DiplomacyPanelView` 和 `AppContainer` 继续收口默认拿战可见 raw id：ruler/focus sector 与玩家 corps order interaction log 会显示为可读 commander / sector 文案，不再直接暴露 `ruler_*` 或 raw `zoneId`；`GeneralCommandPanelView` 和 `GeneralProfileView` 在拿战 faction 下把 VoiceOver profile / portrait placeholder 文案收口为 Commander profile / commander portrait placeholder；legacy faction 保持原文。
 - 并发子 Agent 继续扫描默认 Waterloo 玩家可见 raw id、legacy fallback 和回合控制边界后，本轮补齐 display-only 收口：`RegionInspectorView` / `UnitInspectorView` 的 Sector、Active Wing、Corps Sector、Contact Line 不再直接显示 raw region/theater/front-zone/front-line id；`AppContainer` 选中 sector 的 interaction log 不再显示 raw `regionId`；`CommandExecutor`、`WarCommandExecutor` 和 `StrategicStateSynchronizer` 的拿战动态推进、front change 和 region controller event log 会优先显示 region/theater/front-zone 名称或格式化 sector/wing 文案，legacy 路径继续保留 raw id 调试口径。
+- 并发子 Agent 继续扫描 diplomacy / general command / directive decoder / MapEditor fallback 后，本轮补齐默认拿战可见 raw id 与坏数据兜底：`DiplomacyPanelView` 的 country bloc、relations 和 ruler rationale 改显示可读 coalition/country/sector 文案；`GeneralCommandPanelView` 的 zone 名称和 planned operation target 改显示 region/front-zone 名称或格式化 sector；`StrategicPostureDecoderError`、`TheaterDirectiveDecoderError`、legacy `CommandIntentAdapterError` 和 legacy AI order refusal 摘要不再直接拼 region/theater/front-zone id 或 validation rawValue；`MapEditorGameResourceBridge` 读取 unknown unit faction 时抛错，不再静默兜底 `.allies`。Full raw JSON 和底层 schema 审计值仍按设计保留。
 - `Faction.opponent` 已标记为 legacy 二元兼容 helper，新运行时敌我关系应继续使用 `DiplomacyState.isHostile/isFriendly` 或 `hostileFactions(to:)`；`GamePhase.commandPhase(for:)` 成为当前通用 command phase helper，`legacyCompatibleCommandPhase(for:)` 只保留为旧命名包装，现有 App / Rule 层调用已切到新 helper。
 - 默认入口隔离继续加固：`availablePlayerFactions` 读取场景 faction 失败时只让阿登 legacy fallback 到 Germany / Allies，未知或后续非 legacy 场景优先使用 catalog `defaultPlayerFaction`；非阿登 scenario 中即使出现 `.germany` active faction，也不会自动创建 Guderian agent，而是走普通 sample command staff；`DataLoader.loadInitialGameState()`、无参阿登 loader 和 MapEditor `Default` wrapper 已补 legacy-only 注释，避免被误解为当前 playable 默认入口。
 - `DiplomacyState.isHostile/isFriendly` 的缺国家/缺关系 fallback 改为拿战联军成员之间 friendly、France 与联军成员 hostile、neutral 不 hostile，避免坏快照或半迁移状态把 Anglo-Allied / Prussia 等 co-belligerent 误当敌军。
@@ -1841,6 +1842,7 @@ guerrillaWarfare 额外参考 infrastructure
 - `WWIIHexV0/SpriteKit/MapDisplayAdapter.swift`
 - `WWIIHexV0/SpriteKit/HexNode.swift`
 - `WWIIHexV0/UI/AgentPanelView.swift`
+- `WWIIHexV0/UI/DiplomacyPanelView.swift`
 - `WWIIHexV0/UI/GeneralCommandPanelView.swift`
 - `WWIIHexV0/UI/RegionInspectorView.swift`
 - `WWIIHexV0/UI/UnitInspectorView.swift`

@@ -24,7 +24,7 @@ struct GeneralCommandPanelView: View {
 
             if let zone {
                 LabeledContent(label("Front Zone")) {
-                    Text(zone.name)
+                    Text(frontZoneDisplayText(zone))
                         .multilineTextAlignment(.trailing)
                 }
             } else {
@@ -235,9 +235,49 @@ struct GeneralCommandPanelView: View {
         operation.directiveType == .attack ? "arrow.up.right.circle" : "shield.fill"
     }
 
+    private func frontZoneDisplayText(_ zone: FrontZone) -> String {
+        guard activeFaction.usesNapoleonicLogisticsVocabulary else {
+            return zone.name
+        }
+
+        let name = zone.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !name.isEmpty,
+           name != zone.id.rawValue,
+           !name.contains("_") {
+            return NapoleonicMessageSanitizer.displayText(name, for: activeFaction)
+        }
+        return identifierDisplayText(zone.id.rawValue, fallback: "Corps Sector", suffix: " sector")
+    }
+
     private func operationSummary(_ operation: PlayerPlannedOperation) -> String {
-        let target = operation.targetRegionId?.rawValue ?? operation.sourceRegionId?.rawValue ?? operation.zoneId.rawValue
+        let target = operationTargetDisplayName(operation)
         return "\(directiveLabel(operation.directiveType)) / \(target)"
+    }
+
+    private func operationTargetDisplayName(_ operation: PlayerPlannedOperation) -> String {
+        guard activeFaction.usesNapoleonicLogisticsVocabulary else {
+            return operation.targetRegionId?.rawValue ?? operation.sourceRegionId?.rawValue ?? operation.zoneId.rawValue
+        }
+
+        if let targetRegionId = operation.targetRegionId {
+            if targetRegion?.id == targetRegionId,
+               let name = targetRegion?.name,
+               !name.isEmpty {
+                return name
+            }
+            return identifierDisplayText(targetRegionId.rawValue, fallback: "Target Sector", suffix: " sector")
+        }
+
+        if let sourceRegionId = operation.sourceRegionId {
+            return identifierDisplayText(sourceRegionId.rawValue, fallback: "Source Sector", suffix: " sector")
+        }
+
+        if zone?.id == operation.zoneId,
+           let name = zone?.name,
+           !name.isEmpty {
+            return name
+        }
+        return identifierDisplayText(operation.zoneId.rawValue, fallback: "Corps Sector", suffix: " sector")
     }
 
     private func directiveLabel(_ type: DirectiveType) -> String {
@@ -251,5 +291,38 @@ struct GeneralCommandPanelView: View {
         case .defend:
             return "Hold Contact Line"
         }
+    }
+
+    private func identifierDisplayText(
+        _ rawValue: String,
+        fallback: String,
+        suffix: String? = nil
+    ) -> String {
+        let stopWords: Set<String> = [
+            "region", "front", "frontzone", "zone", "theater", "sector",
+            "legacy", "mock", "ai", "commander", "marshal", "directive",
+            "power", "faction", "global", "ruler"
+        ]
+        let words = rawValue
+            .replacingOccurrences(of: "-", with: "_")
+            .split(separator: "_")
+            .map { String($0) }
+            .filter { !stopWords.contains($0.lowercased()) }
+
+        guard !words.isEmpty else {
+            return fallback
+        }
+
+        let display = words
+            .map { word in
+                word.count <= 3 ? word.uppercased() : word.capitalized
+            }
+            .joined(separator: " ")
+
+        if let suffix,
+           !display.lowercased().hasSuffix(suffix.trimmingCharacters(in: .whitespaces).lowercased()) {
+            return display + suffix
+        }
+        return display
     }
 }

@@ -500,16 +500,49 @@ enum TheaterDirectiveDecoderError: Error, Equatable, LocalizedError {
         case .factionMismatch(let expected, let actual):
             return "Command directive faction mismatch. Expected \(expected.displayName), got \(actual.displayName)."
         case .missingZone(let zoneId):
-            return "Command directive references missing corps sector \(zoneId.rawValue)."
+            return "Command directive references missing corps sector \(Self.identifierDisplayText(zoneId.rawValue, fallback: "corps sector", suffix: " sector"))."
         case .zoneFactionMismatch(let zoneId, let expected, let actual):
-            return "Command directive sector \(zoneId.rawValue) belongs to \(actual.displayName), expected \(expected.displayName)."
+            return "Command directive sector \(Self.identifierDisplayText(zoneId.rawValue, fallback: "corps sector", suffix: " sector")) belongs to \(actual.displayName), expected \(expected.displayName)."
         case .missingTargetTheater(let theaterId):
-            return "Command directive references missing target wing \(theaterId.rawValue)."
+            return "Command directive references missing target wing \(Self.identifierDisplayText(theaterId.rawValue, fallback: "target wing", suffix: " wing"))."
         case .missingRegion(let regionId):
-            return "Command directive references missing region \(regionId.rawValue)."
+            return "Command directive references missing sector \(Self.identifierDisplayText(regionId.rawValue, fallback: "sector", suffix: " sector"))."
         case .tacticCategoryMismatch(let directiveId, let tactic, let category):
             return "Command directive \(directiveId) uses tactic \(tactic.rawValue) outside category \(category.rawValue)."
         }
+    }
+
+    private static func identifierDisplayText(
+        _ rawValue: String,
+        fallback: String,
+        suffix: String? = nil
+    ) -> String {
+        let stopWords: Set<String> = [
+            "region", "front", "frontzone", "zone", "theater", "sector",
+            "legacy", "mock", "ai", "commander", "marshal", "directive",
+            "power", "faction", "global", "ruler"
+        ]
+        let words = rawValue
+            .replacingOccurrences(of: "-", with: "_")
+            .split(separator: "_")
+            .map { String($0) }
+            .filter { !stopWords.contains($0.lowercased()) }
+
+        guard !words.isEmpty else {
+            return fallback
+        }
+
+        let display = words
+            .map { word in
+                word.count <= 3 ? word.uppercased() : word.capitalized
+            }
+            .joined(separator: " ")
+
+        if let suffix,
+           !display.lowercased().hasSuffix(suffix.trimmingCharacters(in: .whitespaces).lowercased()) {
+            return display + suffix
+        }
+        return display
     }
 }
 

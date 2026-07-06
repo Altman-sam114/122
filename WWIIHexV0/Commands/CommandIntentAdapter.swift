@@ -13,16 +13,49 @@ enum CommandIntentAdapterError: Error, Equatable, LocalizedError {
         case .invalidRegionForHex(let hex):
             return "Hex \(hex.q),\(hex.r) does not map to a region."
         case .regionNotFound(let regionId):
-            return "Region \(regionId.rawValue) was not found."
+            return "Sector \(Self.identifierDisplayText(regionId.rawValue, fallback: "sector", suffix: " sector")) was not found."
         case .divisionNotFound(let divisionId):
-            return "Formation \(divisionId) was not found."
+            return "Formation \(Self.identifierDisplayText(divisionId, fallback: "formation")) was not found."
         case .divisionHasNoRegion(let divisionId):
-            return "Formation \(divisionId) is not inside a mapped region."
+            return "Formation \(Self.identifierDisplayText(divisionId, fallback: "formation")) is not inside a mapped sector."
         case .destinationRegionHasNoUsableHex(let regionId):
-            return "Region \(regionId.rawValue) has no usable tactical hex."
+            return "Sector \(Self.identifierDisplayText(regionId.rawValue, fallback: "sector", suffix: " sector")) has no usable tactical hex."
         case .targetRegionMismatch(let targetDivisionId, let expected, let actual):
-            return "Target \(targetDivisionId) is in \(actual.rawValue), not \(expected.rawValue)."
+            return "Target \(Self.identifierDisplayText(targetDivisionId, fallback: "formation")) is in \(Self.identifierDisplayText(actual.rawValue, fallback: "sector", suffix: " sector")), not \(Self.identifierDisplayText(expected.rawValue, fallback: "sector", suffix: " sector"))."
         }
+    }
+
+    private static func identifierDisplayText(
+        _ rawValue: String,
+        fallback: String,
+        suffix: String? = nil
+    ) -> String {
+        let stopWords: Set<String> = [
+            "region", "front", "frontzone", "zone", "theater", "sector",
+            "legacy", "mock", "ai", "commander", "marshal", "directive",
+            "power", "faction", "global", "ruler", "division", "unit"
+        ]
+        let words = rawValue
+            .replacingOccurrences(of: "-", with: "_")
+            .split(separator: "_")
+            .map { String($0) }
+            .filter { !stopWords.contains($0.lowercased()) }
+
+        guard !words.isEmpty else {
+            return fallback
+        }
+
+        let display = words
+            .map { word in
+                word.count <= 3 ? word.uppercased() : word.capitalized
+            }
+            .joined(separator: " ")
+
+        if let suffix,
+           !display.lowercased().hasSuffix(suffix.trimmingCharacters(in: .whitespaces).lowercased()) {
+            return display + suffix
+        }
+        return display
     }
 }
 

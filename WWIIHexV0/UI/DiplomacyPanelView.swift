@@ -36,7 +36,7 @@ struct DiplomacyPanelView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(country.name)
                             .font(.caption.weight(.semibold))
-                        Text("\(country.faction.displayName) | \(country.blocId.rawValue)")
+                        Text("\(country.faction.displayName) | \(blocDisplayName(country.blocId))")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -76,7 +76,7 @@ struct DiplomacyPanelView: View {
             } else {
                 ForEach(diplomacyState.relations) { relation in
                     HStack {
-                        Text("\(relation.firstCountryId.rawValue) - \(relation.secondCountryId.rawValue)")
+                        Text("\(countryDisplayName(relation.firstCountryId)) - \(countryDisplayName(relation.secondCountryId))")
                             .font(.caption)
                             .lineLimit(1)
                         Spacer()
@@ -104,7 +104,7 @@ struct DiplomacyPanelView: View {
                     Text(frontZoneDisplayText(zoneId.rawValue))
                 }
             }
-            Text(record.rationale)
+            Text(rationaleDisplayText(record.rationale))
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -168,6 +168,32 @@ struct DiplomacyPanelView: View {
         }
 
         return identifierDisplayText(rawValue, fallback: "corps sector", suffix: " sector")
+    }
+
+    private func blocDisplayName(_ blocId: DiplomaticBlocId) -> String {
+        if let bloc = diplomacyState.blocs.first(where: { $0.id == blocId }) {
+            return bloc.name
+        }
+        guard activeFaction.usesNapoleonicLogisticsVocabulary else {
+            return blocId.rawValue
+        }
+        return identifierDisplayText(blocId.rawValue, fallback: "Coalition")
+    }
+
+    private func countryDisplayName(_ countryId: CountryId) -> String {
+        if let country = diplomacyState.countries.first(where: { $0.id == countryId }) {
+            return country.name
+        }
+        guard activeFaction.usesNapoleonicLogisticsVocabulary else {
+            return countryId.rawValue
+        }
+        return identifierDisplayText(countryId.rawValue, fallback: "Power")
+    }
+
+    private func rationaleDisplayText(_ text: String) -> String {
+        activeFaction.usesNapoleonicLogisticsVocabulary
+            ? NapoleonicMessageSanitizer.displayText(text, for: activeFaction)
+            : text
     }
 
     private func identifierDisplayText(

@@ -710,7 +710,7 @@ NewGameSetupView Settings
 
 v3.8 默认拿战 replay 展示继续收口：`MockAI+MarshalDirective` 等 provider 也按 `Simulated Staff` 展示，Standard context summary 使用 staff display name 而不是 raw `*_mock_commander` id，EventLog phase metadata 在拿战 faction 下显示 `Orders` / `Staff Dispatch`，DataLoader 初始日志只写 `Campaign loaded.` / `Archived campaign loaded.`，EventLog / AgentPanel / AppContainer interaction log 的 Standard / Concise 层会净化 raw diagnostic、legacy pipeline、front zone / region / theater id 和 WWII faction 名；Full raw JSON 仍保留底层审计内容。
 
-v3.8 后续收口还覆盖 ruler/focus raw id：`AgentPanelView` 和 `DiplomacyPanelView` 在 Standard / Concise 层把 `ruler_*`、front zone id 等 schema id 显示成可读 commander / sector 文案；`AppContainer` 的玩家 corps order interaction log 和选中 sector interaction log 也会优先显示 front zone / region 名称或可读 sector 名，而不是 raw `zoneId` / `regionId`。`CommandExecutor` 的拿战动态推进事件会优先显示 theater name 或格式化 wing 名，legacy 路径仍保留 raw dynamic theater id 便于兼容调试。
+v3.8 后续收口还覆盖 ruler/focus raw id：`AgentPanelView` 和 `DiplomacyPanelView` 在 Standard / Concise 层把 `ruler_*`、front zone id、country / bloc id 和 ruler rationale 中的 legacy / raw 诊断词显示成可读 commander / sector / country / coalition 文案；`GeneralCommandPanelView` 的 corps zone 名称与 planned operation target 在拿战 faction 下优先显示 region/front-zone 名称或格式化 sector；`AppContainer` 的玩家 corps order interaction log 和选中 sector interaction log 也会优先显示 front zone / region 名称或可读 sector 名，而不是 raw `zoneId` / `regionId`。`StrategicPostureDecoderError`、`TheaterDirectiveDecoderError`、legacy `CommandIntentAdapterError` 与 legacy AI order refusal 摘要也会把 region / theater / front-zone id 和 validation raw value 包装成可读 sector / wing / order reason；Full raw JSON 与底层 schema 仍保留审计值。`CommandExecutor` 的拿战动态推进事件会优先显示 theater name 或格式化 wing 名，legacy 路径仍保留 raw dynamic theater id 便于兼容调试。
 
 v3.7 短引导同样只走本地 interaction log：
 
@@ -1045,7 +1045,7 @@ overwriteLegacyArdennesGameResources(document:)
   -> 写回 WWIIHexV0/Data
 ```
 
-旧 `loadDefaultDocument()` / `overwriteDefaultGameResources(document:)` 仍保留为兼容 wrapper，但 MapEditor UI 和 ViewModel 已改用 legacy Ardennes 命名。该桥不等于当前 playable 默认入口；主游戏默认入口由 `ScenarioCatalog.defaultPlayable` 控制，当前指向 Waterloo 1815。MapEditor 新建单位 id 前缀按 faction 和已有 id suffix 生成，避免 France / Prussia 等非 Germany 单位继续写成 `all_*`，也避免替换单位时复用已存在 id。
+旧 `loadDefaultDocument()` / `overwriteDefaultGameResources(document:)` 仍保留为兼容 wrapper，但 MapEditor UI 和 ViewModel 已改用 legacy Ardennes 命名。该桥不等于当前 playable 默认入口；主游戏默认入口由 `ScenarioCatalog.defaultPlayable` 控制，当前指向 Waterloo 1815。MapEditor 新建单位 id 前缀按 faction 和已有 id suffix 生成，避免 France / Prussia 等非 Germany 单位继续写成 `all_*`，也避免替换单位时复用已存在 id。legacy 资源桥读取 scenario initialUnits 时不再把未知 faction 静默兜底为 `.allies`，而是抛出 unknown faction 错误；MapEditor 导出端对纯 neutral / blank 文档仍保留 legacy/default faction fallback，后续若要做中立空白模板需单独收口。
 
 相关测试确认：
 
