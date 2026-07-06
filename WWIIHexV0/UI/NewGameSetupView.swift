@@ -158,8 +158,8 @@ struct NewGameSetupView: View {
                     Toggle("Archived Campaigns", isOn: $showCompatibilityCampaigns)
                 }
 
-                Section("Player Faction") {
-                    Picker("Faction", selection: $selectedPlayerFaction) {
+                Section("Player Power") {
+                    Picker("Power", selection: $selectedPlayerFaction) {
                         ForEach(availableFactions) { faction in
                             Text(faction.displayName).tag(faction)
                         }
@@ -170,7 +170,7 @@ struct NewGameSetupView: View {
                 }
 
                 Section("Opening Turn") {
-                    Toggle("Begin with selected faction", isOn: $startsAtPlayerFaction)
+                    Toggle("Begin with selected power", isOn: $startsAtPlayerFaction)
                     Text(openingTurnDescription)
                         .font(.footnote)
                         .foregroundStyle(.secondary)
@@ -225,7 +225,7 @@ struct NewGameSetupView: View {
                 }
 
                 Section("Reset") {
-                    Text("Starting a campaign reloads JSON data, clears selections and local replay state, then keeps all orders inside the existing command pipeline.")
+                    Text("Starting a campaign reloads campaign data, clears selections and dispatch history, then keeps all orders inside the normal rules path.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
@@ -406,22 +406,22 @@ struct NewGameSetupView: View {
 
     private var openingTurnDescription: String {
         if startsAtPlayerFaction {
-            return "The first command phase is assigned to the selected player faction."
+            return "The first orders phase is assigned to the selected power."
         }
         switch aiControlMode {
         case .simulatedStaff:
-            return "The scenario's scripted opening faction acts first; non-player factions use the simulated staff."
+            return "The scenario's scripted opening power acts first; other powers use the simulated staff."
         case .manualAdvance:
-            return "The scenario's scripted opening faction acts first; non-player factions wait for manual End Orders."
+            return "The scenario's scripted opening power acts first; other powers wait for manual End Orders."
         }
     }
 
     private var otherFactionsControlDescription: String {
         switch aiControlMode {
         case .simulatedStaff:
-            return "Other non-neutral factions are controlled by the simulated staff."
+            return "Other non-neutral powers are controlled by the simulated staff."
         case .manualAdvance:
-            return "Other non-neutral factions wait for manual End Orders."
+            return "Other non-neutral powers wait for manual End Orders."
         }
     }
 
