@@ -20,7 +20,8 @@
       ],
       "preferredRegionIds": [
         "region_french_ridge",
-        "region_la_haye_sainte"
+        "region_la_haye_sainte",
+        "region_plancenoit"
       ],
       "baseLoyalty": 96,
       "baseSatisfaction": 88
@@ -45,6 +46,7 @@
         "zone_anglo_left"
       ],
       "preferredRegionIds": [
+        "region_la_haye_sainte",
         "region_hougoumont",
         "region_mont_saint_jean",
         "region_papelotte"
@@ -71,7 +73,8 @@
       ],
       "preferredRegionIds": [
         "region_prussian_approach",
-        "region_papelotte"
+        "region_papelotte",
+        "region_plancenoit"
       ],
       "baseLoyalty": 84,
       "baseSatisfaction": 78

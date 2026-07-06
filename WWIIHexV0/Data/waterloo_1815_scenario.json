@@ -67,7 +67,7 @@
         "terrain": "fortress",
         "hasRoad": true,
         "riverEdges": [],
-        "controller": "neutral",
+        "controller": "angloAllied",
         "cityName": null,
         "fortressName": "La Haye Sainte",
         "isSupplySource": false,
@@ -174,6 +174,20 @@
         "regionId": "region_papelotte"
       },
       {
+        "q": 3,
+        "r": 2,
+        "terrain": "city",
+        "hasRoad": true,
+        "riverEdges": [],
+        "controller": "france",
+        "cityName": "Plancenoit",
+        "fortressName": null,
+        "isSupplySource": false,
+        "supplyFaction": null,
+        "objectiveId": "objective_plancenoit",
+        "regionId": "region_plancenoit"
+      },
+      {
         "q": 4,
         "r": 0,
         "terrain": "plain",
@@ -234,7 +248,7 @@
         "q": 1,
         "r": 0
       },
-      "faction": "neutral",
+      "faction": "angloAllied",
       "objectiveId": "objective_la_haye_sainte"
     },
     {
@@ -258,6 +272,28 @@
       },
       "faction": "angloAllied",
       "objectiveId": "objective_mont_saint_jean"
+    },
+    {
+      "id": "key_papelotte",
+      "name": "Papelotte",
+      "kind": "village",
+      "coord": {
+        "q": 3,
+        "r": 1
+      },
+      "faction": "angloAllied",
+      "objectiveId": "objective_papelotte"
+    },
+    {
+      "id": "key_plancenoit",
+      "name": "Plancenoit",
+      "kind": "village",
+      "coord": {
+        "q": 3,
+        "r": 2
+      },
+      "faction": "france",
+      "objectiveId": "objective_plancenoit"
     },
     {
       "id": "key_prussian_approach",
@@ -313,6 +349,16 @@
       "points": 2
     },
     {
+      "id": "objective_plancenoit",
+      "name": "Plancenoit",
+      "kind": "city",
+      "coord": {
+        "q": 3,
+        "r": 2
+      },
+      "points": 3
+    },
+    {
       "id": "objective_prussian_arrival",
       "name": "Prussian Arrival Road",
       "kind": "supply",
@@ -355,6 +401,21 @@
       "assignedAgentId": "commander_napoleon"
     },
     {
+      "id": "fr_lobau_plancenoit",
+      "name": "Lobau's Plancenoit Guard",
+      "faction": "france",
+      "templateId": "line_infantry_brigade",
+      "coord": {
+        "q": 3,
+        "r": 2
+      },
+      "facing": "east",
+      "hp": 9,
+      "retreatMode": "hold",
+      "supplyState": "supplied",
+      "assignedAgentId": "commander_napoleon"
+    },
+    {
       "id": "aa_wellington_center",
       "name": "Anglo-Allied Center",
       "faction": "angloAllied",
@@ -365,6 +426,21 @@
       },
       "facing": "west",
       "hp": 10,
+      "retreatMode": "hold",
+      "supplyState": "supplied",
+      "assignedAgentId": "commander_wellington"
+    },
+    {
+      "id": "aa_la_haye_sainte_garrison",
+      "name": "La Haye Sainte Garrison",
+      "faction": "angloAllied",
+      "templateId": "line_infantry_brigade",
+      "coord": {
+        "q": 1,
+        "r": 0
+      },
+      "facing": "west",
+      "hp": 8,
       "retreatMode": "hold",
       "supplyState": "supplied",
       "assignedAgentId": "commander_wellington"
@@ -381,6 +457,21 @@
       "facing": "west",
       "hp": 9,
       "retreatMode": "hold",
+      "supplyState": "supplied",
+      "assignedAgentId": "commander_wellington"
+    },
+    {
+      "id": "aa_papelotte_screen",
+      "name": "Papelotte Screen",
+      "faction": "angloAllied",
+      "templateId": "line_infantry_brigade",
+      "coord": {
+        "q": 3,
+        "r": 1
+      },
+      "facing": "west",
+      "hp": 8,
+      "retreatMode": "retreatable",
       "supplyState": "supplied",
       "assignedAgentId": "commander_wellington"
     },
@@ -495,6 +586,7 @@
     "Uses napoleonic_unit_templates.json through ScenarioCatalog.unitTemplateName.",
     "Napoleonic templates use v3.3 ComponentType cases; morale now has a minimal Division-level model, while formation, cavalry charge, and artillery preparation rules remain future work.",
     "v3.5 adds delayed French and Prussian reinforcement schedule entries; runtime deployment waits for safe controlled entry hexes.",
+    "v3 data follow-up adds Plancenoit as a French-held objective and adds minimal La Haye Sainte / Papelotte garrisons without changing the current Waterloo victory conditions.",
     "Not the final 80-160 hex Waterloo campaign map."
   ]
 }

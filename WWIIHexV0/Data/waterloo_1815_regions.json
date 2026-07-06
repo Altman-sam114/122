@@ -14,6 +14,7 @@
     "2,2": "region_hougoumont",
     "3,0": "region_papelotte",
     "3,1": "region_papelotte",
+    "3,2": "region_plancenoit",
     "4,0": "region_prussian_approach",
     "4,1": "region_prussian_approach"
   },
@@ -62,8 +63,8 @@
     {
       "id": "region_la_haye_sainte",
       "name": "La Haye Sainte",
-      "owner": "neutral",
-      "controller": "neutral",
+      "owner": "angloAllied",
+      "controller": "angloAllied",
       "theaterId": "zone_center_objectives",
       "assignedGeneralId": null,
       "terrain": "fortress",
@@ -96,7 +97,7 @@
       "factories": 0,
       "resources": [],
       "coreOf": [
-        "neutral"
+        "angloAllied"
       ],
       "occupationState": null,
       "isPassable": true
@@ -112,7 +113,8 @@
       "neighbors": [
         "region_french_ridge",
         "region_la_haye_sainte",
-        "region_mont_saint_jean"
+        "region_mont_saint_jean",
+        "region_plancenoit"
       ],
       "displayHexes": [
         {
@@ -195,6 +197,7 @@
       "terrain": "city",
       "neighbors": [
         "region_mont_saint_jean",
+        "region_plancenoit",
         "region_prussian_approach"
       ],
       "displayHexes": [
@@ -227,6 +230,44 @@
       "isPassable": true
     },
     {
+      "id": "region_plancenoit",
+      "name": "Plancenoit",
+      "owner": "france",
+      "controller": "france",
+      "theaterId": "zone_french_center",
+      "assignedGeneralId": "commander_napoleon",
+      "terrain": "city",
+      "neighbors": [
+        "region_hougoumont",
+        "region_papelotte",
+        "region_prussian_approach"
+      ],
+      "displayHexes": [
+        {
+          "q": 3,
+          "r": 2
+        }
+      ],
+      "representativeHex": {
+        "q": 3,
+        "r": 2
+      },
+      "city": {
+        "name": "Plancenoit",
+        "victoryPoints": 3,
+        "isCapital": false
+      },
+      "infrastructure": 1,
+      "supplyValue": 1,
+      "factories": 0,
+      "resources": [],
+      "coreOf": [
+        "france"
+      ],
+      "occupationState": null,
+      "isPassable": true
+    },
+    {
       "id": "region_prussian_approach",
       "name": "Prussian Approach",
       "owner": "prussia",
@@ -235,7 +276,8 @@
       "assignedGeneralId": "commander_blucher",
       "terrain": "hill",
       "neighbors": [
-        "region_papelotte"
+        "region_papelotte",
+        "region_plancenoit"
       ],
       "displayHexes": [
         {
@@ -300,6 +342,13 @@
       "movementCostModifier": 1
     },
     {
+      "from": "region_hougoumont",
+      "to": "region_plancenoit",
+      "hasRoad": false,
+      "hasRiverCrossing": false,
+      "movementCostModifier": 1
+    },
+    {
       "from": "region_mont_saint_jean",
       "to": "region_papelotte",
       "hasRoad": true,
@@ -308,6 +357,20 @@
     },
     {
       "from": "region_papelotte",
+      "to": "region_plancenoit",
+      "hasRoad": true,
+      "hasRiverCrossing": false,
+      "movementCostModifier": 0
+    },
+    {
+      "from": "region_papelotte",
+      "to": "region_prussian_approach",
+      "hasRoad": true,
+      "hasRiverCrossing": false,
+      "movementCostModifier": 0
+    },
+    {
+      "from": "region_plancenoit",
       "to": "region_prussian_approach",
       "hasRoad": true,
       "hasRiverCrossing": false,
@@ -362,6 +425,14 @@
       "regionId": "region_papelotte",
       "type": "city",
       "victoryPoints": 2,
+      "mainObjective": false
+    },
+    {
+      "id": "region_objective_plancenoit",
+      "name": "Plancenoit",
+      "regionId": "region_plancenoit",
+      "type": "city",
+      "victoryPoints": 3,
       "mainObjective": false
     },
     {
