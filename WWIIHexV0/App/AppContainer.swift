@@ -1338,7 +1338,7 @@ final class AppContainer: ObservableObject {
             )
             currentState = refreshedRuntimeState(outcome.state)
             sequenceErrors.append(contentsOf: outcome.record.errors.map {
-                "\(factionDisplayNameForInteraction(actingFaction)): \(diagnosticDisplayText($0))"
+                "\(factionDisplayNameForInteraction(actingFaction)): \(diagnosticDisplayText($0, for: actingFaction))"
             })
             lastOutcome = AgentTurnOutcome(
                 state: currentState,
@@ -1354,7 +1354,7 @@ final class AppContainer: ObservableObject {
             aiControlMode: aiControlMode
         ) {
             sequenceErrors.append(
-                "Command dispatch paused after \(maxSteps) staff step(s) while \(factionDisplayNameForInteraction(currentState.activeFaction)) was still eligible; automatic processing stopped to avoid a loop."
+                "Staff dispatch paused after \(maxSteps) staff step(s) while \(factionDisplayNameForInteraction(currentState.activeFaction)) was still eligible; automatic processing stopped to avoid a loop."
             )
         }
 
@@ -1607,8 +1607,8 @@ final class AppContainer: ObservableObject {
     private func aiTurnMessage(errorCount: Int) -> String {
         if interactionUsesNapoleonicVocabulary {
             return errorCount == 0
-                ? "Command dispatch completed."
-                : "Command dispatch completed with \(errorCount) issue(s)."
+                ? "Staff dispatch completed."
+                : "Staff dispatch completed with \(errorCount) issue(s)."
         }
 
         return errorCount == 0
@@ -1618,7 +1618,7 @@ final class AppContainer: ObservableObject {
 
     private func aiInteractionMessage(provider: String, resultCount: Int) -> String {
         if interactionUsesNapoleonicVocabulary {
-            return "Command dispatch \(providerDisplayName(provider)) resolved \(resultCount) order result(s)."
+            return "Staff dispatch via \(providerDisplayName(provider)) resolved \(resultCount) order result(s)."
         }
 
         return "AI \(provider) resolved \(resultCount) command result(s)."
@@ -1631,7 +1631,7 @@ final class AppContainer: ObservableObject {
             return []
         }
 
-        let prefix = interactionUsesNapoleonicVocabulary ? "Command dispatch issue" : "AI issue"
+        let prefix = interactionUsesNapoleonicVocabulary ? "Staff dispatch issue" : "AI issue"
         var messages = visibleErrors.map { "\(prefix): \(diagnosticDisplayText($0))" }
         if record.errors.count > maxVisibleIssues {
             messages.append("\(prefix): \(record.errors.count - maxVisibleIssues) more issue(s) hidden in Staff Summary.")
@@ -1685,6 +1685,10 @@ final class AppContainer: ObservableObject {
         let displayFaction = gameState.activeFaction.usesNapoleonicLogisticsVocabulary
             ? gameState.activeFaction
             : playerFaction
+        return diagnosticDisplayText(text, for: displayFaction)
+    }
+
+    private func diagnosticDisplayText(_ text: String, for displayFaction: Faction) -> String {
         return NapoleonicMessageSanitizer.displayText(text, for: displayFaction)
     }
 

@@ -321,6 +321,17 @@
       "objectiveId": "objective_prussian_arrival"
     },
     {
+      "id": "key_prussian_approach_screen",
+      "name": "Prussian Approach",
+      "kind": "road",
+      "coord": {
+        "q": 4,
+        "r": 0
+      },
+      "faction": "prussia",
+      "objectiveId": null
+    },
+    {
       "id": "key_wavre_road",
       "name": "Wavre Road",
       "kind": "reinforcement_entry",
