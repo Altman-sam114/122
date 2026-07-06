@@ -69,7 +69,7 @@ flowchart TD
 flowchart TD
     ME["地图编辑器<br/>MapEditor<br/>用来画格子、省份、战区、初始部队"]:::editor
     JSON["游戏数据 JSON<br/>ScenarioDefinition + RegionDataSet<br/>保存地图、单位、省份、初始战区"]:::data
-    SCAT["场景目录<br/>ScenarioCatalog<br/>defaultPlayable 指向 Waterloo 1815 数据切片；Ardennes 作为 legacy 可选剧本保留；defaultPlayerFaction 为 France；目标切片已覆盖 Plancenoit；Wavre Road 是普军后方入口抽象；Papelotte 有 Anglo-Allied 左翼预备"]:::loader
+    SCAT["场景目录<br/>ScenarioCatalog<br/>defaultPlayable 指向 Waterloo 1815 数据切片；Ardennes 作为 legacy 可选剧本保留；defaultPlayerFaction 为 France；目标切片已覆盖 Plancenoit；Wavre Road 是普军后方入口抽象；Papelotte 有 Anglo-Allied 左翼预备；Prussian Approach q4,r0 有开局 screen"]:::loader
     SETUP["新局/继续/设置<br/>NewGameSetupView<br/>New Campaign 默认显示 Waterloo、玩家可见为 Player Power / Power / Opening Turn，底层仍是 Faction；Archived Campaigns 才显示 legacy 新局和旧 legacy 存档详情；AppContainer 按玩家控制权归一拿战 phase；Continue 可选 Slot 1/2/3，可编辑 slot label，坏快照/未知 scenario/将领目录失败显示原因并可 Clear Saved；继续成功后走现有 AI eligibility gate；Status 显示操作结果；Settings 调整 observer、map layer、dispatch detail、AI pace、AI control、guide notes、text size"]:::input
     SAVE["本地试玩快照<br/>GameSaveSnapshot + GameSaveSlot + UserDefaults<br/>schemaVersion 1，保存 scenario / player faction / GameState；3 个本地 slot，Slot 1 兼容旧单槽 key；slot label 独立保存；拿战摘要显示 Current / Your Power；加载区分 missing / loaded / unavailable；恢复后 Staff 模式含 observer + Staff 可续跑 AI，非 observer Manual 需由 End Orders 推进，observer Manual 只读"]:::data
     PSET["试玩偏好<br/>PlaytestSessionSettings + UserDefaults<br/>observer / map layer / replay detail / AI pace / AI control / guide notes / reduce motion / text size；坏设置重置为标准设置并提示"]:::data
@@ -238,7 +238,7 @@ flowchart TD
     LOW["战略补给短缺<br/>supplied 单位降为 lowSupply"]:::rules
     REINF["自动补员<br/>安全后方 supplied 非敌邻单位<br/>每回合最多 +2 strength"]:::rules
     PROD["推进生产/预备队队列<br/>remainingTurns - 1<br/>legacy 部署旧单位<br/>拿战部署拿战 component formation"]:::economy
-    SCHED["延迟增援表<br/>ReinforcementState.pending<br/>按 turn / objective trigger 到期<br/>Waterloo 普军 IV Corps 从 Wavre Road 入场，仍绑定 Prussian Arrival Road 控制权"]:::economy
+    SCHED["延迟增援表<br/>ReinforcementState.pending<br/>按 turn / objective trigger 到期<br/>Waterloo 普军 IV Corps 从 Wavre Road 入场，仍绑定 Prussian Arrival Road 控制权；q4,r0 screen 是初始单位"]:::economy
     ENTRY["安全入口检查<br/>entryCoord 2 格内<br/>己控、空置、非敌邻"]:::rules
     DEPLOY{"有合格后方部署点吗?"}:::decision
     SPAWN["部署新单位<br/>首都/城镇/工厂/高基建/高补给或 supply source<br/>必须己控、空置、非敌邻"]:::rules

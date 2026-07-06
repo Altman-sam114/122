@@ -529,6 +529,21 @@
       "retreatMode": "retreatable",
       "supplyState": "supplied",
       "assignedAgentId": "commander_blucher"
+    },
+    {
+      "id": "pr_blucher_approach_screen",
+      "name": "Prussian Approach Screen",
+      "faction": "prussia",
+      "templateId": "prussian_vanguard",
+      "coord": {
+        "q": 4,
+        "r": 0
+      },
+      "facing": "west",
+      "hp": 8,
+      "retreatMode": "retreatable",
+      "supplyState": "supplied",
+      "assignedAgentId": "commander_blucher"
     }
   ],
   "reinforcements": [
@@ -629,6 +644,7 @@
     "v3 data follow-up adds Plancenoit as a French-held objective and adds minimal La Haye Sainte / Papelotte garrisons without changing the current Waterloo victory conditions.",
     "v3 data follow-up adds q5,r1 Wavre Road as an abstract Prussian rear road, supply, and reinforcement entry hex; Prussian Arrival Road at q4,r1 remains the objective trigger and victory-condition member.",
     "v3 data follow-up adds an Anglo-Allied left reserve at Papelotte to make the coalition left wing less skeletal without changing objective or victory-condition data.",
+    "v3 data follow-up adds a Prussian Approach screen at q4,r0 to make Blucher's arrival axis visible without changing objective, victory-condition, or reinforcement trigger data.",
     "Not the final 80-160 hex Waterloo campaign map."
   ]
 }

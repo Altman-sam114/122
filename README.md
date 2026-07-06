@@ -12,7 +12,7 @@ v3.2 已起步建立 `ScenarioCatalog` 场景目录：`defaultPlayable` 和 `nap
 
 最新数据切片已新增 q5,r1 Wavre Road，作为普军来援方向的抽象后方 road / supply / reinforcement entry hex；`napoleonic_generals` 同步新增 Bulow，将 `pr_bulow_iv_corps` 归属给 Bulow。Wavre Road 不代表完整 Wavre 后方地图，Bulow 当前也只是将领目录、展示、偏好和增援归属数据，不代表完整 CorpsCommander Agent。
 
-Waterloo 初始部队也补入 `aa_papelotte_left_reserve`，复用现有 line infantry 模板和 Wellington 归属，表达 Anglo-Allied 左翼在 Papelotte 一线的预备队；这不新增 objective、region、template、胜负条件或独立 AI Agent。
+Waterloo 初始部队也补入 `aa_papelotte_left_reserve`，复用现有 line infantry 模板和 Wellington 归属，表达 Anglo-Allied 左翼在 Papelotte 一线的预备队；`pr_blucher_approach_screen` 复用 `prussian_vanguard` 模板和 Blucher 归属，表达 Prussian Approach q4,r0 的前卫 screen。二者都不新增 objective、region、template、胜负条件或独立 AI Agent。
 
 v3.4 已起步接入拿战 AI Agent 分层的数据合同：AI 回合先由 `RulerAgent` 生成 Codable `StrategicPostureEnvelope`（offensive / defensive / coalitionMaintenance / stabilizeFront），经 `StrategicPostureDecoder` 校验后写入 `RulerDecisionRecord`，再把姿态传给 `MarshalAgent` 生成 `TheaterDirectiveEnvelope`。元帅输出仍经 decoder / compiler 降级为 `ZoneDirective`，最终只由 `WarCommandExecutor -> RuleEngine` 执行；当前还没有完整 ChiefOfStaff / CorpsCommander / Diplomat 独立 Agent，也未接真实 LLM。
 
