@@ -34,7 +34,7 @@ struct RegionInspectorView: View {
                 }
 
                 LabeledContent(label("Hex Controller")) {
-                    Text(state.selectedHexController?.displayName ?? "None")
+                    Text(state.selectedHexController?.displayName ?? emptyDisplayText("None", napoleonic: "Uncontrolled"))
                 }
 
                 LabeledContent(label("Hex Dynamic Theater")) {
@@ -55,11 +55,11 @@ struct RegionInspectorView: View {
             }
 
             LabeledContent(label("City")) {
-                Text(state.region.city?.name ?? "None")
+                Text(state.region.city?.name ?? emptyDisplayText("None", napoleonic: "Not present"))
             }
 
             LabeledContent(label("City Level")) {
-                Text(state.cityLevel.displayName)
+                Text(cityLevelDisplayName(state.cityLevel))
             }
 
             LabeledContent(label("Fortress")) {
@@ -96,7 +96,7 @@ struct RegionInspectorView: View {
             }
 
             LabeledContent(label("Objectives")) {
-                Text(state.objectiveNames.isEmpty ? "None" : state.objectiveNames.joined(separator: ", "))
+                Text(state.objectiveNames.isEmpty ? emptyDisplayText("None", napoleonic: "No listed objectives") : state.objectiveNames.joined(separator: ", "))
                     .multilineTextAlignment(.trailing)
             }
 
@@ -105,12 +105,12 @@ struct RegionInspectorView: View {
             }
 
             LabeledContent(label("Friendly Units")) {
-                Text(unitNames(state.friendlyDivisions))
+                Text(unitNames(state.friendlyDivisions, napoleonicEmpty: "No formations"))
                     .multilineTextAlignment(.trailing)
             }
 
             LabeledContent(label("Visible Enemies")) {
-                Text(unitNames(state.visibleEnemyDivisions))
+                Text(unitNames(state.visibleEnemyDivisions, napoleonicEmpty: "No visible enemy formations"))
                     .multilineTextAlignment(.trailing)
             }
         }
@@ -145,7 +145,7 @@ struct RegionInspectorView: View {
         case "Yes":
             return "Present"
         case "No":
-            return "None"
+            return "Not present"
         case "Supply":
             return "Logistics"
         case "Factories":
@@ -186,9 +186,25 @@ struct RegionInspectorView: View {
         }
     }
 
-    private func unitNames(_ divisions: [Division]) -> String {
+    private func emptyDisplayText(_ legacy: String, napoleonic: String) -> String {
+        activeFaction.usesNapoleonicLogisticsVocabulary ? napoleonic : legacy
+    }
+
+    private func cityLevelDisplayName(_ cityLevel: CityLevel) -> String {
+        guard activeFaction.usesNapoleonicLogisticsVocabulary else {
+            return cityLevel.displayName
+        }
+        switch cityLevel {
+        case .none:
+            return "Not present"
+        case .village, .town, .metropolis:
+            return cityLevel.displayName
+        }
+    }
+
+    private func unitNames(_ divisions: [Division], napoleonicEmpty: String) -> String {
         guard !divisions.isEmpty else {
-            return "None"
+            return emptyDisplayText("None", napoleonic: napoleonicEmpty)
         }
         return divisions.map(\.name).joined(separator: ", ")
     }

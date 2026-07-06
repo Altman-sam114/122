@@ -210,7 +210,7 @@ struct MapDisplayAdapter {
             }
             .map(\.name)
         let objectiveStatus = objectiveNames.isEmpty
-            ? "None"
+            ? emptyInspectorText("None", napoleonic: "No listed objectives", for: viewerFaction)
             : "\(region.controller.displayName) controlled"
 
         let cityLevel = EconomyRules().cityLevel(for: region, map: state.map)
@@ -288,7 +288,7 @@ struct MapDisplayAdapter {
 
     private func regionDisplayName(_ regionId: RegionId?, for faction: Faction) -> String {
         guard let regionId else {
-            return "None"
+            return emptyInspectorText("None", napoleonic: "No sector assigned", for: faction)
         }
         guard faction.usesNapoleonicLogisticsVocabulary else {
             return regionId.rawValue
@@ -302,7 +302,7 @@ struct MapDisplayAdapter {
 
     private func theaterDisplayName(_ theaterId: TheaterId?, for faction: Faction) -> String {
         guard let theaterId else {
-            return "None"
+            return emptyInspectorText("None", napoleonic: "No active wing assigned", for: faction)
         }
         guard faction.usesNapoleonicLogisticsVocabulary else {
             return theaterId.rawValue
@@ -316,7 +316,7 @@ struct MapDisplayAdapter {
 
     private func frontZoneDisplayName(_ zoneId: FrontZoneId?, for faction: Faction) -> String {
         guard let zoneId else {
-            return "None"
+            return emptyInspectorText("None", napoleonic: "No corps sector assigned", for: faction)
         }
         guard faction.usesNapoleonicLogisticsVocabulary else {
             return zoneId.rawValue
@@ -326,6 +326,10 @@ struct MapDisplayAdapter {
             return name
         }
         return identifierDisplayText(zoneId.rawValue, fallback: "Corps Sector", suffix: " sector")
+    }
+
+    private func emptyInspectorText(_ legacy: String, napoleonic: String, for faction: Faction) -> String {
+        faction.usesNapoleonicLogisticsVocabulary ? napoleonic : legacy
     }
 
     private func frontLineDisplayNames(_ ids: [FrontLineId], for faction: Faction) -> [String] {

@@ -668,6 +668,7 @@
     "v3 data follow-up adds an Anglo-Allied left reserve at Papelotte to make the coalition left wing less skeletal without changing objective or victory-condition data.",
     "v3 data follow-up adds a Prussian Approach screen at q4,r0 to make Blucher's arrival axis visible without changing objective, victory-condition, or reinforcement trigger data.",
     "v3 data follow-up aligns French Cavalry Reserve reinforcement hp with the cavalry_reserve template maxHP without changing reinforcement timing or trigger data.",
+    "v3 data follow-up adds q2,r1 Anglo-Allied Rear Road as a non-objective Mont-Saint-Jean rear supply road marker without changing objective, victory-condition, or reinforcement trigger data.",
     "Not the final 80-160 hex Waterloo campaign map."
   ]
 }
