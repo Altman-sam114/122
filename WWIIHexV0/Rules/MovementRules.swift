@@ -110,10 +110,21 @@ struct MovementRules {
     }
 
     private func tacticalTerrainPenalty(for division: Division, entering tile: HexTile) -> Int {
-        guard division.isArmor else {
+        if division.isArmor {
+            return tile.baseTerrain.armorSlowdownCost
+        }
+
+        guard division.isCavalry else {
             return 0
         }
 
-        return tile.baseTerrain.armorSlowdownCost
+        switch tile.baseTerrain {
+        case .mountain:
+            return 2
+        case .hill, .forest, .city, .fortress:
+            return 1
+        case .plain:
+            return 0
+        }
     }
 }

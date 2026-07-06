@@ -164,7 +164,7 @@ struct AgentPanelView: View {
                 .font(playtestTextSize.valueFont)
                 if let zoneId = rulerRecord.preferredFrontZoneId {
                     LabeledContent(label("Focus")) {
-                        Text(frontZoneDisplayText(zoneId.rawValue))
+                        Text(frontZoneDisplayText(zoneId.rawValue, faction: rulerRecord.faction))
                     }
                     .font(playtestTextSize.valueFont)
                 }
@@ -215,7 +215,9 @@ struct AgentPanelView: View {
                             }
 
                             if !directive.diagnostics.isEmpty {
-                                Text(directive.diagnostics.map(diagnosticDisplayText).joined(separator: " / "))
+                                Text(directive.diagnostics.map {
+                                    diagnosticDisplayText($0, faction: directive.faction)
+                                }.joined(separator: " / "))
                                     .font(playtestTextSize.captionFont)
                                     .foregroundStyle(.orange)
                             }
@@ -338,7 +340,7 @@ struct AgentPanelView: View {
             return directive.faction.usesNapoleonicLogisticsVocabulary ? "army-wide" : "global"
         }
 
-        return frontZoneDisplayText(zoneId.rawValue)
+        return frontZoneDisplayText(zoneId.rawValue, faction: directive.faction)
     }
 
     private func directiveSummary(_ directive: WarDirectiveRecord) -> String {
@@ -346,7 +348,9 @@ struct AgentPanelView: View {
         let tactic = directiveOrderText(directive, fallback: "none")
         let executed = directive.commandResults.filter(\.executed).count
         let rejected = directive.commandResults.count - executed
-        let targets = directive.targetRegionIds.map { regionDisplayText($0.rawValue) }.joined(separator: ", ")
+        let targets = directive.targetRegionIds.map {
+            regionDisplayText($0.rawValue, faction: directive.faction)
+        }.joined(separator: ", ")
         let targetText = targets.isEmpty ? noTargetText(faction: directive.faction) : targets
         return "\(type) / \(tactic) / \(executed) ok, \(rejected) rejected / \(targetText)"
     }
@@ -456,7 +460,7 @@ struct AgentPanelView: View {
         }
 
         if let zoneId = directive.zoneId {
-            return frontZoneDisplayText(zoneId.rawValue)
+            return frontZoneDisplayText(zoneId.rawValue, faction: directive.faction)
         }
 
         return staffIdentifierDisplayText(directive.issuerId, faction: directive.faction)
@@ -464,20 +468,22 @@ struct AgentPanelView: View {
 
     private func directiveTargetText(_ directive: WarDirectiveRecord) -> String {
         if !directive.targetRegionIds.isEmpty {
-            return directive.targetRegionIds.map { regionDisplayText($0.rawValue) }.joined(separator: ", ")
+            return directive.targetRegionIds.map {
+                regionDisplayText($0.rawValue, faction: directive.faction)
+            }.joined(separator: ", ")
         }
 
         if let commandTarget = directive.commandTarget {
             switch commandTarget {
             case let .region(regionId):
-                return regionDisplayText(regionId.rawValue)
+                return regionDisplayText(regionId.rawValue, faction: directive.faction)
             case let .theater(theaterId):
-                return theaterDisplayText(theaterId.rawValue)
+                return theaterDisplayText(theaterId.rawValue, faction: directive.faction)
             }
         }
 
         if let zoneId = directive.zoneId {
-            return frontZoneDisplayText(zoneId.rawValue)
+            return frontZoneDisplayText(zoneId.rawValue, faction: directive.faction)
         }
 
         return noTargetText(faction: directive.faction)
@@ -543,11 +549,18 @@ struct AgentPanelView: View {
 
     private var focusSectorText: String? {
         let targetIds = displayedDirectiveRecords
-            .flatMap(\.targetRegionIds)
-            .map { regionDisplayText($0.rawValue) }
+            .flatMap { directive in
+                directive.targetRegionIds.map {
+                    regionDisplayText($0.rawValue, faction: directive.faction)
+                }
+            }
         let zoneIds = displayedDirectiveRecords
-            .compactMap { $0.zoneId?.rawValue }
-            .map(frontZoneDisplayText)
+            .compactMap { directive -> String? in
+                guard let zoneId = directive.zoneId else {
+                    return nil
+                }
+                return frontZoneDisplayText(zoneId.rawValue, faction: directive.faction)
+            }
         let focusIds = orderedUnique(targetIds.isEmpty ? zoneIds : targetIds)
 
         guard !focusIds.isEmpty else {
@@ -732,7 +745,11 @@ struct AgentPanelView: View {
     }
 
     private func diagnosticDisplayText(_ text: String) -> String {
-        NapoleonicMessageSanitizer.displayText(text, for: activeFaction)
+        diagnosticDisplayText(text, faction: activeFaction)
+    }
+
+    private func diagnosticDisplayText(_ text: String, faction: Faction) -> String {
+        NapoleonicMessageSanitizer.displayText(text, for: faction)
     }
 
     private func noTargetText(faction: Faction) -> String {
@@ -740,7 +757,11 @@ struct AgentPanelView: View {
     }
 
     private func frontZoneDisplayText(_ rawValue: String) -> String {
-        guard activeFaction.usesNapoleonicLogisticsVocabulary else {
+        frontZoneDisplayText(rawValue, faction: activeFaction)
+    }
+
+    private func frontZoneDisplayText(_ rawValue: String, faction: Faction) -> String {
+        guard faction.usesNapoleonicLogisticsVocabulary else {
             return rawValue
         }
 
@@ -748,7 +769,11 @@ struct AgentPanelView: View {
     }
 
     private func regionDisplayText(_ rawValue: String) -> String {
-        guard activeFaction.usesNapoleonicLogisticsVocabulary else {
+        regionDisplayText(rawValue, faction: activeFaction)
+    }
+
+    private func regionDisplayText(_ rawValue: String, faction: Faction) -> String {
+        guard faction.usesNapoleonicLogisticsVocabulary else {
             return rawValue
         }
 
@@ -756,7 +781,11 @@ struct AgentPanelView: View {
     }
 
     private func theaterDisplayText(_ rawValue: String) -> String {
-        guard activeFaction.usesNapoleonicLogisticsVocabulary else {
+        theaterDisplayText(rawValue, faction: activeFaction)
+    }
+
+    private func theaterDisplayText(_ rawValue: String, faction: Faction) -> String {
+        guard faction.usesNapoleonicLogisticsVocabulary else {
             return rawValue
         }
 

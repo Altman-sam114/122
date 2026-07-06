@@ -101,15 +101,12 @@ struct EventLogView: View {
     }
 
     private func messageDisplayText(for entry: GameLogEntry) -> String {
-        guard activeFaction.usesNapoleonicLogisticsVocabulary else {
+        let displayFaction = entry.faction ?? activeFaction
+        guard displayFaction.usesNapoleonicLogisticsVocabulary else {
             return entry.message
         }
 
-        return napoleonicDisplayText(entry.message)
-    }
-
-    private func napoleonicDisplayText(_ text: String) -> String {
-        NapoleonicMessageSanitizer.displayText(text, for: activeFaction)
+        return NapoleonicMessageSanitizer.displayText(entry.message, for: displayFaction)
     }
 
     private func phaseDisplayName(_ phase: GamePhase?, faction: Faction) -> String {

@@ -769,10 +769,6 @@ final class AppContainer: ObservableObject {
             }
         }
 
-        if scenario.id == ScenarioCatalog.napoleonicTarget.id {
-            return Faction.waterlooFactions.filter { !$0.isNeutral }
-        }
-
         if scenario.id == ScenarioCatalog.ardennesLegacy.id {
             return Faction.legacyWorldWarIIFactions
         }

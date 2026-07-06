@@ -80,11 +80,11 @@
       "components": [
         {
           "type": "lineInfantry",
-          "weight": 0.7
+          "weight": 0.55
         },
         {
           "type": "guard",
-          "weight": 0.1
+          "weight": 0.25
         },
         {
           "type": "artillery",

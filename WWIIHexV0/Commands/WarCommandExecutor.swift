@@ -497,7 +497,7 @@ struct WarCommandExecutor {
             return AttackTacticProfile(
                 includeDepthUnits: true,
                 mobileOnlyWhenAvailable: false,
-                artilleryFirst: false,
+                artilleryFirst: true,
                 attackOnly: false,
                 weakPointFocus: true,
                 allowDeepTarget: (parameters.exploitDepth ?? 0) > 0,
@@ -508,7 +508,7 @@ struct WarCommandExecutor {
             return AttackTacticProfile(
                 includeDepthUnits: true,
                 mobileOnlyWhenAvailable: true,
-                artilleryFirst: false,
+                artilleryFirst: true,
                 attackOnly: false,
                 weakPointFocus: true,
                 allowDeepTarget: true,
@@ -631,7 +631,16 @@ struct WarCommandExecutor {
         let mobileIds = activeIds.filter { unitId in
             state.division(id: unitId).map { isMobile($0) } == true
         }
-        let candidateIds = profile.mobileOnlyWhenAvailable && !mobileIds.isEmpty ? mobileIds : activeIds
+        let mobileCandidateIds = profile.mobileOnlyWhenAvailable && !mobileIds.isEmpty ? mobileIds : activeIds
+        let artilleryIds = mobileCandidateIds.filter { unitId in
+            guard let division = state.division(id: unitId) else {
+                return false
+            }
+            return division.isArtillery || division.range > 1
+        }
+        let candidateIds = profile.artilleryFirst && profile.attackOnly && !artilleryIds.isEmpty
+            ? artilleryIds
+            : mobileCandidateIds
         let sortedIds = candidateIds.sorted {
             attackSortKey(for: $0, profile: profile, state: state) <
                 attackSortKey(for: $1, profile: profile, state: state)

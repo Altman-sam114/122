@@ -383,11 +383,21 @@ struct MockAIClient: DecisionProvider {
         context: AgentContext
     ) -> Int {
         let targetTile = context.visibleTiles.first { $0.coord == target.coord }
-        let objectiveTileBonus = targetTile?.baseTerrain == .city || targetTile?.baseTerrain == .fortress ? 20 : 0
+        let objectiveTileBonus = isObjectiveLikeTile(targetTile) ? 20 : 0
         let lowHPBonus = max(0, 12 - target.strength)
         let distanceBonus = max(0, 4 - attacker.coord.distance(to: target.coord))
         let artilleryBonus = attacker.isArtillery ? objectiveTileBonus : 0
         return lowHPBonus + distanceBonus + artilleryBonus
+    }
+
+    private func isObjectiveLikeTile(_ tile: HexTileSummary?) -> Bool {
+        guard let tile else {
+            return false
+        }
+        return tile.baseTerrain == .city ||
+            tile.baseTerrain == .fortress ||
+            tile.cityName != nil ||
+            tile.fortressName != nil
     }
 
     private func canAttack(
