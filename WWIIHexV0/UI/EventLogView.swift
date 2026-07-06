@@ -8,7 +8,7 @@ struct EventLogView: View {
 
     init(
         entries: [GameLogEntry],
-        activeFaction: Faction = .allies,
+        activeFaction: Faction = .france,
         replayDetailLevel: ReplayDetailLevel = .standard,
         playtestTextSize: PlaytestTextSize = .standard
     ) {

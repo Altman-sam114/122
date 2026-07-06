@@ -11,7 +11,7 @@ struct AgentPanelView: View {
     init(
         record: AgentDecisionRecord?,
         rulerRecord: RulerDecisionRecord? = nil,
-        activeFaction: Faction = .allies,
+        activeFaction: Faction = .france,
         directiveRecords: [WarDirectiveRecord] = [],
         replayDetailLevel: ReplayDetailLevel = .standard,
         playtestTextSize: PlaytestTextSize = .standard
@@ -51,8 +51,8 @@ struct AgentPanelView: View {
 
             if replayDetailLevel.showsContextSummary,
                let contextSummary = record?.contextSummary {
-                LabeledContent("Context") {
-                    Text(contextSummary)
+                LabeledContent(label("Context")) {
+                    Text(contextDisplayText(contextSummary))
                         .font(playtestTextSize.valueFont)
                         .multilineTextAlignment(.trailing)
                 }
@@ -178,7 +178,7 @@ struct AgentPanelView: View {
                 VStack(alignment: .leading, spacing: playtestTextSize.summarySpacing) {
                     ForEach(record.commandResults) { result in
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(result.commandDisplayName ?? result.orderType?.rawValue ?? "Order")
+                            Text(commandResultTitle(result))
                                 .font(playtestTextSize.captionFont)
                                 .bold()
                             Text(resultLine(result))
@@ -264,6 +264,8 @@ struct AgentPanelView: View {
             return "Source"
         case "Intent":
             return "Intent"
+        case "Context":
+            return "Situation"
         case "Ruler":
             return "Sovereign"
         case "Posture":
@@ -317,10 +319,14 @@ struct AgentPanelView: View {
 
     private func intentDisplayText(_ intent: String?) -> String {
         if let intent {
-            return intent
+            return diagnosticDisplayText(intent)
         }
 
         return activeFaction.usesNapoleonicLogisticsVocabulary ? "No dispatch submitted" : "No decision submitted"
+    }
+
+    private func contextDisplayText(_ summary: String) -> String {
+        diagnosticDisplayText(summary)
     }
 
     private func providerDisplayName(_ provider: String?) -> String {
@@ -702,7 +708,7 @@ struct AgentPanelView: View {
             return []
         }
 
-        let commandName = result.commandDisplayName ?? result.orderType?.rawValue ?? "Order"
+        let commandName = commandResultTitle(result)
         if !result.mappingSucceeded {
             let prefix = activeFaction.usesNapoleonicLogisticsVocabulary ? "could not form order" : "mapping failed"
             return ["\(commandName): \(prefix) \(displayErrors(result.errors))"]
@@ -711,6 +717,27 @@ struct AgentPanelView: View {
             return ["\(commandName): \(displayErrors(result.errors))"]
         }
         return ["\(commandName): \(diagnosticDisplayText(result.message))"]
+    }
+
+    private func commandResultTitle(_ result: CommandResultSummary) -> String {
+        if let commandDisplayName = result.commandDisplayName {
+            return commandDisplayName
+        }
+        guard activeFaction.usesNapoleonicLogisticsVocabulary,
+              let orderType = result.orderType else {
+            return result.orderType?.rawValue ?? "Order"
+        }
+
+        switch orderType {
+        case .move:
+            return "Movement Order"
+        case .attack:
+            return "Attack Order"
+        case .hold:
+            return "Hold Line"
+        case .resupply:
+            return "Rest and Supply"
+        }
     }
 
     private func directiveIssueLines(
