@@ -288,6 +288,17 @@
       "objectiveId": "objective_mont_saint_jean"
     },
     {
+      "id": "key_anglo_allied_rear_road",
+      "name": "Anglo-Allied Rear Road",
+      "kind": "road",
+      "coord": {
+        "q": 2,
+        "r": 1
+      },
+      "faction": "angloAllied",
+      "objectiveId": null
+    },
+    {
       "id": "key_papelotte",
       "name": "Papelotte",
       "kind": "village",
