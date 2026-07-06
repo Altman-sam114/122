@@ -165,7 +165,7 @@ WWIIHexV0/
 | `UI/RootGameView.swift` | 回合触发 | HUD / CommandPanel 调用 `advanceOrRunAI()`；玩家命令提交后 `AppContainer.submit` 也会调用 `runAIIfNeeded()` |
 
 **MockAI 行为（legacy 兼容 / simulated staff fallback）：**
-跳过已行动单位 → 低补给/包围优先 resupply → 射程内低 hp 敌军优先 attack（炮兵优先打城市/要塞）→ 向当前未控制目标 move → 否则 hold；Waterloo / 拿战 faction 输出 formations、contact sector、corps deployment 口径，legacy 阿登仍按旧数据目标推进。
+跳过已行动单位 → 低补给/包围优先 resupply → 射程内低 hp 敌军优先 attack（炮兵优先打城市/要塞）→ 向当前未控制目标 move → 否则 hold；未控制目标会按 city、fortress、supply 稳定排序，Waterloo 下会优先朝 Mont-Saint-Jean 这类 city 关键点推进；Waterloo / 拿战 faction 输出 formations、可读 contact sector 和 corps deployment 口径，legacy 阿登仍按旧数据目标推进。
 
 **v0.7 ZoneDirective 战术行为：**
 `ZoneCommanderAgent` 读取所属 `FrontZone` 的前线/部署摘要，`BinaryTacticClassifier` 会结合兵力比、机动兵力、炮兵支援、纵深预备队、压力和补给警告，在 `standardAttack`、`blitzkrieg`、`spearhead`、`breakthrough`、`pincerMovement`、`fireCoverage`、`feint`、`guerrillaWarfare`、`holdPosition`、`elasticDefense`、`defenseInDepth`、`lastStand` 之间分类；`WarCommandExecutor` 将这些战术降级为 `move / attack / hold / allowRetreat`，仍统一交给 `RuleEngine` 校验执行。`WarDirectiveRecord` 记录 `category` / `tactic` / `commanderAgentId` / `commandTarget`，便于后续接真 LLM 回放与审计。

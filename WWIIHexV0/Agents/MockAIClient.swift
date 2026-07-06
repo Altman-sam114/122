@@ -231,9 +231,33 @@ struct MockAIClient: DecisionProvider {
     }
 
     private func preferredObjective(in context: AgentContext) -> ObjectiveSummary? {
-        context.objectives.first { objective in
+        let sortedObjectives = context.objectives.sorted(by: objectivePrioritySort)
+        return sortedObjectives.first { objective in
             objective.controller != context.faction
-        } ?? context.objectives.first
+        } ?? sortedObjectives.first
+    }
+
+    private func objectivePrioritySort(_ lhs: ObjectiveSummary, _ rhs: ObjectiveSummary) -> Bool {
+        let lhsPriority = objectivePriority(lhs)
+        let rhsPriority = objectivePriority(rhs)
+        if lhsPriority != rhsPriority {
+            return lhsPriority < rhsPriority
+        }
+        if lhs.name != rhs.name {
+            return lhs.name < rhs.name
+        }
+        return lhs.id < rhs.id
+    }
+
+    private func objectivePriority(_ objective: ObjectiveSummary) -> Int {
+        switch objective.type {
+        case .city:
+            return 0
+        case .fortress:
+            return 1
+        case .supply:
+            return 2
+        }
     }
 
     private func operationalIntent(context: AgentContext, objective: ObjectiveSummary?) -> String {
@@ -278,16 +302,26 @@ struct MockAIClient: DecisionProvider {
 
     private func contactAttackReason(segment: AgentFrontSegmentSnapshot, context: AgentContext) -> String {
         if context.faction.usesNapoleonicLogisticsVocabulary {
-            return "Deployment: contact formation acts on sector \(segment.regionId.rawValue)."
+            return "Deployment: contact formation acts on sector \(sectorDisplayName(for: segment.regionId, context: context))."
         }
         return "Deployment: line unit acts on segment \(segment.regionId.rawValue)."
     }
 
     private func contactHoldReason(segment: AgentFrontSegmentSnapshot, context: AgentContext) -> String {
         if context.faction.usesNapoleonicLogisticsVocabulary {
-            return "Deployment: contact formation holds assigned sector \(segment.regionId.rawValue)."
+            return "Deployment: contact formation holds assigned sector \(sectorDisplayName(for: segment.regionId, context: context))."
         }
         return "Deployment: line unit holds assigned segment \(segment.regionId.rawValue)."
+    }
+
+    private func sectorDisplayName(for regionId: RegionId, context: AgentContext) -> String {
+        if let region = context.visibleRegions.first(where: { $0.id == regionId }),
+           !region.name.isEmpty {
+            return region.name
+        }
+        return regionId.rawValue
+            .replacingOccurrences(of: "region_", with: "")
+            .replacingOccurrences(of: "_", with: " ")
     }
 
     private func reserveReinforceReason(context: AgentContext) -> String {
