@@ -848,7 +848,7 @@ loadGameState(ScenarioCatalogEntry)
 
 DEBUG 下资源读取优先源码目录 `WWIIHexV0/Data/*.json`，不是旧 bundle。旧 simulator 进程不会自动重载，改默认地图后需要重新运行 app。
 
-v3.8 起 `AppContainer.bootstrap()` 不再通过 `DataLoader.loadInitialGameState()` 静默回退默认入口；它先尝试 `ScenarioCatalog.defaultPlayable`，成功时同步使用 Waterloo 场景、France 默认玩家阵营和 Waterloo 将领目录。若默认场景加载失败，会保留 Waterloo 场景元数据、构造 1x1 inert 恢复地图，并在 interaction log 写入提示，要求玩家打开 `New Campaign` 切换到可用 scenario，避免默认发布候选入口静默暴露阿登 legacy 内容；该恢复态的 `victoryState` 固定为 `.ongoing`，不触发胜负态。启动恢复态若将领目录也加载失败，只降为空 registry 并写入诊断；`startNewGame` 和 `continueSavedGame` 的将领目录失败会保留当前状态并返回失败，继续 slot 仍保留摘要并显示 recovery message。继续存档和 slot summary 使用 `ScenarioCatalog.entry(for:)`，因此 legacy 快照中无论记录 `ardennes_v0` 还是 `mapeditor_scenario` 都会回到同一阿登 legacy entry。`DataLoader.loadGameState` 会复用已加载并校验过的 `GeneralRegistry` 分配部署层将领，不再在 `assignGenerals` 内二次 `try?` 读取。默认 stored Guderian `TurnManager` 会同时校验当前 scenario 与 runtime `GameState.scenarioId` 都匹配 Ardennes legacy，避免外部注入状态误触发 legacy manager。`DataLoader.loadInitialGameState()` 仍作为 legacy 兼容 API 保留给旧探针/测试路径。
+v3.8 起 `AppContainer.bootstrap()` 不再通过 `DataLoader.loadInitialGameState()` 静默回退默认入口；它先尝试 `ScenarioCatalog.defaultPlayable`，成功时同步使用 Waterloo 场景、France 默认玩家阵营和 Waterloo 将领目录。若默认场景加载失败，会保留 Waterloo 场景元数据、构造 1x1 inert 恢复地图，并在 interaction log 写入提示，要求玩家打开 `New Campaign` 切换到可用 scenario，避免默认发布候选入口静默暴露阿登 legacy 内容；该恢复态的 `victoryState` 固定为 `.ongoing`，不触发胜负态。启动恢复态若将领目录也加载失败，只降为空 registry 并写入诊断；若默认场景已成功加载但启动阶段二次读取将领目录失败，则同样改用 1x1 inert 恢复态，不让正常 Waterloo 局面带 `.empty` commander registry 继续运行。`startNewGame` 和 `continueSavedGame` 的将领目录失败会保留当前状态并返回失败，继续 slot 仍保留摘要并显示 recovery message。继续存档和 slot summary 使用 `ScenarioCatalog.entry(for:)`，因此 legacy 快照中无论记录 `ardennes_v0` 还是 `mapeditor_scenario` 都会回到同一阿登 legacy entry。`DataLoader.loadGameState` 会复用已加载并校验过的 `GeneralRegistry` 分配部署层将领，不再在 `assignGenerals` 内二次 `try?` 读取。默认 stored Guderian `TurnManager` 会同时校验当前 scenario 与 runtime `GameState.scenarioId` 都匹配 Ardennes legacy，避免外部注入状态误触发 legacy manager。`DataLoader.loadInitialGameState()` 仍作为 legacy 兼容 API 保留给旧探针/测试路径。
 
 ### 2.3 StrategicStateBootstrapper
 
@@ -1045,7 +1045,7 @@ overwriteLegacyArdennesGameResources(document:)
   -> 写回 WWIIHexV0/Data
 ```
 
-旧 `loadDefaultDocument()` / `overwriteDefaultGameResources(document:)` 仍保留为兼容 wrapper，但 MapEditor UI 和 ViewModel 已改用 legacy Ardennes 命名。该桥不等于当前 playable 默认入口；主游戏默认入口由 `ScenarioCatalog.defaultPlayable` 控制，当前指向 Waterloo 1815。MapEditor 新建单位 id 前缀按 faction 和已有 id suffix 生成，避免 France / Prussia 等非 Germany 单位继续写成 `all_*`，也避免替换单位时复用已存在 id。legacy 资源桥读取 scenario initialUnits 时不再把未知 faction 静默兜底为 `.allies`，而是抛出 unknown faction 错误；MapEditor 导出端对纯 neutral / blank 文档不再注入 Germany / Allies，而是导出 `.neutral` faction 与 `.resolution` phase。
+旧 `loadDefaultDocument()` / `overwriteDefaultGameResources(document:)` 仍保留为兼容 wrapper，但 MapEditor UI 和 ViewModel 已改用 legacy Ardennes 命名。该桥不等于当前 playable 默认入口；主游戏默认入口由 `ScenarioCatalog.defaultPlayable` 控制，当前指向 Waterloo 1815。MapEditor 新建单位 id 前缀按 faction 和已有 id suffix 生成，避免 France / Prussia 等非 Germany 单位继续写成 `all_*`，也避免替换单位时复用已存在 id。legacy 资源桥读取 scenario initialUnits 时不再把未知 faction 静默兜底为 `.allies`，而是抛出 unknown faction 错误；tile controller、supplyFaction、unit facing、retreatMode、supplyState 和 region `hexToRegion` raw key 也会 fail-fast，不再用 nil、`.west`、`.retreatable` 或 `.supplied` 覆盖坏数据；MapEditor 导出端对纯 neutral / blank 文档不再注入 Germany / Allies，而是导出 `.neutral` faction 与 `.resolution` phase。
 
 相关测试确认：
 
@@ -1504,6 +1504,7 @@ appendEvent("Turn advanced ...")
   - `GameState.victoryConditions` 中的 `french_break_center` 提供 objective id 和 winner faction；France 控制 `objective_mont_saint_jean` 时立即以 `waterlooFrenchBreakthrough` 获胜。
   - `coalition_hold_until_prussia` 提供 objective id 列表、target faction 和决定回合；到该回合时，如果 Hougoumont、Mont-Saint-Jean 和 Prussian Arrival Road 都未被 France 控制，则 Anglo-Allied 以 `waterlooCoalitionLineHeld` 获胜。
   - 旧存档或半迁移状态缺少 runtime condition 时，Waterloo 分支会补内置 fallback 条件；这只是兼容保护，不代表通用 victory condition DSL 已完成。
+- 非 Waterloo 且非 `ScenarioCatalog.ardennesLegacy` 的 scenario 当前不会进入 Bastogne / St. Vith legacy 判定；若尚未接通 victory DSL，会保持 ongoing，避免后续拿战变体意外继承阿登胜负条件。
 
 `RegionVictoryRules` 只保留给 `ScenarioCatalog.ardennesLegacy` / `mapeditor_scenario` 这类 legacy 阿登 region analysis 使用；非阿登 scenario 直接返回空评估，避免未来误把 `RegionRuleSystem.analyze` 接到 Waterloo UI 时泄漏 Bastogne / St. Vith 口径。当前默认回合胜负仍由 `VictoryRules` 负责。
 

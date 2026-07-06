@@ -22,6 +22,10 @@ struct VictoryRules {
             return
         }
 
+        guard ScenarioCatalog.ardennesLegacy.matches(state.scenarioId) else {
+            return
+        }
+
         let bastogneController = state.map.controllerOfObjective(named: "Bastogne")
         let stVithController = state.map.controllerOfObjective(named: "St. Vith")
 

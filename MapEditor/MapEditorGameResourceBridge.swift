@@ -2,15 +2,33 @@ import Foundation
 
 enum MapEditorGameResourceBridgeError: Error, CustomStringConvertible {
     case missingTerrain(String)
+    case invalidTileController(String, coord: HexCoord)
+    case invalidSupplyFaction(String, coord: HexCoord)
     case unknownFaction(String, unitId: String)
+    case invalidFacing(String, unitId: String)
+    case invalidRetreatMode(String, unitId: String)
+    case invalidSupplyState(String, unitId: String)
+    case invalidRegionMappingKey(String)
     case missingResource(URL)
 
     var description: String {
         switch self {
         case .missingTerrain(let terrain):
             return "Unknown terrain in game data: \(terrain)."
+        case .invalidTileController(let faction, let coord):
+            return "Unknown tile controller \(faction) at \(coord.q),\(coord.r)."
+        case .invalidSupplyFaction(let faction, let coord):
+            return "Unknown supply faction \(faction) at \(coord.q),\(coord.r)."
         case .unknownFaction(let faction, let unitId):
             return "Unknown faction \(faction) for unit \(unitId)."
+        case .invalidFacing(let facing, let unitId):
+            return "Unknown facing \(facing) for unit \(unitId)."
+        case .invalidRetreatMode(let retreatMode, let unitId):
+            return "Unknown retreat mode \(retreatMode) for unit \(unitId)."
+        case .invalidSupplyState(let supplyState, let unitId):
+            return "Unknown supply state \(supplyState) for unit \(unitId)."
+        case .invalidRegionMappingKey(let key):
+            return "Invalid region mapping key: \(key)."
         case .missingResource(let url):
             return "Missing resource: \(url.path)."
         }
@@ -73,22 +91,34 @@ enum MapEditorGameResourceBridge {
         scenario: ScenarioDefinition,
         regionData: RegionDataSet
     ) throws -> MapEditorDocument {
-        let regionMapping = regionData.toHexToRegion()
+        let regionMapping = try makeRegionMapping(regionData)
         var hexes: [HexCoord: MapEditorHex] = [:]
         for tile in scenario.map.tiles {
             let coord = HexCoord(q: tile.q, r: tile.r)
             guard let terrain = BaseTerrain(rawValue: tile.terrain) else {
                 throw MapEditorGameResourceBridgeError.missingTerrain(tile.terrain)
             }
+            guard let controller = Faction(rawValue: tile.controller) else {
+                throw MapEditorGameResourceBridgeError.invalidTileController(tile.controller, coord: coord)
+            }
+            let supplyFaction: Faction?
+            if let supplyFactionId = tile.supplyFaction {
+                guard let parsedSupplyFaction = Faction(rawValue: supplyFactionId) else {
+                    throw MapEditorGameResourceBridgeError.invalidSupplyFaction(supplyFactionId, coord: coord)
+                }
+                supplyFaction = parsedSupplyFaction
+            } else {
+                supplyFaction = nil
+            }
             hexes[coord] = MapEditorHex(
                 coord: coord,
                 terrain: terrain,
                 hasRoad: tile.hasRoad,
-                controller: Faction(rawValue: tile.controller),
+                controller: controller,
                 cityName: tile.cityName,
                 fortressName: tile.fortressName,
                 isSupplySource: tile.isSupplySource,
-                supplyFaction: tile.supplyFaction.flatMap(Faction.init(rawValue:)),
+                supplyFaction: supplyFaction,
                 objectiveId: tile.objectiveId,
                 regionId: regionMapping[coord] ?? tile.regionId.map { RegionId($0) }
             )
@@ -120,16 +150,31 @@ enum MapEditorGameResourceBridge {
             guard let faction = Faction(rawValue: unit.faction) else {
                 throw MapEditorGameResourceBridgeError.unknownFaction(unit.faction, unitId: unit.id)
             }
+            guard let facing = HexDirection(rawValue: unit.facing) else {
+                throw MapEditorGameResourceBridgeError.invalidFacing(unit.facing, unitId: unit.id)
+            }
+            let retreatMode: RetreatMode
+            if let retreatModeId = unit.retreatMode {
+                guard let parsedRetreatMode = RetreatMode(rawValue: retreatModeId) else {
+                    throw MapEditorGameResourceBridgeError.invalidRetreatMode(retreatModeId, unitId: unit.id)
+                }
+                retreatMode = parsedRetreatMode
+            } else {
+                retreatMode = .retreatable
+            }
+            guard let supplyState = SupplyState(rawValue: unit.supplyState) else {
+                throw MapEditorGameResourceBridgeError.invalidSupplyState(unit.supplyState, unitId: unit.id)
+            }
             return MapEditorUnitDraft(
                 id: unit.id,
                 name: unit.name,
                 faction: faction,
                 templateId: unit.templateId,
                 coord: HexCoord(q: unit.coord.q, r: unit.coord.r),
-                facing: HexDirection(rawValue: unit.facing) ?? .west,
+                facing: facing,
                 hp: unit.hp,
-                retreatMode: unit.retreatMode.flatMap(RetreatMode.init(rawValue:)) ?? .retreatable,
-                supplyState: SupplyState(rawValue: unit.supplyState) ?? .supplied,
+                retreatMode: retreatMode,
+                supplyState: supplyState,
                 assignedAgentId: unit.assignedAgentId
             )
         }
@@ -145,5 +190,19 @@ enum MapEditorGameResourceBridge {
             regionTheaterAssignments: regionTheaterAssignments,
             initialUnits: units
         )
+    }
+
+    private static func makeRegionMapping(_ regionData: RegionDataSet) throws -> [HexCoord: RegionId] {
+        var result: [HexCoord: RegionId] = [:]
+        for (key, regionId) in regionData.hexToRegion {
+            let parts = key.split(separator: ",")
+            guard parts.count == 2,
+                  let q = Int(parts[0]),
+                  let r = Int(parts[1]) else {
+                throw MapEditorGameResourceBridgeError.invalidRegionMappingKey(key)
+            }
+            result[HexCoord(q: q, r: r)] = regionId
+        }
+        return result
     }
 }

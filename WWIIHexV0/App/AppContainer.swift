@@ -123,8 +123,15 @@ final class AppContainer: ObservableObject {
             operation: "Startup"
         )
         let generalRegistry = registryLoad.registry
+        let startupState: GameState
+        if startup.recoveryMessage == nil,
+           let registryRecoveryMessage = registryLoad.recoveryMessage {
+            startupState = recoveryState(for: startup.scenario, errorMessage: registryRecoveryMessage)
+        } else {
+            startupState = startup.state
+        }
         let bootstrappedState = Self.refreshGeneralAssignments(
-            in: StrategicStateBootstrapper().bootstrapIfNeeded(startup.state),
+            in: StrategicStateBootstrapper().bootstrapIfNeeded(startupState),
             registry: generalRegistry
         )
         let sessionSettingsResult = PlaytestSessionSettings.loadResult()
