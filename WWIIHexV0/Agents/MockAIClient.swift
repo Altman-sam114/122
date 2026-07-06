@@ -390,7 +390,7 @@ struct MockAIClient: DecisionProvider {
         return lowHPBonus + distanceBonus + artilleryBonus
     }
 
-    private func isObjectiveLikeTile(_ tile: HexTileSummary?) -> Bool {
+    private func isObjectiveLikeTile(_ tile: TileSummary?) -> Bool {
         guard let tile else {
             return false
         }
@@ -437,8 +437,8 @@ struct MockAIClient: DecisionProvider {
     ) -> String {
         let targetTile = context.visibleTiles.first { $0.coord == target.coord }
         if attacker.isArtillery,
-           targetTile?.baseTerrain == .city || targetTile?.baseTerrain == .fortress {
-            return "Artillery fires on defender in a city or fortress hex."
+           isObjectiveLikeTile(targetTile) {
+            return "Artillery fires on defender at a marked objective."
         }
         return "Target is within range and vulnerable enough for a local attack."
     }
