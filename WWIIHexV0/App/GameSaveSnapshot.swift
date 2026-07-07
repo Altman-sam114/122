@@ -185,11 +185,11 @@ struct GameSaveSnapshot: Codable, Equatable {
                 return .unavailable(incompatibleSchemaMessage(schemaVersion))
             }
 
-            return .unavailable("Saved campaign data could not be decoded by this build.")
+            return .unavailable("Saved campaign could not be opened by this app version.")
         }
     }
 
-    private static func incompatibleSchemaMessage(_ schemaVersion: Int) -> String {
-        "Saved campaign uses format version \(schemaVersion); this build expects version \(currentSchemaVersion)."
+    private static func incompatibleSchemaMessage(_: Int) -> String {
+        "Saved campaign was created by another app version and cannot be opened here."
     }
 }

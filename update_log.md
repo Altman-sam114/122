@@ -2191,6 +2191,36 @@ guerrillaWarfare 额外参考 infrastructure
 - 本轮未做本机 SwiftUI 渲染或截图验收；Concise `Staff Reason` 的实际换行、截断和 Dynamic Type 观感需由云端 build 与后续人工运行时验收确认。
 - 该切片只提升 replay 可见性，不保证每条元帅 directive 都有 rationale，也不改变 Hold Line 是否成功执行。
 
+## v3.17 - Saved campaign recovery wording follow-up
+
+完成日期：2026-07-07
+
+性质：v3.7 保存/继续试玩闭环的玩家可见错误文案补强。本节不改变 `GameSaveSnapshot.currentSchemaVersion`、保存 key、slot label、解码流程、继续流程、清理流程、存档 schema 或迁移策略，只把不兼容/不可解码保存的 recovery message 收口为普通玩家可读口径。
+
+核心更新：
+
+- `GameSaveSnapshot.load` 遇到不可解码保存时显示 `Saved campaign could not be opened by this app version.`，不再显示 `decoded by this build`。
+- 保存版本不兼容时显示 `Saved campaign was created by another app version and cannot be opened here.`，不再暴露 format version、expected version 或 build version 细节。
+- README、`md/flow/flow.md` 和 v3 总提示词已同步：Continue 区块仍按 slot 显示不可用原因并保留 `Clear Saved` 清理入口；这是 display-only 文案收口，不是发布级迁移器。
+
+关键文件：
+
+- `WWIIHexV0/App/GameSaveSnapshot.swift`
+- `README.md`
+- `md/flow/flow.md`
+- `md/prompt/v3.0-拿战迁移/codex-v3.0-拿战aiagent迁移总提示词.md`
+- `update_log.md`
+
+验证记录：
+
+- 本轮按人工要求未运行本地测试、构建、lint、parse、`jq`、`plutil` 或 `git diff --check`。
+- 云端验证需以本轮提交到 `origin/main` 后的 GitHub Actions `WWIIHexV0 CI Results` run 和未加密 artifact 为准。
+
+遗留风险：
+
+- 本轮只改保存恢复失败文案；仍没有发布级存档迁移器、文件导出、云同步或运行时恢复 UI 验收。
+- 不兼容旧保存仍需要玩家手动 `Clear Saved`，不会自动删除或迁移。
+
 ## 历史维护记录
 
 以下提交不作为正式 v 版本，但影响项目资料完整性：
