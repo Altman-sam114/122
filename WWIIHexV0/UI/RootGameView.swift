@@ -30,7 +30,7 @@ struct RootGameView: View {
                     .padding(.top, 8)
                     .padding(.horizontal, 8)
 
-                    Picker("Map Layer", selection: Binding(
+                    Picker("Map View", selection: Binding(
                         get: { container.mapDisplayLayer },
                         set: { container.setMapDisplayLayer($0) }
                     )) {
@@ -64,7 +64,7 @@ struct RootGameView: View {
                 Button {
                     isInfoExpanded.toggle()
                 } label: {
-                    Text("[ INFO ]")
+                    Text("Briefing")
                         .font(.caption.weight(.semibold))
                         .lineLimit(1)
                 }

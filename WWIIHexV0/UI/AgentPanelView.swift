@@ -243,7 +243,7 @@ struct AgentPanelView: View {
             }
 
             if replayDetailLevel.showsRawJSON {
-                Text(activeFaction.usesNapoleonicLogisticsVocabulary ? "Dispatch Audit" : "Raw JSON")
+                Text(activeFaction.usesNapoleonicLogisticsVocabulary ? "Staff Record" : "Raw JSON")
                     .font(playtestTextSize.captionFont)
                     .foregroundStyle(.secondary)
 
@@ -946,7 +946,7 @@ struct AgentPanelView: View {
 
     private var rawJSONPlaceholder: String {
         if activeFaction.usesNapoleonicLogisticsVocabulary {
-            return "No dispatch audit recorded."
+            return "No staff record recorded."
         }
 
         return """

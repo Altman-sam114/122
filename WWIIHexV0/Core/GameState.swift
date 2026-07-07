@@ -154,7 +154,7 @@ struct GameState: Codable, Equatable {
                     turn: 1,
                     faction: .germany,
                     phase: .germanAI,
-                    message: "Legacy scenario initialized."
+                    message: "Archived scenario initialized."
                 )
             ]
         )

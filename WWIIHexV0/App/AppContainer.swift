@@ -443,7 +443,7 @@ final class AppContainer: ObservableObject {
 
     func queueProduction(_ kind: ProductionKind) {
         guard !observerModeEnabled else {
-            appendInteractionEvent(interactionUsesNapoleonicVocabulary ? "Reserve order rejected: observer mode is read-only." : "Production rejected: observer mode is read-only.")
+            appendInteractionEvent(interactionUsesNapoleonicVocabulary ? "Observation only: reserve orders are disabled." : "Production rejected: observation mode is read-only.")
             return
         }
 
@@ -452,7 +452,7 @@ final class AppContainer: ObservableObject {
 
     func endTurn() {
         guard !observerModeEnabled else {
-            appendInteractionEvent(interactionUsesNapoleonicVocabulary ? "End Orders unavailable: observer mode is read-only." : "End Turn unavailable: observer mode is read-only.")
+            appendInteractionEvent(interactionUsesNapoleonicVocabulary ? "Observation only: end orders are disabled." : "End Turn unavailable: observation mode is read-only.")
             return
         }
         if gameState.phase.allowsCommands && gameState.activeFaction == playerFaction {

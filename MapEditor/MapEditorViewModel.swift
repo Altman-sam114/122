@@ -314,7 +314,7 @@ final class MapEditorViewModel: ObservableObject {
             selectedTheaterId = document.theaters.keys.sorted { $0.rawValue < $1.rawValue }.first
             syncBackgroundControlsFromDocument()
             lastErrorMessage = nil
-            lastStatusMessage = "已读取 Legacy 阿登游戏资源。"
+            lastStatusMessage = "已读取归档阿登游戏资源。"
             markChanged()
         } catch {
             lastErrorMessage = String(describing: error)
@@ -330,7 +330,7 @@ final class MapEditorViewModel: ObservableObject {
             let result = try MapEditorGameResourceBridge.overwriteLegacyArdennesGameResources(document: document)
             lastExportResult = result
             lastErrorMessage = nil
-            lastStatusMessage = "已覆盖 Legacy 阿登资源：\(result.scenarioFileName).json 和 \(result.regionFileName).json。"
+            lastStatusMessage = "已覆盖归档阿登资源：\(result.scenarioFileName).json 和 \(result.regionFileName).json。"
         } catch {
             lastErrorMessage = String(describing: error)
         }

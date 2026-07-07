@@ -179,7 +179,7 @@ struct NewGameSetupView: View {
                 Section("Settings") {
                     Toggle("Observer Mode", isOn: $observerModeEnabled)
 
-                    Picker("Map Layer", selection: $selectedMapDisplayLayer) {
+                    Picker("Map View", selection: $selectedMapDisplayLayer) {
                         ForEach(MapDisplayLayer.allCases) { layer in
                             Text(layer.displayName(for: selectedPlayerFaction)).tag(layer)
                         }

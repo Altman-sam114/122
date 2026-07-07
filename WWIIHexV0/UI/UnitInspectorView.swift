@@ -39,7 +39,7 @@ struct UnitInspectorView: View {
             }
 
             LabeledContent(label("Mode")) {
-                Text(division.faction == playerFaction ? "Player" : "Read-only")
+                Text(controlDisplayText(for: division))
             }
 
             if let strategicState {
@@ -197,6 +197,13 @@ struct UnitInspectorView: View {
 
     private func displayFactionName(_ faction: Faction) -> String {
         NapoleonicMessageSanitizer.displayText(faction.displayName, for: inspectionFaction)
+    }
+
+    private func controlDisplayText(for division: Division) -> String {
+        if division.faction == playerFaction {
+            return "Player"
+        }
+        return usesNapoleonicVocabulary ? "Observed" : "Read-only"
     }
 
     private func statusValue(_ text: String, systemImage: String, tone: Color) -> some View {

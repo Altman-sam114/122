@@ -2257,6 +2257,56 @@ guerrillaWarfare 额外参考 infrastructure
 - 本轮未做本机 SwiftUI 渲染或截图验收；Saved Campaign sheet 的实际换行、截断和小屏布局需由云端 build 与后续人工运行时验收确认。
 - 底层仍是 3 个 `UserDefaults` 本地试玩 slot 和最小 slot label，不是发布级命名存档、迁移器、文件导出或云同步。
 
+## v3.19 - Map View and observed formation wording follow-up
+
+完成日期：2026-07-07
+
+性质：v3.6-v3.8 发布候选 UI 术语一致性补强。本节不改变 `MapDisplayLayer` enum、地图图层切换逻辑、info overlay 展开逻辑、Full replay raw 内容、observer mode、玩家阵营、命令校验、`AppContainer.submit(_:)`、scenario catalog id、MapEditor 读写目标或任何规则/存档 schema，只把默认 Waterloo UI、备用 info toggle、归档场景入口和工具提示中仍偏工程化的 Map Layer / Read-only / `[ INFO ]` / Dispatch Audit / raw JSON / Playtest settings / Legacy wording 收口为更面向玩家或维护者的 Map View / Observed / Briefing / Staff Record / Campaign settings / Archived wording。
+
+核心更新：
+
+- `RootGameView` 顶部 segmented picker 从 `Map Layer` 改为 `Map View`；底层仍绑定 `container.mapDisplayLayer` 和 `MapDisplayLayer.displayName(for:)`。
+- `RootGameView` 左下信息展开按钮和备用 `InfoPanelToggle` 从 `[ INFO ]` 改为 `Briefing`；底层仍只切换 info 展开状态。
+- `NewGameSetupView` Settings 区块同样从 `Map Layer` 改为 `Map View`；试玩偏好仍写入 `PlaytestSessionSettings.mapDisplayLayer`。
+- `UnitInspectorView` 在拿战路径下把非玩家控制 formation 的 Control 值从 `Read-only` 改为 `Observed`；legacy 路径仍显示 `Read-only`。
+- `AgentPanelView` Full 拿战路径的 raw 记录区块标题从 `Dispatch Audit` 改为 `Staff Record`，空态改为 `No staff record recorded.`；`NapoleonicMessageSanitizer` 也把可见 `raw JSON` / `Raw JSON` 包装为 staff record；底层 `AgentDecisionRecord.rawJSON` 和 legacy `Raw JSON` 标题不改。
+- `AppContainer` observer mode 下的拿战拒绝提示改为 `Observation only` 口径；legacy fallback 仍保留只读含义。
+- `PlaytestSessionSettings` 坏偏好恢复提示从 Playtest settings 改为 Campaign settings。
+- `ScenarioCatalog.ardennesLegacy.displayName` 从 `Ardennes Legacy` 改为 `Archived Ardennes`；catalog id、runtime id 和资源文件名不改。
+- MapEditor 资源面板和状态消息从 `Legacy 阿登资源` 改为 `归档阿登资源`；读写方法和资源目标不改。
+- `GameState.legacyFallback` 初始化日志从 `Legacy scenario initialized.` 改为 `Archived scenario initialized.`。
+- README、`md/flow/flow.md`、`md/flow/flowchart.md` 和 v3 总提示词已同步：这是 display-only 文案收口，不改变权限、观察者模式或命令执行。
+
+关键文件：
+
+- `WWIIHexV0/UI/RootGameView.swift`
+- `WWIIHexV0/UI/InfoPanelToggle.swift`
+- `WWIIHexV0/Core/Faction.swift`
+- `WWIIHexV0/UI/NewGameSetupView.swift`
+- `WWIIHexV0/UI/UnitInspectorView.swift`
+- `WWIIHexV0/UI/AgentPanelView.swift`
+- `WWIIHexV0/App/AppContainer.swift`
+- `WWIIHexV0/App/PlaytestSessionSettings.swift`
+- `WWIIHexV0/Data/DataLoader.swift`
+- `WWIIHexV0/Core/GameState.swift`
+- `MapEditor/MapEditorView.swift`
+- `MapEditor/MapEditorViewModel.swift`
+- `README.md`
+- `md/flow/flow.md`
+- `md/flow/flowchart.md`
+- `md/prompt/v3.0-拿战迁移/codex-v3.0-拿战aiagent迁移总提示词.md`
+- `update_log.md`
+
+验证记录：
+
+- 本轮按人工要求未运行本地测试、构建、lint、parse、`jq`、`plutil` 或 `git diff --check`。
+- 云端验证需以本轮提交到 `origin/main` 后的 GitHub Actions `WWIIHexV0 CI Results` run 和未加密 artifact 为准。
+
+遗留风险：
+
+- 本轮未做本机 SwiftUI 渲染、VoiceOver、截图或模拟器验收；Map View picker、UnitInspector Control 行、Archived Campaign picker 和 MapEditor 资源面板的小屏观感仍需云端 build 和后续人工运行时确认。
+- `Dispatch Detail`、`Staff Pace`、`Staff Control`、更多启动/恢复错误消息等发布口径仍可继续审计；本轮只处理 Map View、Briefing、Observed、Staff Record、Campaign settings、Archived Ardennes / 归档阿登资源这些低风险可见文案点。
+
 ## 历史维护记录
 
 以下提交不作为正式 v 版本，但影响项目资料完整性：

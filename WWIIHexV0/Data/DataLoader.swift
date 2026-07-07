@@ -17,7 +17,7 @@ enum ScenarioCatalog {
     static let ardennesLegacy = ScenarioCatalogEntry(
         id: "ardennes_v0",
         runtimeScenarioIds: ["mapeditor_scenario"],
-        displayName: "Ardennes Legacy",
+        displayName: "Archived Ardennes",
         scenarioName: "ardennes_v0_scenario",
         regionName: "ardennes_v02_regions",
         terrainRulesName: "terrain_rules",

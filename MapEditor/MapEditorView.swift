@@ -194,10 +194,10 @@ struct MapEditorView: View {
 
     private var dataPanel: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Legacy 阿登资源")
+            Text("归档阿登资源")
                 .font(.headline)
-            Button("读取 Legacy 阿登资源", action: viewModel.loadLegacyArdennesGameResources)
-            Button("覆盖 Legacy 阿登资源", action: viewModel.overwriteLegacyArdennesGameResources)
+            Button("读取归档阿登资源", action: viewModel.loadLegacyArdennesGameResources)
+            Button("覆盖归档阿登资源", action: viewModel.overwriteLegacyArdennesGameResources)
                 .buttonStyle(.borderedProminent)
             Button("导出 JSON 到内存") {
                 _ = viewModel.export()
