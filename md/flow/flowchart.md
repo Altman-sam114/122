@@ -73,7 +73,7 @@ flowchart TD
     SETUP["新局/继续/设置<br/>NewGameSetupView<br/>New Campaign 默认显示 Waterloo、玩家可见为 Player Power / Power / Opening Turn，底层仍是 Faction；Archived Campaigns 才显示 legacy 新局和旧 legacy 存档详情；AppContainer 按玩家控制权归一拿战 phase；Continue 可选 Slot 1/2/3，可编辑 slot label，坏快照/未知 scenario/将领目录失败显示原因并可 Clear Saved；继续成功后走现有 AI eligibility gate；Status 显示操作结果；Settings 调整 observer、map layer、dispatch detail、AI pace、AI control、guide notes、text size"]:::input
     SAVE["本地试玩快照<br/>GameSaveSnapshot + GameSaveSlot + UserDefaults<br/>schemaVersion 1，保存 scenario / player faction / GameState；3 个本地 slot，Slot 1 兼容旧单槽 key；slot label 独立保存；拿战摘要显示 Current / Your Power；加载区分 missing / loaded / unavailable；恢复后 Staff 模式含 observer + Staff 可续跑 AI，非 observer Manual 需由 End Orders 推进，observer Manual 只读"]:::data
     PSET["试玩偏好<br/>PlaytestSessionSettings + UserDefaults<br/>observer / map layer / replay detail / AI pace / AI control / guide notes / reduce motion / text size；坏设置重置为标准设置并提示"]:::data
-    REPLAY["试玩回放详细度<br/>ReplayDetailLevel<br/>Concise 保留 Staff Summary / Issue Preview / Recent Dispatch Timeline；控制日志条数、directive limit、metadata、context、明细卡和 Dispatch Audit / raw JSON 审计显示"]:::ui
+    REPLAY["试玩回放详细度<br/>ReplayDetailLevel<br/>Concise 保留 Staff Summary / Issue Preview / Recent Dispatch Timeline；Standard / Full 的 Situation 可显示 selected staff rationale；控制日志条数、directive limit、metadata、context、明细卡和 Dispatch Audit / raw JSON 审计显示"]:::ui
     GUIDE["非阻塞短引导与 AI 反馈<br/>PlaytestGuideCue + playerOrdersStatus + aiNoActionFeedback + aiDiagnosticFeedback<br/>首次 formation / artillery / cavalry / end orders 写入 Staff note；玩家无可行动、AI 无有效命令、record-level issue 和 dispatch paused 给可读提示"]:::ui
     DL["数据加载器<br/>DataLoader.loadGameState<br/>校验 initial phase / faction / terrain / victory；把 JSON 变成可运行 GameState"]:::loader
     TERR["运行时地形规则<br/>TerrainRuleSet / GameState.terrainRules<br/>Waterloo 移动/战斗读取 napoleonic_terrain_rules；旧状态 fallback legacy"]:::rules
@@ -93,7 +93,7 @@ flowchart TD
     POST["战略姿态 JSON<br/>StrategicPostureEnvelope<br/>offensive / defensive / coalition / stabilize"]:::command
     PDEC["战略姿态解码<br/>StrategicPostureDecoder<br/>校验 schema / issuer / turn / faction / zone / region"]:::command
     DEC["元帅 JSON 解码<br/>TheaterDirectiveDecoder<br/>提取 fenced JSON、校验 id 与 schema"]:::command
-    COMP["元帅意图编译<br/>TheaterDirectiveCompiler<br/>把 TheaterDirective 降级成 ZoneDirective"]:::command
+    COMP["元帅意图编译<br/>TheaterDirectiveCompiler<br/>把 TheaterDirective 降级成 ZoneDirective<br/>已选 rationale 汇入 theaterContext"]:::command
     ZD["战争指令<br/>ZoneDirective<br/>战区级 attack/defend 意图"]:::command
     WCE["指令翻译器<br/>WarCommandExecutor<br/>把战区意图翻成具体单位命令"]:::command
     CMD["底层命令<br/>Command<br/>move / attack / hold / resupply / queueProduction / endTurn"]:::command
@@ -301,7 +301,7 @@ flowchart TD
     SUM["战场摘要<br/>MarshalBattlefieldSummarizer<br/>读取 front/deploy/目标/补给/士气/疲劳/弹药/敌骑兵摘要<br/>敌我判断来自 DiplomacyState"]:::ai
     LLM["模拟 LLM 客户端<br/>SimulatedMarshalLLMClient<br/>输出 fenced JSON，不接真实网络或模型"]:::ai
     DEC["元帅 JSON 解码器<br/>TheaterDirectiveDecoder<br/>提取 JSON、解码、校验 schema/zone/region/tactic"]:::command
-    COMP["元帅意图编译器<br/>TheaterDirectiveCompiler<br/>TheaterDirective -> ZoneDirective<br/>传递 focus/convergence/coordinated 参数"]:::command
+    COMP["元帅意图编译器<br/>TheaterDirectiveCompiler<br/>TheaterDirective -> ZoneDirective<br/>传递 focus/convergence/coordinated 参数<br/>最多 3 条已选 rationale 写入 theaterContext"]:::command
     ENV["指令信封<br/>DirectiveEnvelope<br/>收集编译后的 ZoneDirective"]:::command
     TACTIC["高级战术路由<br/>TacticName<br/>blitzkrieg / cavalryCharge / spearhead / breakthrough / pincer / artilleryPreparation / fire / feint / guerrilla / hold / elastic / depth / lastStand<br/>敌骑兵压力偏向 Hold Line"]:::command
     WCE["指令执行器<br/>WarCommandExecutor.execute<br/>按战术 profile 选择单位、目标和 fallback；broken morale offensive order 降级为 Hold"]:::command

@@ -264,7 +264,12 @@ struct TurnManager {
                 resolution.directiveEnvelope,
                 state: strategicState,
                 faction: faction,
-                contextSummary: "\(contextSummary) Strategic posture: \(postureResolution.envelope.posture.displayName).",
+                contextSummary: [
+                    "\(contextSummary) Strategic posture: \(postureResolution.envelope.posture.displayName).",
+                    resolution.directiveEnvelope.theaterContext
+                ]
+                .compactMap { $0 }
+                .joined(separator: " "),
                 rawJSON: rawJSON,
                 parsedIntent: resolution.theaterEnvelope?.strategicIntent ?? postureResolution.envelope.strategicIntent,
                 providerSuffix: "MarshalDirective",

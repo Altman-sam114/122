@@ -1633,6 +1633,7 @@ struct TheaterDirectiveCompiler {
             .filter { $0.faction == theaterEnvelope.faction && !$0.frontSegments.isEmpty }
             .sorted { $0.id.rawValue < $1.id.rawValue }
 
+        var rationaleNotes: [String] = []
         let compiledDirectives = candidateZones.compactMap { zone -> ZoneDirective? in
             guard let theaterDirective = directivesByZone[zone.id]?.sorted(by: {
                 if $0.priority == $1.priority {
@@ -1643,9 +1644,22 @@ struct TheaterDirectiveCompiler {
                 return fallbackByZone[zone.id]
             }
 
-            return compile(theaterDirective, zone: zone, state: state)
-                ?? fallbackByZone[zone.id]
+            if let compiled = compile(theaterDirective, zone: zone, state: state) {
+                if !theaterDirective.rationale.isEmpty {
+                    rationaleNotes.append("\(zone.name): \(theaterDirective.rationale)")
+                }
+                return compiled
+            }
+            return fallbackByZone[zone.id]
         }
+        let rationaleContext = Array(rationaleNotes.prefix(3)).joined(separator: " ")
+        let theaterContext = [
+            theaterEnvelope.strategicIntent,
+            "Compiled \(compiledDirectives.count) zone directive(s).",
+            rationaleContext.isEmpty ? nil : "Selected staff rationale: \(rationaleContext)"
+        ]
+        .compactMap { $0 }
+        .joined(separator: " ")
 
         return DirectiveEnvelope(
             schemaVersion: max(2, fallbackEnvelope.schemaVersion),
@@ -1653,7 +1667,7 @@ struct TheaterDirectiveCompiler {
             turn: theaterEnvelope.turn,
             directives: compiledDirectives,
             commanderAgentId: theaterEnvelope.issuerId,
-            theaterContext: "\(theaterEnvelope.strategicIntent) Compiled \(compiledDirectives.count) zone directive(s)."
+            theaterContext: theaterContext
         )
     }
 

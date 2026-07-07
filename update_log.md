@@ -2092,6 +2092,38 @@ guerrillaWarfare 额外参考 infrastructure
 - Staff rationale 是否在所有 replay detail level 下可见，仍取决于现有 `AgentPanelView` / Dispatch Audit 展示路径；本轮未改 UI 布局。
 - 该切片只解释和排序防守意图，不保证每个 Hold Line 命令都成功执行，也不新增完整 square formation AI。
 
+## v3.14 - Staff rationale situation summary follow-up
+
+完成日期：2026-07-07
+
+性质：v3.13 staff cavalry pressure rationale 的可见性补强。本节不改变 `Command`、`ZoneDirective`、`TheaterDirective` schema、`WarDirectiveRecord` schema、`WarCommandExecutor` 或 `CombatRules`，只复用既有 `DirectiveEnvelope.theaterContext` 和 `AgentDecisionRecord.contextSummary`，让 Standard / Full 的 AgentPanel Situation 摘要能看到已选元帅 rationale。
+
+核心更新：
+
+- `TheaterDirectiveCompiler` 在编译 `TheaterDirectiveEnvelope` 时收集最多 3 条已选 `TheaterDirective.rationale`，合入既有 `DirectiveEnvelope.theaterContext`。
+- `TurnManager.runMarshalDirectiveTurn` 将 `resolution.directiveEnvelope.theaterContext` 追加进 `AgentDecisionRecord.contextSummary`，因此 AgentPanel 的 Situation 摘要能展示 selected staff rationale；Concise 仍按现有设置隐藏 context summary。
+- README、`md/flow/flow.md`、`md/flow/flowchart.md` 和 v3 总提示词已同步：这是 replay / Situation 可见性增强，不是新命令执行路径或完整方阵系统。
+
+关键文件：
+
+- `WWIIHexV0/Agents/ZoneCommanderAgent.swift`
+- `WWIIHexV0/Turn/TurnManager.swift`
+- `README.md`
+- `md/flow/flow.md`
+- `md/flow/flowchart.md`
+- `md/prompt/v3.0-拿战迁移/codex-v3.0-拿战aiagent迁移总提示词.md`
+- `update_log.md`
+
+验证记录：
+
+- 本轮按人工要求未运行本地测试、构建、lint、parse、`jq`、`plutil` 或 `git diff --check`。
+- 云端验证需以本轮提交到 `origin/main` 后的 GitHub Actions `WWIIHexV0 CI Results` run 和未加密 artifact 为准。
+
+遗留风险：
+
+- Situation 摘要仍受 `ReplayDetailLevel.showsContextSummary` 控制；Concise 不显示该摘要。
+- 该切片只提升 rationale 可见性，不验证运行时 UI 换行，也不保证每条 defense directive 都产生 Hold Line。
+
 ## 历史维护记录
 
 以下提交不作为正式 v 版本，但影响项目资料完整性：

@@ -1549,7 +1549,7 @@ AppContainer.runAIIfNeeded
 
 `MarshalAgent` 是元帅层，不是单位，也不是新规则执行器。它只读取降维摘要并输出 `TheaterDirectiveEnvelope` JSON：
 
-`MarshalBattlefieldSummarizer` 的 `MarshalBattlefieldSummary` 当前 schemaVersion 为 7；每个 `MarshalFrontSummary` 除兵力、压力、目标和 supply warning 外，还带 `fatigueWarningCount`、`ammunitionWarningCount`、可选 `cavalryUnitCount` 与可选 `visibleEnemyCavalryStrength`，供元帅层在选择攻守、防御优先级、骑兵冲锋和防骑兵 Hold Line 时看到战术消耗与兵种风险。v3.13 起防御 priority 与 `TheaterDirective.rationale` 会把可见敌骑兵压力纳入 staff 说明，但执行器仍只接收既有 defense tactic / stance。
+`MarshalBattlefieldSummarizer` 的 `MarshalBattlefieldSummary` 当前 schemaVersion 为 7；每个 `MarshalFrontSummary` 除兵力、压力、目标和 supply warning 外，还带 `fatigueWarningCount`、`ammunitionWarningCount`、可选 `cavalryUnitCount` 与可选 `visibleEnemyCavalryStrength`，供元帅层在选择攻守、防御优先级、骑兵冲锋和防骑兵 Hold Line 时看到战术消耗与兵种风险。v3.13 起防御 priority 与 `TheaterDirective.rationale` 会把可见敌骑兵压力纳入 staff 说明；v3.14 起 `TheaterDirectiveCompiler` 会把最多 3 条已选 rationale 合入 `DirectiveEnvelope.theaterContext`，`TurnManager` 再写入 `AgentDecisionRecord.contextSummary`，供 AgentPanel 的 Standard / Full Situation 摘要显示；执行器仍只接收既有 defense tactic / stance。
 
 ```text
 TheaterDirectiveEnvelope
@@ -1802,7 +1802,7 @@ defenseInDepth:
   run(command, fallback: hold)
 ```
 
-v3.12/v3.13 只改变上游 AI / Marshal 的 tactic 倾向、priority 和 rationale：看见敌方骑兵压力时更可能生成 `holdPosition` / `Hold Line`，并在 staff rationale 中说明压力来源。`WarCommandExecutor` 的防御翻译没有新增反骑兵分支，仍按现有 `holdLine -> .hold`、`flexible -> .allowRetreat` 执行。
+v3.12-v3.14 只改变上游 AI / Marshal 的 tactic 倾向、priority、rationale 和 AgentPanel Situation 摘要：看见敌方骑兵压力时更可能生成 `holdPosition` / `Hold Line`，并在 staff rationale 中说明压力来源。`WarCommandExecutor` 的防御翻译没有新增反骑兵分支，仍按现有 `holdLine -> .hold`、`flexible -> .allowRetreat` 执行。
 
 进攻翻译：
 
@@ -2160,7 +2160,7 @@ MapEditorGameResourceBridge.loadLegacyArdennesDocument
 - 统治者层当前只输出战略姿态和审计记录，不能直接输出底层 `Command`，不能直接修改地图、单位、hex controller 或动态战区权威。
 - 当前工作树存在外交/经济/UI 等非 v0.5 方向残留，合并前需要单独审查文件归属和 public API 冲突。
 - `AttackIntensity.infiltration` 已在 `WarCommandExecutor` 中解释为默认低投入上限；`.limitedCounter` 和 `.allOut` 仍主要依赖 tactic profile 与显式 `maxCommittedUnits`。
-- `TacticConditionChecker` 已对机动、骑兵、炮兵/远程、佯攻和纵深防御做最小条件过滤；v3.11 已把 infantry-heavy + hold 接成 square-ready hold 的最小防骑兵克制，v3.12/v3.13 让 AI / Marshal 摘要读取可见敌方骑兵压力、更偏向 Hold Line，并在 staff rationale / priority 中暴露该压力，但完整队形、方阵克制、炮兵准备/骑兵冲锋的发布级平衡仍未完成。
+- `TacticConditionChecker` 已对机动、骑兵、炮兵/远程、佯攻和纵深防御做最小条件过滤；v3.11 已把 infantry-heavy + hold 接成 square-ready hold 的最小防骑兵克制，v3.12-v3.14 让 AI / Marshal 摘要读取可见敌方骑兵压力、更偏向 Hold Line，并在 staff rationale / priority / Situation 摘要中暴露该压力，但完整队形、方阵克制、炮兵准备/骑兵冲锋的发布级平衡仍未完成。
 - 战区互助接口 `requestSupport` / `getAvailableForces` / `notifyThreat` 有模型但没有主流程调用方。
 - 攻击不会自动占领目标 hex，只有移动会占领。
 - Legacy Agent D 管线仍保留，不应删除，也不应默认接回主战争 AI。
