@@ -31,6 +31,7 @@ final class AppContainer: ObservableObject {
     @Published private(set) var playtestTextSize: PlaytestTextSize
     @Published private(set) var reduceMotionEnabled: Bool
     @Published private(set) var sessionSettingsRecoveryMessage: String?
+    @Published private(set) var selectedGeneralAttackTactic: TacticName
 
     let commandHandler: GameCommandHandling
     let dataLoader: DataLoader
@@ -97,6 +98,7 @@ final class AppContainer: ObservableObject {
         self.playtestTextSize = playtestTextSize
         self.reduceMotionEnabled = reduceMotionEnabled
         self.sessionSettingsRecoveryMessage = sessionSettingsRecoveryMessage
+        self.selectedGeneralAttackTactic = .standardAttack
         self.deliveredPlaytestCues = []
         self.gameState = normalizeCommandPhase(self.gameState)
         if let recoveryMessage = savedGameRecoveryMessage {
@@ -417,6 +419,7 @@ final class AppContainer: ObservableObject {
             appendInteractionEvent(generalOrderRejectedMessage("no friendly source corps sector available.", legacy: "no allied source front zone available."))
             return
         }
+        let tactic = resolvedSelectedGeneralAttackTactic(for: zone)
 
         let directive = ZoneDirective(
             zoneId: zone.id,
@@ -428,7 +431,7 @@ final class AppContainer: ObservableObject {
                 maxCommittedUnits: max(1, min(3, zone.unitsFront.count + zone.unitsDepth.count))
             ),
             category: .offense,
-            tactic: .standardAttack,
+            tactic: tactic,
             commandTarget: .region(target.region.id)
         )
         submitPlayerDirective(
@@ -644,6 +647,7 @@ final class AppContainer: ObservableObject {
         generalRegistry = nextRegistry
         playerFaction = snapshot.playerFaction
         startsNewGameAtPlayerFaction = snapshot.startsAtPlayerFaction
+        selectedGeneralAttackTactic = .standardAttack
         gameState = refreshGeneralAssignments(in: bootstrappedState)
         selectedUnitId = nil
         selectedHex = nil
@@ -741,6 +745,7 @@ final class AppContainer: ObservableObject {
         generalRegistry = nextRegistry
         playerFaction = nextPlayerFaction
         startsNewGameAtPlayerFaction = startsAtPlayerFaction
+        selectedGeneralAttackTactic = .standardAttack
         gameState = refreshGeneralAssignments(in: bootstrappedState)
         selectedUnitId = nil
         selectedHex = nil
@@ -962,6 +967,33 @@ final class AppContainer: ObservableObject {
 
     var canOrderSelectedGeneralAttackRegion: Bool {
         canIssuePlayerDirective && selectedAttackTarget != nil && selectedGeneralCommandZone != nil
+    }
+
+    var selectedGeneralAttackTactics: [TacticName] {
+        guard let zone = selectedGeneralCommandZone else {
+            return [.standardAttack]
+        }
+
+        let preferred: [TacticName] = [
+            .standardAttack,
+            .artilleryPreparation,
+            .cavalryCharge
+        ]
+        let available = preferred.filter { playerAttackTacticAvailable($0, for: zone, in: gameState) }
+        return available.isEmpty ? [.standardAttack] : available
+    }
+
+    var effectiveSelectedGeneralAttackTactic: TacticName {
+        selectedGeneralAttackTactics.contains(selectedGeneralAttackTactic)
+            ? selectedGeneralAttackTactic
+            : .standardAttack
+    }
+
+    func selectGeneralAttackTactic(_ tactic: TacticName) {
+        guard tactic.category == .offense else {
+            return
+        }
+        selectedGeneralAttackTactic = selectedGeneralAttackTactics.contains(tactic) ? tactic : .standardAttack
     }
 
     var canAdvanceOrders: Bool {
@@ -1273,6 +1305,7 @@ final class AppContainer: ObservableObject {
                 directiveType: directive.type,
                 sourceRegionId: sourceRegionId,
                 targetRegionId: targetRegionId,
+                tactic: directive.tactic,
                 createdByGeneralId: refreshedZone.generalAssignment?.generalId
             )
         )
@@ -1282,6 +1315,53 @@ final class AppContainer: ObservableObject {
         lastCommandMessage = playerDirectiveMessage(for: execution, diagnostics: diagnostics)
         appendInteractionEvent(generalOrderSubmittedMessage(for: directive))
         refreshSelectionAfterStateChange()
+    }
+
+    private func resolvedSelectedGeneralAttackTactic(for zone: FrontZone) -> TacticName {
+        if playerAttackTacticAvailable(selectedGeneralAttackTactic, for: zone, in: gameState) {
+            return selectedGeneralAttackTactic
+        }
+        selectedGeneralAttackTactic = .standardAttack
+        return .standardAttack
+    }
+
+    private func playerAttackTacticAvailable(
+        _ tactic: TacticName,
+        for zone: FrontZone,
+        in state: GameState
+    ) -> Bool {
+        guard tactic.category == .offense else {
+            return false
+        }
+        let attackUnitIds = Set(zone.unitsFront + zone.unitsDepth + zone.frontSegments.flatMap(\.assignedFrontUnitIds))
+        let attackUnits = state.divisions.filter {
+            attackUnitIds.contains($0.id)
+                && $0.faction == zone.faction
+                && !$0.isDestroyed
+                && $0.canAct
+        }
+
+        switch tactic {
+        case .standardAttack:
+            return !attackUnits.isEmpty
+        case .artilleryPreparation:
+            return attackUnits.contains { $0.isArtillery || $0.range > 1 }
+        case .cavalryCharge:
+            return attackUnits.contains { $0.isCavalry }
+        case .blitzkrieg,
+             .spearhead,
+             .breakthrough,
+             .pincerMovement,
+             .fireCoverage,
+             .feint,
+             .guerrillaWarfare:
+            return false
+        case .holdPosition,
+             .elasticDefense,
+             .defenseInDepth,
+             .lastStand:
+            return false
+        }
     }
 
     private func playerDirectiveMessage(

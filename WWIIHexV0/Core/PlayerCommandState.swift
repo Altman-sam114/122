@@ -49,6 +49,7 @@ struct PlayerPlannedOperation: Identifiable, Codable, Equatable {
     let directiveType: DirectiveType
     let sourceRegionId: RegionId?
     let targetRegionId: RegionId?
+    let tactic: TacticName?
     let createdByGeneralId: String?
 
     init(
@@ -59,6 +60,7 @@ struct PlayerPlannedOperation: Identifiable, Codable, Equatable {
         directiveType: DirectiveType,
         sourceRegionId: RegionId? = nil,
         targetRegionId: RegionId? = nil,
+        tactic: TacticName? = nil,
         createdByGeneralId: String? = nil
     ) {
         self.id = id
@@ -68,6 +70,7 @@ struct PlayerPlannedOperation: Identifiable, Codable, Equatable {
         self.directiveType = directiveType
         self.sourceRegionId = sourceRegionId
         self.targetRegionId = targetRegionId
+        self.tactic = tactic
         self.createdByGeneralId = createdByGeneralId
     }
 }

@@ -293,9 +293,12 @@ struct RootGameView: View {
                         plannedOperations: container.selectedGeneralPlannedOperations,
                         canHoldLine: container.canOrderSelectedGeneralHoldLine,
                         canAttackRegion: container.canOrderSelectedGeneralAttackRegion,
+                        selectedAttackTactic: container.effectiveSelectedGeneralAttackTactic,
+                        availableAttackTactics: container.selectedGeneralAttackTactics,
                         onShowProfile: { isGeneralProfilePresented = true },
                         onHoldLine: container.orderSelectedGeneralHoldLine,
-                        onAttackRegion: container.orderSelectedGeneralAttackRegion
+                        onAttackRegion: container.orderSelectedGeneralAttackRegion,
+                        onSelectAttackTactic: container.selectGeneralAttackTactic
                     )
                 case .region:
                     RegionInspectorView(
@@ -315,9 +318,12 @@ struct RootGameView: View {
                         plannedOperations: container.selectedGeneralPlannedOperations,
                         canHoldLine: container.canOrderSelectedGeneralHoldLine,
                         canAttackRegion: container.canOrderSelectedGeneralAttackRegion,
+                        selectedAttackTactic: container.effectiveSelectedGeneralAttackTactic,
+                        availableAttackTactics: container.selectedGeneralAttackTactics,
                         onShowProfile: { isGeneralProfilePresented = true },
                         onHoldLine: container.orderSelectedGeneralHoldLine,
-                        onAttackRegion: container.orderSelectedGeneralAttackRegion
+                        onAttackRegion: container.orderSelectedGeneralAttackRegion,
+                        onSelectAttackTactic: container.selectGeneralAttackTactic
                     )
                 case .log:
                     EventLogView(

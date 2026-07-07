@@ -1909,7 +1909,7 @@ guerrillaWarfare 额外参考 infrastructure
 
 完成日期：2026-07-07
 
-性质：v3.9 起步记录。本节代表 `artilleryPreparation` 与 `cavalryCharge` 已作为最小 `TacticName` 接入 AI 分类、条件过滤、执行 profile 和回放展示；它们仍降级为既有 `attack / move / hold / allowRetreat`，统一交给 `WarCommandExecutor -> RuleEngine`。不代表完整 line / column / square 队形、方阵克制、发布级炮击/冲锋动画、玩家战术选择 UI 或完整平衡系统已经完成。
+性质：v3.9 起步记录。本节代表 `artilleryPreparation` 与 `cavalryCharge` 已作为最小 `TacticName` 接入 AI 分类、条件过滤、执行 profile、玩家 corps command tactic menu 和回放展示；它们仍降级为既有 `attack / move / hold / allowRetreat`，统一交给 `WarCommandExecutor -> RuleEngine`。不代表完整 line / column / square 队形、方阵克制、发布级炮击/冲锋动画或完整平衡系统已经完成。
 
 核心更新：
 
@@ -1920,6 +1920,8 @@ guerrillaWarfare 额外参考 infrastructure
 - `MarshalBattlefieldSummary.schemaVersion` 升到 7，`MarshalFrontSummary` 新增可选 `cavalryUnitCount`；模拟元帅只有在目标 front 有骑兵时才会选 `cavalryCharge`。
 - `ZoneCommanderAgent` 的 attack intensity、focus region、commitment limit、exploit depth、reserve、stance 和 fallback helper 已覆盖两个新 tactic。
 - `WarCommandExecutor.executeTactic` 把两个新 tactic 路由到 `executeAttack(tactic)`；`AttackTacticProfile` 新增 `cavalryFirst` 排序字段，`cavalryCharge` 会优先骑兵/机动纵深并允许深目标，`artilleryPreparation` 与 `fireCoverage` 复用 artillery-first、attack-only profile，不主动推进。
+- `GeneralCommandPanelView` 新增最小 attack tactic menu；`AppContainer` 只在当前 player corps sector 的可行动 front/depth/assigned front 单位中有炮兵/远程或骑兵候选时暴露 `Artillery Preparation` / `Cavalry Charge`，玩家提交后仍走 `ZoneDirective -> WarCommandExecutor -> RuleEngine`。
+- `PlayerPlannedOperation` 新增可选 `tactic`，用于 planned orders 展示玩家选择的 tactic；旧存档缺字段时保持 nil 兼容。
 - `AgentPanelView` 拿战展示区分 `Covering Fire`、`Artillery Preparation` 和 `Cavalry Charge`；`BoardScene` directive replay 中炮兵准备沿用 `ART` reticle，骑兵冲锋显示 `CAV` 并沿用推进 marker。
 - README、`md/flow/flow.md`、`md/flow/flowchart.md`、v3 总提示词和本日志已同步：当前只是最小 tactic slice，完整队形/视觉/平衡仍后置。
 
@@ -1928,6 +1930,10 @@ guerrillaWarfare 额外参考 infrastructure
 - `WWIIHexV0/Commands/WarDirective.swift`
 - `WWIIHexV0/Agents/ZoneCommanderAgent.swift`
 - `WWIIHexV0/Commands/WarCommandExecutor.swift`
+- `WWIIHexV0/App/AppContainer.swift`
+- `WWIIHexV0/Core/PlayerCommandState.swift`
+- `WWIIHexV0/UI/GeneralCommandPanelView.swift`
+- `WWIIHexV0/UI/RootGameView.swift`
 - `WWIIHexV0/UI/AgentPanelView.swift`
 - `WWIIHexV0/SpriteKit/BoardScene.swift`
 - `README.md`
@@ -1945,7 +1951,7 @@ guerrillaWarfare 额外参考 infrastructure
 
 遗留风险：
 
-- 玩家手写 / UI directive 入口仍默认 `.standardAttack`，尚未提供玩家可点选 `artilleryPreparation` / `cavalryCharge` 的战术控件。
+- 玩家 corps command UI 只有最小 tactic menu，尚未提供完整战术说明、快捷键、战术预览、冲锋/炮击动画或更细队形控制。
 - `cavalryCharge` 当前是骑兵优先的进攻 profile，不是独立冲锋伤害模型；实际限制仍来自现有 `MovementRules` / `CombatRules` 地形和守方修正。
 - `artilleryPreparation` 当前复用 artillery-first attack-only profile，不是完整 Grand Battery 准备阶段、压制状态或多回合炮击系统。
 - 未跑本地重测试或本地轻量检查；构建和静态检查结果需由云端 artifact 核对。

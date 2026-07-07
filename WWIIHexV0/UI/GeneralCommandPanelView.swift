@@ -12,9 +12,12 @@ struct GeneralCommandPanelView: View {
     let plannedOperations: [PlayerPlannedOperation]
     let canHoldLine: Bool
     let canAttackRegion: Bool
+    let selectedAttackTactic: TacticName
+    let availableAttackTactics: [TacticName]
     let onShowProfile: () -> Void
     let onHoldLine: () -> Void
     let onAttackRegion: () -> Void
+    let onSelectAttackTactic: (TacticName) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -108,6 +111,16 @@ struct GeneralCommandPanelView: View {
                     .disabled(!canHoldLine)
                 Button(label("Attack Region"), systemImage: "arrow.up.right.circle", action: onAttackRegion)
                     .disabled(!canAttackRegion)
+                Menu {
+                    ForEach(availableAttackTactics, id: \.self) { tactic in
+                        Button(tacticDisplayName(tactic)) {
+                            onSelectAttackTactic(tactic)
+                        }
+                    }
+                } label: {
+                    Label(tacticDisplayName(selectedAttackTactic), systemImage: "slider.horizontal.3")
+                }
+                .disabled(availableAttackTactics.count <= 1)
             }
             .buttonStyle(.bordered)
 
@@ -255,7 +268,8 @@ struct GeneralCommandPanelView: View {
 
     private func operationSummary(_ operation: PlayerPlannedOperation) -> String {
         let target = operationTargetDisplayName(operation)
-        return "\(directiveLabel(operation.directiveType)) / \(target)"
+        let tactic = operation.tactic.map { " / \(tacticDisplayName($0))" } ?? ""
+        return "\(directiveLabel(operation.directiveType))\(tactic) / \(target)"
     }
 
     private func operationTargetDisplayName(_ operation: PlayerPlannedOperation) -> String {
@@ -294,6 +308,43 @@ struct GeneralCommandPanelView: View {
             return "Attack Sector"
         case .defend:
             return "Hold Contact Line"
+        }
+    }
+
+    private func tacticDisplayName(_ tactic: TacticName) -> String {
+        guard activeFaction.usesNapoleonicLogisticsVocabulary else {
+            return tactic.rawValue
+        }
+
+        switch tactic {
+        case .standardAttack:
+            return "Attack Sector"
+        case .artilleryPreparation:
+            return "Artillery Preparation"
+        case .cavalryCharge:
+            return "Cavalry Charge"
+        case .fireCoverage:
+            return "Covering Fire"
+        case .blitzkrieg:
+            return "Rapid Advance"
+        case .spearhead:
+            return "Column Assault"
+        case .breakthrough:
+            return "Break Contact Line"
+        case .pincerMovement:
+            return "Converging Attack"
+        case .feint:
+            return "Demonstration"
+        case .guerrillaWarfare:
+            return "Harassing Action"
+        case .holdPosition:
+            return "Hold Line"
+        case .elasticDefense:
+            return "Flexible Defense"
+        case .defenseInDepth:
+            return "Reserve Line"
+        case .lastStand:
+            return "Final Defense"
         }
     }
 
