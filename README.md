@@ -34,6 +34,8 @@ v3.8 已起步发布候选收口：默认 playable 场景切到 Waterloo 1815，
 
 v3.21 继续收口数据加载错误的玩家可见外层：缺资源、未知/未声明 power、opening orders phase、地图 controller / supply point / region 映射和归档阿登 commander data 不一致时，`DataLoader` / `ScenarioDefinition` 不再直接暴露 `.json`、`playerFaction`、`aiFaction`、`regionId`、`hexToRegion` 或 `guderian.assignedDivisionIds` 等工程字段；校验条件、JSON schema、加载流程和底层兼容路径不变。
 
+v3.22 继续补强新局 Settings 的试玩说明：`Dispatch Detail`、`Staff Pace` 和 `Staff Control` 现在会随当前选项显示短 footnote，解释回放密度、simulated staff 本地等待和 Staff / Manual 推进差异；这只改 `NewGameSetupView` 的展示与 accessibility 文案，不改 `ReplayDetailLevel`、`AICommandPace`、`PlaytestAIControlMode` raw value、`UserDefaults` key、AI eligibility gate 或规则执行。
+
 当前拿战迁移入口文档：
 
 - `md/prompt/v3.0-拿战迁移/codex-v3.0-拿战aiagent迁移总提示词.md`

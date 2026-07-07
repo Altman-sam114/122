@@ -191,6 +191,10 @@ struct NewGameSetupView: View {
                         }
                     }
                     .pickerStyle(.segmented)
+                    Text(dispatchDetailDescription)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .accessibilityLabel("Dispatch Detail. \(dispatchDetailDescription)")
 
                     Picker("Staff Pace", selection: $aiCommandPace) {
                         ForEach(AICommandPace.allCases) { pace in
@@ -198,6 +202,10 @@ struct NewGameSetupView: View {
                         }
                     }
                     .pickerStyle(.segmented)
+                    Text(staffPaceDescription)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .accessibilityLabel("Staff Pace. \(staffPaceDescription)")
 
                     Picker("Staff Control", selection: $aiControlMode) {
                         ForEach(PlaytestAIControlMode.allCases) { mode in
@@ -205,6 +213,10 @@ struct NewGameSetupView: View {
                         }
                     }
                     .pickerStyle(.segmented)
+                    Text(staffControlDescription)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .accessibilityLabel("Staff Control. \(staffControlDescription)")
 
                     Toggle("Guide Notes", isOn: $playtestGuideCuesEnabled)
 
@@ -422,6 +434,37 @@ struct NewGameSetupView: View {
             return "Other non-neutral powers are controlled by the simulated staff."
         case .manualAdvance:
             return "Other non-neutral powers wait for manual End Orders."
+        }
+    }
+
+    private var dispatchDetailDescription: String {
+        switch replayDetailLevel {
+        case .concise:
+            return "Shows a short staff summary, key issues and the recent dispatch timeline."
+        case .standard:
+            return "Shows staff summaries, recent corps orders and issue previews for normal play."
+        case .full:
+            return "Shows Staff Record details for audit while keeping rules and orders unchanged."
+        }
+    }
+
+    private var staffPaceDescription: String {
+        switch aiCommandPace {
+        case .instant:
+            return "Staff dispatch resolves without a local pause."
+        case .balanced:
+            return "Staff dispatch uses a short pause before issuing orders."
+        case .deliberate:
+            return "Staff dispatch uses a longer pause for easier replay reading."
+        }
+    }
+
+    private var staffControlDescription: String {
+        switch aiControlMode {
+        case .simulatedStaff:
+            return "Staff automatically dispatches non-neutral powers outside your direct orders."
+        case .manualAdvance:
+            return "Manual keeps powers waiting until you advance them with End Orders."
         }
     }
 

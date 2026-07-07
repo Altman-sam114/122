@@ -2374,6 +2374,35 @@ guerrillaWarfare 额外参考 infrastructure
 - 本轮未做真实坏 JSON / 缺资源 / 坏存档运行时恢复验收；错误消息在 sheet、interaction log 和 EventLog 中的换行与上下文观感仍需云端 build 与后续人工运行时确认。
 - 其他较深层 DataLoader 校验仍可能保留开发者定位词；本轮只处理启动/新局路径最容易透出的 faction、supply、region mapping 和 archived commander assignment 文案。
 
+## v3.22 - Settings guidance wording follow-up
+
+完成日期：2026-07-07
+
+性质：新局 Settings 说明文案补强。本节不改变 `ReplayDetailLevel`、`AICommandPace`、`PlaytestAIControlMode` raw value、`PlaytestSessionSettings` 编码、`UserDefaults` key、AI eligibility gate、`runAISequence` 或规则执行，只让玩家在 `NewGameSetupView` 中更清楚地理解 Dispatch Detail、Staff Pace 和 Staff Control 的影响。
+
+核心更新：
+
+- `Dispatch Detail` segmented picker 下新增动态 footnote / accessibility 文案，解释 Concise / Standard / Full 对 staff summary、corps orders、Staff Record 审计密度的影响。
+- `Staff Pace` segmented picker 下新增动态 footnote / accessibility 文案，解释 Instant / Balanced / Deliberate 只影响 simulated staff 派令前的本地等待。
+- `Staff Control` segmented picker 下新增动态 footnote / accessibility 文案，解释 Staff 会自动 dispatch 非中立 power，Manual 则等待 End Orders 手动推进。
+
+关键文件：
+
+- `WWIIHexV0/UI/NewGameSetupView.swift`
+- `README.md`
+- `md/flow/flow.md`
+- `md/prompt/v3.0-拿战迁移/codex-v3.0-拿战aiagent迁移总提示词.md`
+- `update_log.md`
+
+验证记录：
+
+- 本轮按人工要求未运行本地测试、构建、lint、parse、`jq`、`plutil` 或 `git diff --check`。
+- 云端验证需以本轮提交到 `origin/main` 后的 GitHub Actions `WWIIHexV0 CI Results` run 和未加密 artifact 为准。
+
+遗留风险：
+
+- 本轮未做 SwiftUI 运行时截图、VoiceOver 或小屏布局验收；三条 footnote 在紧凑宽度下的换行和 spacing 仍需云端 build 与后续人工运行时确认。
+
 ## 历史维护记录
 
 以下提交不作为正式 v 版本，但影响项目资料完整性：
