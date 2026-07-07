@@ -677,7 +677,7 @@ final class AppContainer: ObservableObject {
             UserDefaults.standard.removeObject(forKey: legacyDefaultsKey)
         }
         setSavedGameStatus(summary: nil, recoveryMessage: nil, for: targetSlot)
-        let message = "\(saveSlotDisplayName(targetSlot)) saved campaign cleared."
+        let message = "Saved campaign cleared from \(saveSlotDisplayName(targetSlot))."
         lastCommandMessage = message
         appendInteractionEvent(message)
     }
@@ -694,12 +694,12 @@ final class AppContainer: ObservableObject {
         savedGameRecoveryMessage = savedGameRecoveryMessages[slot]
         if let persistedLabel = GameSaveSlot.persistLabel(label, for: slot) {
             saveSlotLabels[slot] = persistedLabel
-            let message = "Save slot name updated: \(slot.displayName) -> \(persistedLabel)."
+            let message = "Campaign name updated: \(slot.displayName) -> \(persistedLabel)."
             lastCommandMessage = message
             appendInteractionEvent(message)
         } else {
             saveSlotLabels.removeValue(forKey: slot)
-            let message = "Save slot name reset: \(slot.displayName)."
+            let message = "Campaign name reset: \(slot.displayName)."
             lastCommandMessage = message
             appendInteractionEvent(message)
         }

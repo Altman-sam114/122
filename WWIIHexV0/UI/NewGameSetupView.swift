@@ -109,44 +109,44 @@ struct NewGameSetupView: View {
                     }
                 }
 
-                Section("Continue") {
-                    Picker("Save Slot", selection: $selectedSaveSlot) {
+                Section("Saved Campaign") {
+                    Picker("Campaign Slot", selection: $selectedSaveSlot) {
                         ForEach(GameSaveSlot.allCases) { slot in
                             Text(saveSlotDisplayName(slot)).tag(slot)
                         }
                     }
 
-                    TextField("Slot Name", text: $selectedSaveSlotLabel)
-                    Button("Rename Slot", systemImage: "tag", action: renameSaveSlot)
+                    TextField("Campaign Name", text: $selectedSaveSlotLabel)
+                    Button("Rename Campaign", systemImage: "tag", action: renameSaveSlot)
                         .disabled(!saveSlotLabelChanged)
 
                     if let savedGameSummary = selectedSavedGameSummary,
                        isHiddenCompatibilitySummary(savedGameSummary) {
-                        Label("Archived saved campaign available", systemImage: "archivebox")
+                        Label("Older saved campaign found", systemImage: "archivebox")
                             .font(.footnote.weight(.semibold))
-                        LabeledContent("Saved At", value: savedGameSummary.savedAt.formatted(date: .abbreviated, time: .shortened))
+                        LabeledContent("Last Saved", value: savedGameSummary.savedAt.formatted(date: .abbreviated, time: .shortened))
                         Button("Show Archived", systemImage: "archivebox", action: showCompatibilitySavedGame)
-                        Button("Clear Saved", systemImage: "trash", role: .destructive, action: clearSavedGame)
+                        Button("Clear Campaign", systemImage: "trash", role: .destructive, action: clearSavedGame)
                     } else if let savedGameSummary = selectedSavedGameSummary {
-                        LabeledContent("Saved", value: savedGameSummary.title)
-                        LabeledContent("Forces", value: savedGameSummary.detail)
-                        LabeledContent("Saved At", value: savedGameSummary.savedAt.formatted(date: .abbreviated, time: .shortened))
-                        Button("Continue Saved", systemImage: "play.circle", action: continueSavedGame)
-                        Button("Clear Saved", systemImage: "trash", role: .destructive, action: clearSavedGame)
+                        LabeledContent("Campaign", value: savedGameSummary.title)
+                        LabeledContent("Command", value: savedGameSummary.detail)
+                        LabeledContent("Last Saved", value: savedGameSummary.savedAt.formatted(date: .abbreviated, time: .shortened))
+                        Button("Continue Campaign", systemImage: "play.circle", action: continueSavedGame)
+                        Button("Clear Campaign", systemImage: "trash", role: .destructive, action: clearSavedGame)
                     } else if let savedGameRecoveryMessage = selectedSavedGameRecoveryMessage {
-                        Label("Saved campaign unavailable", systemImage: "exclamationmark.triangle")
+                        Label("This saved campaign can't be opened", systemImage: "exclamationmark.triangle")
                             .font(.footnote.weight(.semibold))
                         Text(savedGameRecoveryMessage)
                             .font(.footnote)
                             .foregroundStyle(.secondary)
-                        Button("Clear Saved", systemImage: "trash", role: .destructive, action: clearSavedGame)
+                        Button("Clear Campaign", systemImage: "trash", role: .destructive, action: clearSavedGame)
                     } else {
                         Text("No saved campaign in \(saveSlotDisplayName(selectedSaveSlot)).")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
 
-                    Button("Save Current", systemImage: "square.and.arrow.down", action: saveCurrentGame)
+                    Button("Save Campaign", systemImage: "square.and.arrow.down", action: saveCurrentGame)
                 }
 
                 Section("Campaign") {
@@ -225,7 +225,7 @@ struct NewGameSetupView: View {
                 }
 
                 Section("Reset") {
-                    Text("Starting a campaign reloads campaign data, clears selections and dispatch history, then keeps every order inside the rules-guided orders path.")
+                    Text("Starting a campaign reloads campaign data, clears selections and dispatch history, and returns orders to the normal command flow.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }

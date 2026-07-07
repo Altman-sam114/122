@@ -2221,6 +2221,42 @@ guerrillaWarfare 额外参考 infrastructure
 - 本轮只改保存恢复失败文案；仍没有发布级存档迁移器、文件导出、云同步或运行时恢复 UI 验收。
 - 不兼容旧保存仍需要玩家手动 `Clear Saved`，不会自动删除或迁移。
 
+## v3.18 - Saved Campaign sheet wording follow-up
+
+完成日期：2026-07-07
+
+性质：v3.7 保存/继续试玩闭环的 release-facing 文案补强。本节不改变 `GameSaveSlot`、slot label `UserDefaults` key、`GameSaveSnapshot` schema、保存/继续/清理流程、AI eligibility gate、规则执行或存档迁移策略，只把 `NewGameSetupView` 的保存区块和 `AppContainer` 状态消息从 slot / saved 原型口径收口为玩家更容易理解的 Saved Campaign 口径。
+
+核心更新：
+
+- `NewGameSetupView` 的 Continue 区块改为 `Saved Campaign`，`Save Slot` / `Slot Name` / `Rename Slot` 改为 `Campaign Slot` / `Campaign Name` / `Rename Campaign`。
+- `GameSaveSlot.displayName` 默认展示从 `Slot 1/2/3` 改为 `Campaign 1/2/3`；底层 enum raw value、`UserDefaults` key 和 Slot 1 旧 key 兼容不变。
+- 保存摘要标签从 `Saved` / `Forces` / `Saved At` 改为 `Campaign` / `Command` / `Last Saved`，按钮从 `Save Current` / `Continue Saved` / `Clear Saved` 改为 `Save Campaign` / `Continue Campaign` / `Clear Campaign`。
+- 归档和坏存档提示改为 `Older saved campaign found` 与 `This saved campaign can't be opened`；Reset 说明从 `rules-guided orders path` 改为 normal command flow 口径。
+- `AppContainer` 的重命名和清理状态消息改为 Campaign name / Saved campaign cleared，不再显示 save slot name reset/update 原型词。
+- README、`md/flow/flow.md`、`md/flow/flowchart.md` 和 v3 总提示词已同步：这是 display-only 文案收口，不是发布级命名存档、迁移器、文件导出或云同步。
+
+关键文件：
+
+- `WWIIHexV0/UI/NewGameSetupView.swift`
+- `WWIIHexV0/App/AppContainer.swift`
+- `WWIIHexV0/App/GameSaveSnapshot.swift`
+- `README.md`
+- `md/flow/flow.md`
+- `md/flow/flowchart.md`
+- `md/prompt/v3.0-拿战迁移/codex-v3.0-拿战aiagent迁移总提示词.md`
+- `update_log.md`
+
+验证记录：
+
+- 本轮按人工要求未运行本地测试、构建、lint、parse、`jq`、`plutil` 或 `git diff --check`。
+- 云端验证需以本轮提交到 `origin/main` 后的 GitHub Actions `WWIIHexV0 CI Results` run 和未加密 artifact 为准。
+
+遗留风险：
+
+- 本轮未做本机 SwiftUI 渲染或截图验收；Saved Campaign sheet 的实际换行、截断和小屏布局需由云端 build 与后续人工运行时验收确认。
+- 底层仍是 3 个 `UserDefaults` 本地试玩 slot 和最小 slot label，不是发布级命名存档、迁移器、文件导出或云同步。
+
 ## 历史维护记录
 
 以下提交不作为正式 v 版本，但影响项目资料完整性：

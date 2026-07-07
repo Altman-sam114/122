@@ -14,11 +14,11 @@ enum GameSaveSlot: String, CaseIterable, Codable, Equatable, Hashable, Identifia
     var displayName: String {
         switch self {
         case .slot1:
-            return "Slot 1"
+            return "Campaign 1"
         case .slot2:
-            return "Slot 2"
+            return "Campaign 2"
         case .slot3:
-            return "Slot 3"
+            return "Campaign 3"
         }
     }
 

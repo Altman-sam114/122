@@ -70,8 +70,8 @@ flowchart TD
     ME["地图编辑器<br/>MapEditor<br/>用来画格子、省份、战区、初始部队"]:::editor
     JSON["游戏数据 JSON<br/>ScenarioDefinition + RegionDataSet<br/>保存地图、单位、省份、初始战区"]:::data
     SCAT["场景目录<br/>ScenarioCatalog<br/>defaultPlayable 指向 Waterloo 1815 数据切片；Ardennes 作为 legacy 可选剧本保留；defaultPlayerFaction 为 France；目标切片已覆盖 Plancenoit；Wavre Road 是普军后方入口抽象；Papelotte 有 Anglo-Allied 左翼预备；Mont-Saint-Jean 后方 q2,r1 有 Anglo-Allied Rear Road marker；Prussian Approach q4,r0 有开局 screen 和非目标 road marker；q4,r1 目标显示为 Prussian Arrival Road"]:::loader
-    SETUP["新局/继续/设置<br/>NewGameSetupView<br/>New Campaign 默认显示 Waterloo、玩家可见为 Player Power / Power / Opening Turn，底层仍是 Faction；Archived Campaigns 才显示 legacy 新局和旧 legacy 存档详情；AppContainer 按玩家控制权归一拿战 phase；Continue 可选 Slot 1/2/3，可编辑 slot label，坏快照/未知 scenario/将领目录失败显示原因并可 Clear Saved；继续成功后走现有 AI eligibility gate；Status 显示操作结果；Settings 调整 observer、map layer、dispatch detail、AI pace、AI control、guide notes、text size"]:::input
-    SAVE["本地试玩快照<br/>GameSaveSnapshot + GameSaveSlot + UserDefaults<br/>schemaVersion 1，保存 scenario / player faction / GameState；3 个本地 slot，Slot 1 兼容旧单槽 key；slot label 独立保存；拿战摘要显示 Current / Your Power；加载区分 missing / loaded / unavailable；恢复后 Staff 模式含 observer + Staff 可续跑 AI，非 observer Manual 需由 End Orders 推进，observer Manual 只读"]:::data
+    SETUP["新局/继续/设置<br/>NewGameSetupView<br/>New Campaign 默认显示 Waterloo、玩家可见为 Player Power / Power / Opening Turn，底层仍是 Faction；Archived Campaigns 才显示 legacy 新局和旧 legacy 存档详情；AppContainer 按玩家控制权归一拿战 phase；Saved Campaign 可选 Slot 1/2/3，可编辑 campaign name，坏快照/未知 scenario/将领目录失败显示原因并可 Clear Campaign；继续成功后走现有 AI eligibility gate；Status 显示操作结果；Settings 调整 observer、map layer、dispatch detail、AI pace、AI control、guide notes、text size"]:::input
+    SAVE["本地试玩快照<br/>GameSaveSnapshot + GameSaveSlot + UserDefaults<br/>schemaVersion 1，保存 scenario / player faction / GameState；内部仍是 3 个 slot，默认显示 Campaign 1/2/3，Slot 1 兼容旧单槽 key；campaign name 独立保存；拿战摘要显示 Current / Your Power；加载区分 missing / loaded / unavailable；恢复后 Staff 模式含 observer + Staff 可续跑 AI，非 observer Manual 需由 End Orders 推进，observer Manual 只读"]:::data
     PSET["试玩偏好<br/>PlaytestSessionSettings + UserDefaults<br/>observer / map layer / replay detail / AI pace / AI control / guide notes / reduce motion / text size；坏设置重置为标准设置并提示"]:::data
     REPLAY["试玩回放详细度<br/>ReplayDetailLevel<br/>Concise 保留 Staff Summary / Staff Reason / Issue Preview / Recent Dispatch Timeline；Standard / Full 的 Situation 可显示完整 selected staff rationale；控制日志条数、directive limit、metadata、context、明细卡和 Dispatch Audit / raw JSON 审计显示"]:::ui
     GUIDE["非阻塞短引导与 AI 反馈<br/>PlaytestGuideCue + playerOrdersStatus + aiNoActionFeedback + aiDiagnosticFeedback<br/>首次 formation / artillery / cavalry / end orders 写入 Staff note；infantry-heavy formation 提示 square-ready Hold Contact Line；玩家无可行动、AI 无有效命令、record-level issue 和 dispatch paused 给可读提示"]:::ui
@@ -109,7 +109,7 @@ flowchart TD
     SETUP --> PSET
     SETUP --> REPLAY --> UI
     REPLAY --> LOG
-    GS -.Save Current.-> SAVE
+    GS -.Save Campaign.-> SAVE
     GS --> HEX
     HEX --> REGION
     HEX --> ECO
