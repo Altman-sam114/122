@@ -2342,6 +2342,38 @@ guerrillaWarfare 额外参考 infrastructure
 - 本轮未做本机 SwiftUI 渲染、VoiceOver、截图、模拟器或真实坏存档恢复验收；错误消息实际换行和上下文观感需由云端 build 与后续人工运行时确认。
 - DataLoader 的 validation 详情在 Full/错误路径仍可能包含开发者级定位信息；本轮只改善外层玩家可见包装和 sanitizer 覆盖，不重写底层错误模型。
 
+## v3.21 - Campaign data error wording follow-up
+
+完成日期：2026-07-07
+
+性质：数据加载错误玩家可见文案收口。本节不改变 `DataLoader` 校验条件、JSON schema、`ScenarioCatalog` id、Waterloo / legacy 阿登加载流程、存档兼容或命令管线，只把启动、新局或继续失败时可能透出的底层数据字段改成 campaign data / campaign map / power / region data / archived commander data 口径。
+
+核心更新：
+
+- `DataLoaderError.missingResource` 不再显示 `Missing data resource: *.json`，改为 `Campaign data is missing or unavailable.`。
+- scenario faction / player power / staff-controlled power / opening orders phase 校验不再暴露 `playerFaction`、`aiFaction` 或 raw scenario id。
+- map tile controller、supply point 和 map-region 映射校验不再暴露 tile 坐标、`regionId`、`hexToRegion` 或 raw controller 字段。
+- 归档阿登 commander assignment 校验不再暴露 `guderian.assignedDivisionIds` / German initial units，改为 archived campaign commander data 口径。
+
+关键文件：
+
+- `WWIIHexV0/Data/ScenarioDefinition.swift`
+- `WWIIHexV0/Data/DataLoader.swift`
+- `README.md`
+- `md/flow/flow.md`
+- `md/prompt/v3.0-拿战迁移/codex-v3.0-拿战aiagent迁移总提示词.md`
+- `update_log.md`
+
+验证记录：
+
+- 本轮按人工要求未运行本地测试、构建、lint、parse、`jq`、`plutil` 或 `git diff --check`。
+- 云端验证需以本轮提交到 `origin/main` 后的 GitHub Actions `WWIIHexV0 CI Results` run 和未加密 artifact 为准。
+
+遗留风险：
+
+- 本轮未做真实坏 JSON / 缺资源 / 坏存档运行时恢复验收；错误消息在 sheet、interaction log 和 EventLog 中的换行与上下文观感仍需云端 build 与后续人工运行时确认。
+- 其他较深层 DataLoader 校验仍可能保留开发者定位词；本轮只处理启动/新局路径最容易透出的 faction、supply、region mapping 和 archived commander assignment 文案。
+
 ## 历史维护记录
 
 以下提交不作为正式 v 版本，但影响项目资料完整性：

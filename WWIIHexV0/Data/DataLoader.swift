@@ -380,26 +380,26 @@ struct DataLoader {
         let declaredFactionIds = Set(scenario.factions)
 
         for factionId in scenario.factions where Faction(rawValue: factionId) == nil {
-            errors.append(DataValidationError(message: "Scenario \(scenario.id) declares unknown faction \(factionId)."))
+            errors.append(DataValidationError(message: "Campaign data includes a power this version cannot read."))
         }
 
         guard let phase = GamePhase(rawValue: scenario.initialPhase) else {
-            errors.append(DataValidationError(message: "Scenario \(scenario.id) has unknown initialPhase \(scenario.initialPhase)."))
+            errors.append(DataValidationError(message: "Campaign data has an unavailable opening orders phase."))
             throw DataLoaderError.validationFailed(errors)
         }
 
         let playerFaction = Faction(rawValue: scenario.playerFaction)
         if playerFaction == nil {
-            errors.append(DataValidationError(message: "Scenario \(scenario.id) has unknown playerFaction \(scenario.playerFaction)."))
+            errors.append(DataValidationError(message: "Campaign data has an unavailable player power."))
         } else if !declaredFactionIds.contains(scenario.playerFaction) {
-            errors.append(DataValidationError(message: "Scenario \(scenario.id) playerFaction \(scenario.playerFaction) is not declared in factions."))
+            errors.append(DataValidationError(message: "Campaign data uses a player power that is not part of this campaign."))
         }
 
         let aiFaction = Faction(rawValue: scenario.aiFaction)
         if aiFaction == nil {
-            errors.append(DataValidationError(message: "Scenario \(scenario.id) has unknown aiFaction \(scenario.aiFaction)."))
+            errors.append(DataValidationError(message: "Campaign data has an unavailable staff-controlled power."))
         } else if !declaredFactionIds.contains(scenario.aiFaction) {
-            errors.append(DataValidationError(message: "Scenario \(scenario.id) aiFaction \(scenario.aiFaction) is not declared in factions."))
+            errors.append(DataValidationError(message: "Campaign data uses a staff-controlled power that is not part of this campaign."))
         }
 
         if !errors.isEmpty {
@@ -617,7 +617,7 @@ struct DataLoader {
                 if assignedDivisionIds != germanUnitIds {
                     errors.append(
                         DataValidationError(
-                            message: "guderian.assignedDivisionIds must exactly cover German initial units."
+                            message: "Archived campaign commander data does not match the starting forces."
                         )
                     )
                 }
@@ -697,24 +697,24 @@ struct DataLoader {
 
         for tile in scenario.map.tiles {
             guard let controller = Faction(rawValue: tile.controller) else {
-                errors.append(DataValidationError(message: "Tile \(tile.q),\(tile.r) has unknown controller \(tile.controller)."))
+                errors.append(DataValidationError(message: "Campaign map has a sector assigned to an unavailable power."))
                 continue
             }
             if !declaredFactions.contains(controller) {
-                errors.append(DataValidationError(message: "Tile \(tile.q),\(tile.r) controller \(controller.rawValue) is not declared in scenario factions."))
+                errors.append(DataValidationError(message: "Campaign map has a sector assigned to a power outside this campaign."))
             }
 
             if tile.isSupplySource {
                 guard let supplyFactionId = tile.supplyFaction else {
-                    errors.append(DataValidationError(message: "Supply tile \(tile.q),\(tile.r) is missing supplyFaction."))
+                    errors.append(DataValidationError(message: "Campaign map has a supply point without an assigned power."))
                     continue
                 }
                 guard let supplyFaction = Faction(rawValue: supplyFactionId) else {
-                    errors.append(DataValidationError(message: "Supply tile \(tile.q),\(tile.r) has unknown supplyFaction \(supplyFactionId)."))
+                    errors.append(DataValidationError(message: "Campaign map has a supply point assigned to an unavailable power."))
                     continue
                 }
                 if !declaredFactions.contains(supplyFaction) {
-                    errors.append(DataValidationError(message: "Supply tile \(tile.q),\(tile.r) supplyFaction \(supplyFaction.rawValue) is not declared in scenario factions."))
+                    errors.append(DataValidationError(message: "Campaign map has a supply point assigned to a power outside this campaign."))
                 }
             }
 
@@ -731,7 +731,7 @@ struct DataLoader {
                 if !regionIds.contains(regionId) {
                     errors.append(
                         DataValidationError(
-                            message: "Tile \(tile.q),\(tile.r) references unknown regionId \(regionId.rawValue)."
+                            message: "Campaign map references a sector that is not available."
                         )
                     )
                 }
@@ -739,7 +739,7 @@ struct DataLoader {
                 guard let mappedRegionId = regionHexToRegion[coord] else {
                     errors.append(
                         DataValidationError(
-                            message: "Tile \(tile.q),\(tile.r) regionId \(regionId.rawValue) is missing from region data hexToRegion."
+                            message: "Campaign map and region data do not match."
                         )
                     )
                     continue
@@ -748,7 +748,7 @@ struct DataLoader {
                 if mappedRegionId != regionId {
                     errors.append(
                         DataValidationError(
-                            message: "Tile \(tile.q),\(tile.r) regionId \(regionId.rawValue) does not match region data \(mappedRegionId.rawValue)."
+                            message: "Campaign map and region data assign a sector differently."
                         )
                     )
                 }

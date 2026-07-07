@@ -176,8 +176,8 @@ enum DataLoaderError: Error, CustomStringConvertible, LocalizedError {
 
     var description: String {
         switch self {
-        case .missingResource(let resourceName):
-            return "Missing data resource: \(resourceName).json"
+        case .missingResource:
+            return "Campaign data is missing or unavailable."
         case .validationFailed(let errors):
             return errors.map(\.description).joined(separator: "\n")
         }
