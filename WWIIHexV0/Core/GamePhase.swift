@@ -18,6 +18,21 @@ enum GamePhase: String, Codable, Equatable, CaseIterable {
         }
     }
 
+    func displayName(for activeFaction: Faction) -> String {
+        guard activeFaction.usesNapoleonicLogisticsVocabulary else {
+            return displayName
+        }
+
+        switch self {
+        case .germanAI, .aiCommand:
+            return "Staff Dispatch"
+        case .alliedPlayer, .playerCommand:
+            return "Orders"
+        case .resolution:
+            return "Resolution"
+        }
+    }
+
     var allowsCommands: Bool {
         self != .resolution
     }

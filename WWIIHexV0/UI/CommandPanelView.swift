@@ -171,18 +171,7 @@ struct CommandPanelView: View {
     }
 
     private var phaseDisplayName: String {
-        guard activeFaction.usesNapoleonicLogisticsVocabulary else {
-            return phase.displayName
-        }
-
-        switch phase {
-        case .germanAI, .aiCommand:
-            return "Staff Dispatch"
-        case .alliedPlayer, .playerCommand:
-            return "Orders"
-        case .resolution:
-            return "Resolution"
-        }
+        phase.displayName(for: activeFaction)
     }
 
     private func label(_ legacy: String) -> String {

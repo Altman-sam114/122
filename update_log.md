@@ -2403,6 +2403,38 @@ guerrillaWarfare 额外参考 infrastructure
 
 - 本轮未做 SwiftUI 运行时截图、VoiceOver 或小屏布局验收；三条 footnote 在紧凑宽度下的换行和 spacing 仍需云端 build 与后续人工运行时确认。
 
+## v3.23 - Phase display helper follow-up
+
+完成日期：2026-07-07
+
+性质：拿战 phase 展示 helper 收口。本节不改变 `GamePhase` raw value、`GamePhase.commandPhase(for:)`、turn order、AI eligibility、Manual / Staff 触发、保存 schema、`GameLogEntry` 底层结构或规则执行，只减少 UI 面板内重复 phase 文案分支。
+
+核心更新：
+
+- `GamePhase` 新增 `displayName(for activeFaction:)`；legacy / 非拿战 faction 继续返回既有 `displayName`。
+- 拿战 faction 下 `.germanAI/.aiCommand` 显示为 `Staff Dispatch`，`.alliedPlayer/.playerCommand` 显示为 `Orders`，`.resolution` 显示为 `Resolution`。
+- `HUDView` 的普通 fallback、`CommandPanelView` 和 `EventLogView` phase metadata 复用该 helper；HUD 的 `Your Orders`、`Manual Dispatch`、`Manual Observation` 仍由 HUD 自身根据玩家 faction、observer 和 Staff Control 推导。
+
+关键文件：
+
+- `WWIIHexV0/Core/GamePhase.swift`
+- `WWIIHexV0/UI/HUDView.swift`
+- `WWIIHexV0/UI/CommandPanelView.swift`
+- `WWIIHexV0/UI/EventLogView.swift`
+- `README.md`
+- `md/flow/flow.md`
+- `md/prompt/v3.0-拿战迁移/codex-v3.0-拿战aiagent迁移总提示词.md`
+- `update_log.md`
+
+验证记录：
+
+- 本轮按人工要求未运行本地测试、构建、lint、parse、`jq`、`plutil` 或 `git diff --check`。
+- 云端验证需以本轮提交到 `origin/main` 后的 GitHub Actions `WWIIHexV0 CI Results` run 和未加密 artifact 为准。
+
+遗留风险：
+
+- 本轮未做 SwiftUI 运行时截图、VoiceOver 或小屏布局验收；HUD fallback 与 EventLog / Command panel phase 文案的实际显示位置仍需云端 build 与后续人工运行时确认。
+
 ## 历史维护记录
 
 以下提交不作为正式 v 版本，但影响项目资料完整性：

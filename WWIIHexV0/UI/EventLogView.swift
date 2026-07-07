@@ -113,18 +113,7 @@ struct EventLogView: View {
         guard let phase else {
             return "Setup"
         }
-        guard faction.usesNapoleonicLogisticsVocabulary else {
-            return phase.displayName
-        }
-
-        switch phase {
-        case .germanAI, .aiCommand:
-            return "Staff Dispatch"
-        case .alliedPlayer, .playerCommand:
-            return "Orders"
-        case .resolution:
-            return "Resolution"
-        }
+        return phase.displayName(for: faction)
     }
 }
 

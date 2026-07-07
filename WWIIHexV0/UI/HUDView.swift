@@ -172,7 +172,7 @@ struct HUDView: View {
         guard let playerFaction,
               gameState.phase.allowsCommands,
               !gameState.activeFaction.isNeutral else {
-            return gameState.phase.displayName
+            return gameState.phase.displayName(for: gameState.activeFaction)
         }
 
         if observerModeEnabled {
