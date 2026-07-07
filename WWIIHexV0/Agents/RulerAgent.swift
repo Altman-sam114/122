@@ -138,7 +138,9 @@ enum StrategicPostureDecoderError: Error, Equatable, LocalizedError {
         let stopWords: Set<String> = [
             "region", "front", "frontzone", "zone", "theater", "sector",
             "legacy", "mock", "ai", "commander", "marshal", "directive",
-            "power", "faction", "global", "ruler"
+            "power", "faction", "global", "ruler", "germany", "german",
+            "allies", "allied", "panzer", "tank", "motorized", "division",
+            "wwii", "ardennes", "bastogne"
         ]
         let words = rawValue
             .replacingOccurrences(of: "-", with: "_")
@@ -494,13 +496,13 @@ struct RulerAgent {
     private func rationale(for posture: RulerStrategicPosture, snapshot: RulerStrategicSnapshot) -> String {
         switch posture {
         case .offensive:
-            return "Ruler sees \(snapshot.advantagedFrontZoneCount) advantaged zone(s) and accepts offensive risk."
+            return "Sovereign command sees \(snapshot.advantagedFrontZoneCount) advantaged sector(s) and accepts offensive risk."
         case .defensive:
-            return "Ruler sees pressure \(snapshot.averageZonePressure) and \(snapshot.outnumberedFrontZoneCount) outnumbered zone(s)."
+            return "Sovereign command sees pressure \(snapshot.averageZonePressure) and \(snapshot.outnumberedFrontZoneCount) outnumbered sector(s)."
         case .coalitionMaintenance:
-            return "Ruler preserves coalition reserves across \(snapshot.frontZoneCount) active zone(s)."
+            return "Sovereign command preserves coalition reserves across \(snapshot.frontZoneCount) active sector(s)."
         case .stabilizeFront:
-            return "Ruler avoids overextension while contested forward presence is resolved."
+            return "Sovereign command avoids overextension while contested forward presence is resolved."
         }
     }
 

@@ -103,12 +103,12 @@ struct CommandPanelView: View {
             if activeFaction != playerFaction && phase.allowsCommands {
                 if aiControlMode == .manualAdvance {
                     return activeFaction.usesNapoleonicLogisticsVocabulary
-                        ? "Manual dispatch: use End Orders to advance \(activeFaction.displayName)."
+                        ? "Manual dispatch: use End Orders to advance \(factionDisplayName(activeFaction))."
                         : "Manual command: use End Turn to advance \(activeFaction.displayName)."
                 }
 
                 return activeFaction.usesNapoleonicLogisticsVocabulary
-                    ? "Staff dispatch is resolving \(activeFaction.displayName)."
+                    ? "Staff dispatch is resolving \(factionDisplayName(activeFaction))."
                     : "AI command is resolving \(activeFaction.displayName)."
             }
 
@@ -146,6 +146,10 @@ struct CommandPanelView: View {
 
     private func messageDisplayText(_ text: String) -> String {
         NapoleonicMessageSanitizer.displayText(text, for: activeFaction)
+    }
+
+    private func factionDisplayName(_ faction: Faction) -> String {
+        NapoleonicMessageSanitizer.displayText(faction.displayName, for: activeFaction)
     }
 
     private var phaseDisplayName: String {

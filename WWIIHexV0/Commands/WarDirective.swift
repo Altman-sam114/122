@@ -520,7 +520,9 @@ enum TheaterDirectiveDecoderError: Error, Equatable, LocalizedError {
         let stopWords: Set<String> = [
             "region", "front", "frontzone", "zone", "theater", "sector",
             "legacy", "mock", "ai", "commander", "marshal", "directive",
-            "power", "faction", "global", "ruler"
+            "power", "faction", "global", "ruler", "germany", "german",
+            "allies", "allied", "panzer", "tank", "motorized", "division",
+            "wwii", "ardennes", "bastogne"
         ]
         let words = rawValue
             .replacingOccurrences(of: "-", with: "_")

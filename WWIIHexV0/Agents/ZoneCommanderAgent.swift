@@ -1507,7 +1507,7 @@ struct SimulatedMarshalLLMClient: MarshalLLMClient {
         strategicPosture: StrategicPostureEnvelope?
     ) -> String {
         if let strategicPosture {
-            return "\(strategicPosture.strategicIntent) Marshal converts posture \(strategicPosture.posture.rawValue) into command directives."
+            return "\(strategicPosture.strategicIntent) Staff converts posture \(strategicPosture.posture.rawValue) into corps orders."
         }
 
         switch bias {
@@ -1526,9 +1526,9 @@ struct SimulatedMarshalLLMClient: MarshalLLMClient {
         strategicPosture: StrategicPostureEnvelope?
     ) -> String {
         if let strategicPosture {
-            return "Simulated marshal JSON: \(tactic.rawValue) selected for \(strategicPosture.posture.rawValue) posture, strength ratio \(front.strengthRatio)."
+            return "Staff rationale: \(tactic.rawValue) selected for \(strategicPosture.posture.rawValue) posture, strength ratio \(front.strengthRatio)."
         }
-        return "Simulated marshal JSON: \(tactic.rawValue) selected from strength ratio \(front.strengthRatio)."
+        return "Staff rationale: \(tactic.rawValue) selected from strength ratio \(front.strengthRatio)."
     }
 
     private func defensiveRationale(
@@ -1537,9 +1537,9 @@ struct SimulatedMarshalLLMClient: MarshalLLMClient {
         strategicPosture: StrategicPostureEnvelope?
     ) -> String {
         if let strategicPosture {
-            return "Simulated marshal JSON: \(tactic.rawValue) selected under \(strategicPosture.posture.rawValue) posture for front status \(front.status)."
+            return "Staff rationale: \(tactic.rawValue) selected under \(strategicPosture.posture.rawValue) posture for front status \(front.status)."
         }
-        return "Simulated marshal JSON: \(tactic.rawValue) selected for front status \(front.status)."
+        return "Staff rationale: \(tactic.rawValue) selected for front status \(front.status)."
     }
 }
 

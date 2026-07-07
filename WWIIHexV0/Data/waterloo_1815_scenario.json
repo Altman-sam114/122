@@ -655,17 +655,17 @@
       "turn": 16,
       "count": null,
       "status": "active",
-      "description": "Coalition wins by holding the ridge and keeping the Prussian arrival road open."
+      "description": "Anglo-Allied victory is awarded when the coalition line holds the ridge and keeps the Prussian arrival road open."
     }
   ],
   "dataNotes": [
-    "v3.2 minimal Waterloo data slice for JSON/schema integration.",
-    "Uses napoleonic_unit_templates.json through ScenarioCatalog.unitTemplateName.",
-    "Napoleonic templates use v3.3 ComponentType cases; morale now has a minimal formation-level model, while explicit formation stance, cavalry charge, and artillery preparation rules remain future work.",
-    "v3.5 adds delayed French and Prussian reinforcement schedule entries; runtime deployment waits for safe controlled entry hexes.",
-    "Scenario displayName is release-facing; this file remains a small data slice as recorded in dataNotes, not the final full Waterloo campaign.",
+    "Current Waterloo campaign data is a compact playable campaign foundation, not the final full battlefield map.",
+    "Reserve formations use the Napoleonic unit catalog shared by the default Waterloo campaign.",
+    "Morale now has a minimal formation-level model, while explicit formation stance, cavalry charge, and artillery preparation rules remain future work.",
+    "Delayed French and Prussian reserves arrive only when a safe controlled entry hex is available.",
+    "Scenario displayName is release-facing; the current campaign data remains smaller than the final full Waterloo campaign.",
     "French I Corps Detachment and Prussian IV Corps Vanguard are abstract playable formations using existing templates, not full corps-scale orders of battle.",
-    "Current Waterloo runtime victory conditions read Mont-Saint-Jean, Hougoumont, and Prussian Arrival Road; La Haye Sainte, Papelotte, and Plancenoit are map objectives, region summaries, and AI sorting targets unless later victory data expands them.",
+    "Current Waterloo victory conditions read Mont-Saint-Jean, Hougoumont, and Prussian Arrival Road; La Haye Sainte, Papelotte, and Plancenoit are map objectives, sector summaries, and staff target-sorting signals unless later victory data expands them.",
     "v3 data follow-up adds Plancenoit as a French-held objective and adds minimal La Haye Sainte / Papelotte garrisons plus Lobau's Plancenoit detachment without changing the current Waterloo victory conditions.",
     "v3 data follow-up adds q5,r1 Wavre Road as an abstract Prussian rear road, supply, and reinforcement entry hex; Prussian Arrival Road at q4,r1 remains the objective trigger and victory-condition member.",
     "v3 data follow-up adds an Anglo-Allied left reserve at Papelotte to make the coalition left wing less skeletal without changing objective or victory-condition data.",

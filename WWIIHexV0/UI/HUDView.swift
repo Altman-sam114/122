@@ -53,7 +53,7 @@ struct HUDView: View {
             Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 8) {
                 GridRow {
                     metric("Turn", "\(gameState.turn) / \(gameState.maxTurns)")
-                    metric(label("Faction"), gameState.activeFaction.displayName)
+                    metric(label("Faction"), factionDisplayName(gameState.activeFaction))
                 }
 
                 GridRow {
@@ -135,6 +135,10 @@ struct HUDView: View {
         default:
             return legacy
         }
+    }
+
+    private func factionDisplayName(_ faction: Faction) -> String {
+        NapoleonicMessageSanitizer.displayText(faction.displayName, for: gameState.activeFaction)
     }
 
     private var victoryText: String {

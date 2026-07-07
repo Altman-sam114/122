@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "scenarioId": "waterloo_1815",
-  "displayName": "Waterloo 1815 Region Slice",
+  "displayName": "Waterloo 1815 Sectors",
   "hexToRegion": {
     "0,0": "region_french_ridge",
     "0,1": "region_french_ridge",
