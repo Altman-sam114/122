@@ -28,7 +28,7 @@ struct CommandPanelView: View {
 
             HStack(spacing: 8) {
                 Button(action: onHold) {
-                    Label(label("Hold"), systemImage: "shield.fill")
+                    Label(holdActionLabel, systemImage: "shield.fill")
                 }
                 .disabled(!canSetHold)
 
@@ -139,9 +139,27 @@ struct CommandPanelView: View {
                 : "Selected unit has acted."
         }
 
-        return activeFaction.usesNapoleonicLogisticsVocabulary
-            ? "Move/Attack orders ready."
-            : "Move/Attack ready."
+        guard activeFaction.usesNapoleonicLogisticsVocabulary else {
+            return "Move/Attack ready."
+        }
+
+        if selectedDivision.isInfantryHeavy {
+            return "Move/Attack ready; Square-ready Hold can blunt cavalry."
+        }
+
+        return "Move/Attack orders ready."
+    }
+
+    private var holdActionLabel: String {
+        guard activeFaction.usesNapoleonicLogisticsVocabulary else {
+            return "Hold"
+        }
+
+        if selectedDivision?.isInfantryHeavy == true {
+            return "Square Hold"
+        }
+
+        return "Hold Line"
     }
 
     private func messageDisplayText(_ text: String) -> String {

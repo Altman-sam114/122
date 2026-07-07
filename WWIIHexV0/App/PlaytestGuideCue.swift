@@ -17,13 +17,16 @@ enum PlaytestGuideCue: String, CaseIterable, Codable, Equatable, Hashable {
         switch self {
         case .formationSelected:
             let name = division?.name ?? "formation"
+            if division?.isInfantryHeavy == true {
+                return "Staff note: \(name) can receive direct orders while its faction holds the command phase. Hold Contact Line can form a square-ready defense against open-ground cavalry shock."
+            }
             return "Staff note: \(name) can receive direct orders while its faction holds the command phase."
         case .artillerySelected:
             let name = division?.name ?? "Artillery"
             return "Staff note: \(name) favors prepared fire against exposed targets; rough ground and strongpoints blunt its effect."
         case .cavalrySelected:
             let name = division?.name ?? "Cavalry"
-            return "Staff note: \(name) is best used for open-ground shock and pursuit; villages, woods, hills, and square-ready Hold Line infantry blunt charges."
+            return "Staff note: \(name) is best used for open-ground shock and pursuit; villages, woods, hills, and square-ready Hold Contact Line infantry blunt charges."
         case .endingOrders:
             return "Staff note: ending orders hands initiative to the next faction; staff dispatches and rejected orders remain in replay."
         }

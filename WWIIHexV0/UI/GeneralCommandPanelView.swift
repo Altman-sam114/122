@@ -412,7 +412,7 @@ struct GeneralCommandPanelView: View {
         case .guerrillaWarfare:
             return "Harassing action by light or mobile formations."
         case .holdPosition:
-            return "Hold the current line."
+            return "Hold the contact line; infantry-heavy formations become square-ready against cavalry."
         case .elasticDefense:
             return "Trade ground while preserving formations."
         case .defenseInDepth:

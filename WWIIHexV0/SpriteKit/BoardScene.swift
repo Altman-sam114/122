@@ -747,13 +747,28 @@ final class BoardScene: SKScene {
     }
 
     private func drawOperationHoldMarker(at point: CGPoint) {
+        let color = operationColor(for: .defend)
         let marker = SKShapeNode(circleOfRadius: 18)
         marker.position = point
-        marker.strokeColor = operationColor(for: .defend)
-        marker.fillColor = operationColor(for: .defend).withAlphaComponent(0.16)
+        marker.strokeColor = color
+        marker.fillColor = color.withAlphaComponent(0.16)
         marker.lineWidth = 4
         marker.zPosition = 26
         addChild(marker)
+
+        drawOperationLabel("HOLD", at: CGPoint(x: point.x, y: point.y + 24), color: color)
+    }
+
+    private func drawOperationLabel(_ text: String, at point: CGPoint, color: SKColor) {
+        let label = SKLabelNode(text: text)
+        label.fontName = "AvenirNext-DemiBold"
+        label.fontSize = 8
+        label.fontColor = color.withAlphaComponent(0.90)
+        label.horizontalAlignmentMode = .center
+        label.verticalAlignmentMode = .center
+        label.position = point
+        label.zPosition = 28
+        addChild(label)
     }
 
     private func drawOperationTacticMarker(

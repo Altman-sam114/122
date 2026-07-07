@@ -2124,6 +2124,42 @@ guerrillaWarfare 额外参考 infrastructure
 - Situation 摘要仍受 `ReplayDetailLevel.showsContextSummary` 控制；Concise 不显示该摘要。
 - 该切片只提升 rationale 可见性，不验证运行时 UI 换行，也不保证每条 defense directive 都产生 Hold Line。
 
+## v3.15 - Player square-ready Hold visibility follow-up
+
+完成日期：2026-07-07
+
+性质：v3.11-v3.14 square-ready Hold / cavalry pressure 链路的玩家可见性补强。本节不改变 `Command`、`ZoneDirective`、`WarCommandExecutor`、`RuleEngine`、`CombatRules`、directive schema 或存档 schema，只改 Command panel、Corps Command brief、Guide note 和玩家计划线视觉反馈。
+
+核心更新：
+
+- `CommandPanelView` 在拿战 infantry-heavy formation 可下令时把 Hold 按钮显示为 `Square Hold`，状态行提示 square-ready Hold 可削弱骑兵；非 infantry-heavy 拿战 formation 仍显示 `Hold Line`，legacy 保持 `Hold`。
+- `GeneralCommandPanelView.tacticSummary(.holdPosition)` 改为说明 Hold Contact Line 下 infantry-heavy formation 可进入 square-ready 防骑兵姿态。
+- `PlaytestGuideCue` 在首次选择 infantry-heavy formation 时提示 Hold Contact Line 可形成 square-ready 防御；骑兵提示也统一为 square-ready Hold Contact Line infantry 会削弱冲锋。
+- `BoardScene` 的玩家 defense planned operation 圆环旁新增只读 `HOLD` marker，帮助玩家看到已提交的 Hold Contact Line 防御计划；不推断具体 formation 是否 square-ready。
+- README、`md/flow/flow.md`、`md/flow/flowchart.md` 和 v3 总提示词已同步：这是 display-only / 只读视觉反馈，不是新规则路径。
+
+关键文件：
+
+- `WWIIHexV0/UI/CommandPanelView.swift`
+- `WWIIHexV0/UI/GeneralCommandPanelView.swift`
+- `WWIIHexV0/App/PlaytestGuideCue.swift`
+- `WWIIHexV0/SpriteKit/BoardScene.swift`
+- `README.md`
+- `md/flow/flow.md`
+- `md/flow/flowchart.md`
+- `md/prompt/v3.0-拿战迁移/codex-v3.0-拿战aiagent迁移总提示词.md`
+- `update_log.md`
+
+验证记录：
+
+- 本轮按人工要求未运行本地测试、构建、lint、parse、`jq`、`plutil` 或 `git diff --check`。
+- 云端验证需以本轮提交到 `origin/main` 后的 GitHub Actions `WWIIHexV0 CI Results` run 和未加密 artifact 为准。
+
+遗留风险：
+
+- 本轮未做本机截图或模拟器视觉验收；`HOLD` marker 的实际地图位置、重叠和小屏观感需后续人工或云端视觉流程确认。
+- 该切片只提升下令前和下令后的可见性，不新增完整方阵、队形切换时间、炮击克制方阵或骑兵冲锋独立伤害模型。
+
 ## 历史维护记录
 
 以下提交不作为正式 v 版本，但影响项目资料完整性：

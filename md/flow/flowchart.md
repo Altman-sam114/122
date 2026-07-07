@@ -74,7 +74,7 @@ flowchart TD
     SAVE["本地试玩快照<br/>GameSaveSnapshot + GameSaveSlot + UserDefaults<br/>schemaVersion 1，保存 scenario / player faction / GameState；3 个本地 slot，Slot 1 兼容旧单槽 key；slot label 独立保存；拿战摘要显示 Current / Your Power；加载区分 missing / loaded / unavailable；恢复后 Staff 模式含 observer + Staff 可续跑 AI，非 observer Manual 需由 End Orders 推进，observer Manual 只读"]:::data
     PSET["试玩偏好<br/>PlaytestSessionSettings + UserDefaults<br/>observer / map layer / replay detail / AI pace / AI control / guide notes / reduce motion / text size；坏设置重置为标准设置并提示"]:::data
     REPLAY["试玩回放详细度<br/>ReplayDetailLevel<br/>Concise 保留 Staff Summary / Issue Preview / Recent Dispatch Timeline；Standard / Full 的 Situation 可显示 selected staff rationale；控制日志条数、directive limit、metadata、context、明细卡和 Dispatch Audit / raw JSON 审计显示"]:::ui
-    GUIDE["非阻塞短引导与 AI 反馈<br/>PlaytestGuideCue + playerOrdersStatus + aiNoActionFeedback + aiDiagnosticFeedback<br/>首次 formation / artillery / cavalry / end orders 写入 Staff note；玩家无可行动、AI 无有效命令、record-level issue 和 dispatch paused 给可读提示"]:::ui
+    GUIDE["非阻塞短引导与 AI 反馈<br/>PlaytestGuideCue + playerOrdersStatus + aiNoActionFeedback + aiDiagnosticFeedback<br/>首次 formation / artillery / cavalry / end orders 写入 Staff note；infantry-heavy formation 提示 square-ready Hold Contact Line；玩家无可行动、AI 无有效命令、record-level issue 和 dispatch paused 给可读提示"]:::ui
     DL["数据加载器<br/>DataLoader.loadGameState<br/>校验 initial phase / faction / terrain / victory；把 JSON 变成可运行 GameState"]:::loader
     TERR["运行时地形规则<br/>TerrainRuleSet / GameState.terrainRules<br/>Waterloo 移动/战斗读取 napoleonic_terrain_rules；旧状态 fallback legacy"]:::rules
     GS["运行时总状态<br/>GameState<br/>一局游戏所有状态都在这里"]:::state
@@ -433,7 +433,7 @@ flowchart TD
     ROOT["主界面<br/>RootGameView + AppContainer interactionLog + CommandPanelView<br/>HUD + map layers + Info tabs<br/>拿战 faction 显示 Sector / Formation / Corps Order / Order result / Command Dispatch<br/>lastCommandMessage 走 NapoleonicMessageSanitizer"]:::ui
     LOG["日志面板<br/>EventLogView<br/>最近 60 条 LogDisplayEntry<br/>拿战分类显示 Engagement / Withdrawal / Logistics / Isolation / Dispatch；事件显示 active wing / Contact sector<br/>Standard / Concise 复用 NapoleonicMessageSanitizer 净化 raw AI、MockAI、legacy pipeline、validation rawValue 和 WWII faction 名；Full 保留 raw 审计值"]:::ui
     AIUI["AI / 外交 / 将军面板<br/>AgentPanelView + DiplomacyPanelView + GeneralCommandPanelView<br/>Staff Summary + Issue Preview + Recent Dispatch Timeline + corps order target + relations<br/>拿战显示 Command Dispatch / Staff Summary / Dispatch Issues / Corps Directives<br/>Standard / Concise 净化 raw id / diagnostic / country-bloc id；Full 保留 raw JSON 审计"]:::ui
-    BOARD["地图场景<br/>BoardScene + UnitNode<br/>缓存 unit display hex 后排序绘制<br/>拿战单位棋子显示 formation symbols<br/>pending 增援入口显示 RES marker<br/>目标点显示村庄/据点/道路 marker<br/>WarDirectiveRecord 显示 recent replay 线与 tactic marker"]:::ui
+    BOARD["地图场景<br/>BoardScene + UnitNode<br/>缓存 unit display hex 后排序绘制<br/>拿战单位棋子显示 formation symbols<br/>pending 增援入口显示 RES marker<br/>目标点显示村庄/据点/道路 marker<br/>WarDirectiveRecord 显示 recent replay 线与 tactic marker<br/>玩家 defense planned operation 显示 HOLD marker"]:::ui
     MARSHAL["模拟元帅 / MockAI<br/>MarshalAgent + SimulatedMarshalLLMClient<br/>Waterloo fallback 目标按 objective-aware sorting 排序，只输出指令/命令意图"]:::ai
     ZD["战区指令<br/>ZoneDirective<br/>tactic / focus / intensity"]:::command
     WCE["执行解释<br/>WarCommandExecutor<br/>infiltration 限制默认投入"]:::command
@@ -478,12 +478,12 @@ flowchart TD
     TAP["玩家地图点击<br/>RootGameView / BoardScene<br/>选单位、选 region、选目标"]:::input
     MICRO["全微操<br/>AppContainer.submit(Command)<br/>move / attack / hold / resupply<br/>infantry-heavy hold = square-ready hold"]:::command
     LOCK["微操锁<br/>PlayerCommandState.micromanagedDivisionIds<br/>本回合玩家亲控单位"]:::state
-    GENUI["将军面板<br/>GeneralCommandPanelView<br/>legacy Hold Line / Attack Region<br/>拿战 Corps Command / Hold Contact Line / Attack Sector<br/>最小 attack tactic menu + tactic brief<br/>Hold Line 可形成 square-ready hold"]:::ui
+    GENUI["将军面板<br/>GeneralCommandPanelView<br/>legacy Hold Line / Attack Region<br/>拿战 Corps Command / Hold Contact Line / Attack Sector<br/>最小 attack tactic menu + tactic brief<br/>Hold Contact Line 可形成 square-ready hold"]:::ui
     ZD["玩家战区指令<br/>ZoneDirective<br/>defense holdLine 或带 tactic 的 attack selected region"]:::command
     WCE["执行器<br/>WarCommandExecutor.execute(excluding lockedIds)<br/>跳过已微操单位"]:::command
     RE["规则权威<br/>RuleEngine<br/>校验并修改 GameState"]:::rules
     RECORD["记录<br/>WarDirectiveRecord + PlayerPlannedOperation<br/>AI 面板、日志、计划线共用"]:::ui
-    BOARD["视觉反馈<br/>BoardScene<br/>进攻箭头、防御圆环、tactic marker、微操单位金色圈"]:::ui
+    BOARD["视觉反馈<br/>BoardScene<br/>进攻箭头、防御圆环 + HOLD marker、tactic marker、微操单位金色圈"]:::ui
     PROFILE["将军档案<br/>GeneralProfileView<br/>legacy General Profile<br/>拿战 Commander Profile / Assigned Formations"]:::ui
 
     GJSON --> DL --> DISP
