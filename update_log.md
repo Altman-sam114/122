@@ -2062,6 +2062,36 @@ guerrillaWarfare 额外参考 infrastructure
 - 该切片只影响 tactic 选择倾向；是否形成 square-ready hold 仍取决于 `WarCommandExecutor -> Command.hold -> RuleEngine` 是否成功执行，以及目标 infantry-heavy formation 是否处于 `retreatMode.hold`。
 - 完整 line / column / square 切换、方阵形成时间、炮击克制方阵、骑兵冲锋独立伤害模型、动画和运行时 UI 验收仍未完成。
 
+## v3.13 - Staff cavalry pressure rationale follow-up
+
+完成日期：2026-07-07
+
+性质：v3.12 AI enemy cavalry pressure 的可解释性补强。本节不改变 `Command`、`ZoneDirective`、`WarCommandExecutor`、`CombatRules`、存档 schema、directive schema 或 tactic case，只把已派生的可见敌方骑兵压力用于 Marshal 防御 priority 和 `TheaterDirective.rationale`，让 Staff replay / Dispatch Audit 能解释 Hold Line 倾向。
+
+核心更新：
+
+- `SimulatedMarshalLLMClient.defensivePriority(front:)` 将 `visibleEnemyCavalryStrength` 作为小幅防御优先级加权，最高 +12。
+- `SimulatedMarshalLLMClient.defensiveRationale(front:tactic:strategicPosture:)` 在存在可见敌方骑兵压力时追加 pressure 数值，说明当前防御 tactic 的选择原因。
+- README、`md/flow/flow.md` 和 v3 总提示词已同步：这是 staff rationale / priority 可解释性，不是新执行器分支或完整方阵系统。
+
+关键文件：
+
+- `WWIIHexV0/Agents/ZoneCommanderAgent.swift`
+- `README.md`
+- `md/flow/flow.md`
+- `md/prompt/v3.0-拿战迁移/codex-v3.0-拿战aiagent迁移总提示词.md`
+- `update_log.md`
+
+验证记录：
+
+- 本轮按人工要求未运行本地测试、构建、lint、parse、`jq`、`plutil` 或 `git diff --check`。
+- 云端验证需以本轮提交到 `origin/main` 后的 GitHub Actions `WWIIHexV0 CI Results` run 和未加密 artifact 为准。
+
+遗留风险：
+
+- Staff rationale 是否在所有 replay detail level 下可见，仍取决于现有 `AgentPanelView` / Dispatch Audit 展示路径；本轮未改 UI 布局。
+- 该切片只解释和排序防守意图，不保证每个 Hold Line 命令都成功执行，也不新增完整 square formation AI。
+
 ## 历史维护记录
 
 以下提交不作为正式 v 版本，但影响项目资料完整性：

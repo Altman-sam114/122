@@ -1497,6 +1497,7 @@ struct SimulatedMarshalLLMClient: MarshalLLMClient {
                 + front.moraleWarningCount * 8
                 + front.fatigueWarningCount * 6
                 + front.ammunitionWarningCount * 6
+                + min(12, (front.visibleEnemyCavalryStrength ?? 0) / 2)
         )
     }
 
@@ -1609,10 +1610,12 @@ struct SimulatedMarshalLLMClient: MarshalLLMClient {
         tactic: TacticName,
         strategicPosture: StrategicPostureEnvelope?
     ) -> String {
+        let cavalryPressure = front.visibleEnemyCavalryStrength ?? 0
+        let cavalryClause = cavalryPressure > 0 ? " with visible enemy cavalry pressure \(cavalryPressure)" : ""
         if let strategicPosture {
-            return "Staff rationale: \(tactic.rawValue) selected under \(strategicPosture.posture.rawValue) posture for front status \(front.status)."
+            return "Staff rationale: \(tactic.rawValue) selected under \(strategicPosture.posture.rawValue) posture for front status \(front.status)\(cavalryClause)."
         }
-        return "Staff rationale: \(tactic.rawValue) selected for front status \(front.status)."
+        return "Staff rationale: \(tactic.rawValue) selected for front status \(front.status)\(cavalryClause)."
     }
 }
 
