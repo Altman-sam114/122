@@ -298,12 +298,12 @@ flowchart TD
     DIPREL["敌我/友军关系查询<br/>DiplomacyState.isHostile / isFriendly<br/>给补给、目标、ZOC、占领和前线统一口径"]:::rules
     RULER["统治者战略姿态<br/>RulerAgent.resolvePosture<br/>生成 StrategicPostureEnvelope 和 RulerDecisionRecord"]:::ai
     SPDEC["姿态解码校验<br/>StrategicPostureDecoder<br/>schema / issuer / turn / faction / zone / region"]:::command
-    SUM["战场摘要<br/>MarshalBattlefieldSummarizer<br/>读取 front/deploy/目标/补给/士气/疲劳/弹药摘要<br/>敌我判断来自 DiplomacyState"]:::ai
+    SUM["战场摘要<br/>MarshalBattlefieldSummarizer<br/>读取 front/deploy/目标/补给/士气/疲劳/弹药/敌骑兵摘要<br/>敌我判断来自 DiplomacyState"]:::ai
     LLM["模拟 LLM 客户端<br/>SimulatedMarshalLLMClient<br/>输出 fenced JSON，不接真实网络或模型"]:::ai
     DEC["元帅 JSON 解码器<br/>TheaterDirectiveDecoder<br/>提取 JSON、解码、校验 schema/zone/region/tactic"]:::command
     COMP["元帅意图编译器<br/>TheaterDirectiveCompiler<br/>TheaterDirective -> ZoneDirective<br/>传递 focus/convergence/coordinated 参数"]:::command
     ENV["指令信封<br/>DirectiveEnvelope<br/>收集编译后的 ZoneDirective"]:::command
-    TACTIC["高级战术路由<br/>TacticName<br/>blitzkrieg / cavalryCharge / spearhead / breakthrough / pincer / artilleryPreparation / fire / feint / guerrilla / elastic / depth / lastStand"]:::command
+    TACTIC["高级战术路由<br/>TacticName<br/>blitzkrieg / cavalryCharge / spearhead / breakthrough / pincer / artilleryPreparation / fire / feint / guerrilla / hold / elastic / depth / lastStand<br/>敌骑兵压力偏向 Hold Line"]:::command
     WCE["指令执行器<br/>WarCommandExecutor.execute<br/>按战术 profile 选择单位、目标和 fallback；broken morale offensive order 降级为 Hold"]:::command
     BOTTOM["具体单位命令<br/>Command<br/>attack / move / hold / allowRetreat"]:::command
     RE["统一规则校验执行<br/>RuleEngine<br/>AI 和玩家共用同一套规则"]:::rules

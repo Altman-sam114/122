@@ -2029,6 +2029,39 @@ guerrillaWarfare 额外参考 infrastructure
 - square-ready hold 只是 infantry-heavy + `retreatMode.hold` 的最小规则解释，没有新增独立方阵状态、朝向/形成时间、方阵被炮击削弱、线列/纵队切换、阵型动画或完整平衡。
 - 骑兵冲锋仍不是独立伤害模型；实际效果继续由现有 attack profile、地形、士气、疲劳、弹药、反击和撤退规则共同决定。
 
+## v3.12 - AI enemy cavalry pressure / Hold Line follow-up
+
+完成日期：2026-07-07
+
+性质：v3.11 square-ready hold 的紧邻 AI 决策补强。本节不新增 `FormationStance`、`DefenseStance` case、`RetreatMode` case、directive schema、存档 schema 或战斗伤害状态，只让现有 AI / Marshal 摘要识别可见敌方骑兵压力，并在合适防守局面更偏向现有 `holdPosition -> Hold Line`，从而复用 infantry-heavy + hold 的最小 square-ready hold 规则解释。
+
+核心更新：
+
+- `BinaryTacticClassifier.classify` 新增默认参数 `visibleEnemyCavalryStrength`，在敌方可见骑兵压力存在、本方不是极端崩溃且没有补给告急时优先选择 `holdPosition`。
+- `ZoneCommanderAgent` 新增只读派生 `visibleEnemyCavalryStrength(zone:state:)`，基于当前 visible enemy regions、`DiplomacyState.isHostile` 和 `Division.isCavalry` 计算，不直接改 `GameState`。
+- `MarshalBattlefieldSummarizer` 的 `MarshalFrontSummary` 增加可选 `visibleEnemyCavalryStrength`，`defensiveTactic(front:)` 遇到敌骑兵压力时更偏向 Hold Line。
+- README、`md/flow/flow.md`、`md/flow/flowchart.md`、AI pipeline mermaid 和 v3 总提示词已同步：这是 AI 防骑兵姿态倾向，不是完整方阵/队形系统。
+
+关键文件：
+
+- `WWIIHexV0/Agents/ZoneCommanderAgent.swift`
+- `README.md`
+- `md/flow/flow.md`
+- `md/flow/flowchart.md`
+- `md/flow/03_ai_zone_directive_pipeline.mermaid`
+- `md/prompt/v3.0-拿战迁移/codex-v3.0-拿战aiagent迁移总提示词.md`
+- `update_log.md`
+
+验证记录：
+
+- 本轮按人工要求未运行本地测试、构建、lint、parse、`jq`、`plutil` 或 `git diff --check`。
+- 云端验证需以本轮提交到 `origin/main` 后的 GitHub Actions `WWIIHexV0 CI Results` run 和未加密 artifact 为准。
+
+遗留风险：
+
+- 该切片只影响 tactic 选择倾向；是否形成 square-ready hold 仍取决于 `WarCommandExecutor -> Command.hold -> RuleEngine` 是否成功执行，以及目标 infantry-heavy formation 是否处于 `retreatMode.hold`。
+- 完整 line / column / square 切换、方阵形成时间、炮击克制方阵、骑兵冲锋独立伤害模型、动画和运行时 UI 验收仍未完成。
+
 ## 历史维护记录
 
 以下提交不作为正式 v 版本，但影响项目资料完整性：

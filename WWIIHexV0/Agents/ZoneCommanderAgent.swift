@@ -109,7 +109,8 @@ struct BinaryTacticClassifier {
         pressure: Int = 0,
         supplyWarningCount: Int = 0,
         visibleEnemyRegionCount: Int = 0,
-        cavalryFriendlyStrength: Int = 0
+        cavalryFriendlyStrength: Int = 0,
+        visibleEnemyCavalryStrength: Int = 0
     ) -> Classification {
         let ratio = visibleEnemyStrength == 0
             ? Double(friendlyStrength)
@@ -210,6 +211,16 @@ struct BinaryTacticClassifier {
                 reason: "no_reserve_crisis"
             )
         }
+        if visibleEnemyCavalryStrength > 0,
+           adjustedRatio >= 0.55,
+           supplyWarningCount == 0 {
+            return Classification(
+                category: .defense,
+                tactic: .holdPosition,
+                confidence: min(1, 0.55 + Double(visibleEnemyCavalryStrength) / Double(max(1, visibleEnemyStrength + friendlyStrength)) / 2),
+                reason: "enemy_cavalry_pressure"
+            )
+        }
         if depthStrength > 0,
            (pressure >= 2 || adjustedRatio < 1.0) {
             return Classification(
@@ -275,7 +286,8 @@ struct ZoneCommanderAgent: ZoneCommanderProviding {
             pressure: zone.pressure,
             supplyWarningCount: supplyWarningCount(zone: zone, state: state),
             visibleEnemyRegionCount: visibleEnemy.count,
-            cavalryFriendlyStrength: cavalryFriendlyStrength(zone: zone, state: state)
+            cavalryFriendlyStrength: cavalryFriendlyStrength(zone: zone, state: state),
+            visibleEnemyCavalryStrength: visibleEnemyCavalryStrength(zone: zone, state: state)
         )
 
         guard conditionChecker.canUseTactic(classification.tactic, commander: config, zone: zone, state: state) else {
@@ -635,6 +647,18 @@ struct ZoneCommanderAgent: ZoneCommanderProviding {
         }
 
         return strengthByRegion
+    }
+
+    private func visibleEnemyCavalryStrength(zone: FrontZone, state: GameState) -> Int {
+        let visibleEnemyRegions = Set(visibleEnemyRegionIds(zone: zone, state: state))
+        return state.divisions
+            .filter {
+                state.diplomacyState.isHostile(zone.faction, to: $0.faction)
+                    && !$0.isDestroyed
+                    && $0.isCavalry
+                    && $0.location(in: state.map).map { visibleEnemyRegions.contains($0) } == true
+            }
+            .reduce(0) { $0 + combatPower($1, mode: .enemy) }
     }
 
     private func visibleEnemyRegionIds(zone: FrontZone, state: GameState) -> [RegionId] {
@@ -1021,6 +1045,7 @@ struct MarshalFrontSummary: Codable, Equatable, Identifiable {
     let friendlyFrontStrength: Int
     let friendlyDepthStrength: Int
     let visibleEnemyStrength: Int
+    let visibleEnemyCavalryStrength: Int?
     let strengthRatio: Double
     let frontUnitCount: Int
     let depthUnitCount: Int
@@ -1099,15 +1124,16 @@ struct MarshalBattlefieldSummarizer {
         let frontStrength = strength(for: zone.unitsFront, faction: faction, state: state, mode: .friendly)
             + strength(for: zone.frontSegments.flatMap(\.assignedFrontUnitIds), faction: faction, state: state, mode: .friendly)
         let depthStrength = strength(for: zone.unitsDepth, faction: faction, state: state, mode: .friendly)
-        let enemyStrength = enemyRegionIds.reduce(0) { total, regionId in
-            total + state.divisions
-                .filter {
-                    state.diplomacyState.isHostile(faction, to: $0.faction)
-                        && !$0.isDestroyed
-                        && $0.location(in: state.map) == regionId
-                }
-                .reduce(0) { $0 + max(1, $1.strength) + max(1, $1.defense) }
+        let enemyRegionSet = Set(enemyRegionIds)
+        let visibleEnemyDivisions = state.divisions.filter {
+            state.diplomacyState.isHostile(faction, to: $0.faction)
+                && !$0.isDestroyed
+                && $0.location(in: state.map).map { enemyRegionSet.contains($0) } == true
         }
+        let enemyStrength = visibleEnemyDivisions.reduce(0) { $0 + max(1, $1.strength) + max(1, $1.defense) }
+        let enemyCavalryStrength = visibleEnemyDivisions
+            .filter(\.isCavalry)
+            .reduce(0) { $0 + max(1, $1.strength) + max(1, $1.defense) }
         let ratio = enemyStrength == 0 ? Double(max(1, frontStrength)) : Double(frontStrength) / Double(enemyStrength)
         let unitIds = Set(
             zone.unitsFront
@@ -1144,6 +1170,7 @@ struct MarshalBattlefieldSummarizer {
             friendlyFrontStrength: frontStrength,
             friendlyDepthStrength: depthStrength,
             visibleEnemyStrength: enemyStrength,
+            visibleEnemyCavalryStrength: enemyCavalryStrength,
             strengthRatio: ratio,
             frontUnitCount: zone.unitsFront.count,
             depthUnitCount: zone.unitsDepth.count,
@@ -1513,6 +1540,11 @@ struct SimulatedMarshalLLMClient: MarshalLLMClient {
         if front.strengthRatio <= 0.35,
            front.depthUnitCount == 0 {
             return .lastStand
+        }
+        if (front.visibleEnemyCavalryStrength ?? 0) > 0,
+           front.strengthRatio >= 0.55,
+           front.supplyWarningCount == 0 {
+            return .holdPosition
         }
         if front.depthUnitCount > 0,
            (front.pressure >= 2 || front.strengthRatio <= 0.9) {

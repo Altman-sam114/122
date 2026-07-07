@@ -7,15 +7,15 @@ flowchart TD
     RULER["RulerAgent.resolvePosture<br/>生成 StrategicPostureEnvelope 和 RulerDecisionRecord"]:::ai
     SPDEC["StrategicPostureDecoder<br/>校验 schema / issuer / turn / faction / zone / region"]:::command
     MARSHAL["MarshalAgent<br/>读取降维战场摘要"]:::ai
-    SUMMARY["MarshalBattlefieldSummarizer<br/>front/deploy/目标/补给/士气/疲劳/弹药摘要"]:::ai
+    SUMMARY["MarshalBattlefieldSummarizer<br/>front/deploy/目标/补给/士气/疲劳/弹药/敌骑兵摘要"]:::ai
     LLM["SimulatedMarshalLLMClient<br/>读取 posture，输出 fenced TheaterDirective JSON"]:::ai
     DECODER["TheaterDirectiveDecoder<br/>提取 JSON 并校验 schema/zone/region/tactic"]:::command
     COMPILER["TheaterDirectiveCompiler<br/>TheaterDirective -> ZoneDirective"]:::command
     POOL["TheaterCommanderPool<br/>遍历当前 faction 的 FrontZone"]:::ai
     ZONE{"FrontZone 有 frontSegments?"}:::decision
     SKIP["该 zone 不出 directive"]:::stop
-    AGENT["ZoneCommanderAgent<br/>读取 unitsFront / unitsDepth / visibleEnemy / pressure / supply"]:::ai
-    CLS["BinaryTacticClassifier<br/>strength ratio + mobile + artillery + depth + pressure"]:::ai
+    AGENT["ZoneCommanderAgent<br/>读取 unitsFront / unitsDepth / visibleEnemy / enemy cavalry / pressure / supply"]:::ai
+    CLS["BinaryTacticClassifier<br/>strength ratio + mobile + artillery + depth + pressure + enemy cavalry"]:::ai
     ATK["高级进攻战术<br/>standard / blitzkrieg / spearhead / breakthrough / pincer / fire / feint / guerrilla"]:::command
     DEF["高级防御战术<br/>hold / elastic / depth / lastStand"]:::command
     ENV["DirectiveEnvelope<br/>directives[]"]:::command
