@@ -1312,7 +1312,11 @@ final class AppContainer: ObservableObject {
 
         gameState = refreshGeneralAssignments(in: nextState)
         lastWarDirectiveRecords = Array((lastWarDirectiveRecords + [record]).suffix(12))
-        lastCommandMessage = playerDirectiveMessage(for: execution, diagnostics: diagnostics)
+        lastCommandMessage = playerDirectiveMessage(
+            for: execution,
+            directive: directive,
+            diagnostics: diagnostics
+        )
         appendInteractionEvent(generalOrderSubmittedMessage(for: directive))
         refreshSelectionAfterStateChange()
     }
@@ -1366,17 +1370,21 @@ final class AppContainer: ObservableObject {
 
     private func playerDirectiveMessage(
         for execution: WarCommandExecutionResult,
+        directive: ZoneDirective,
         diagnostics: [String]
     ) -> String {
         let acceptedCount = execution.commandResults.filter(\.succeeded).count
         let totalCount = execution.generatedCommands.count
+        let orderName = directiveOrderDisplayName(directive)
+        let target = directiveTargetDisplayName(directive)
+        let targetPhrase = target.map { " against \($0)" } ?? ""
         if totalCount == 0 {
             return diagnostics.first ?? (interactionUsesNapoleonicVocabulary ? "Corps order produced no orders." : "General order produced no commands.")
         }
         if acceptedCount == totalCount {
-            return interactionUsesNapoleonicVocabulary ? "Corps order executed \(acceptedCount) order(s)." : "General order executed \(acceptedCount) command(s)."
+            return interactionUsesNapoleonicVocabulary ? "\(orderName) carried out \(acceptedCount) order(s)\(targetPhrase)." : "General order executed \(acceptedCount) command(s)."
         }
-        return interactionUsesNapoleonicVocabulary ? "Corps order executed \(acceptedCount)/\(totalCount) order(s)." : "General order executed \(acceptedCount)/\(totalCount) command(s)."
+        return interactionUsesNapoleonicVocabulary ? "\(orderName) carried out \(acceptedCount)/\(totalCount) order(s)\(targetPhrase)." : "General order executed \(acceptedCount)/\(totalCount) command(s)."
     }
 
     private func shouldRunAI(for faction: Faction, phase: GamePhase) -> Bool {
@@ -1627,10 +1635,48 @@ final class AppContainer: ObservableObject {
 
     private func generalOrderSubmittedMessage(for directive: ZoneDirective) -> String {
         if interactionUsesNapoleonicVocabulary {
-            return "Corps order submitted: \(directiveTypeDisplayName(directive.type)) \(frontZoneDisplayName(directive.zoneId))."
+            let target = directiveTargetDisplayName(directive).map { " toward \($0)" } ?? ""
+            return "Corps order submitted: \(directiveOrderDisplayName(directive)) from \(frontZoneDisplayName(directive.zoneId))\(target)."
         }
 
         return "General order submitted: \(directive.type.rawValue) \(directive.zoneId.rawValue)."
+    }
+
+    private func directiveOrderDisplayName(_ directive: ZoneDirective) -> String {
+        guard interactionUsesNapoleonicVocabulary else {
+            return directive.type.rawValue
+        }
+
+        if let tactic = directive.tactic {
+            return tacticDisplayName(tactic)
+        }
+        return directiveTypeDisplayName(directive.type)
+    }
+
+    private func directiveTargetDisplayName(_ directive: ZoneDirective) -> String? {
+        guard interactionUsesNapoleonicVocabulary else {
+            return nil
+        }
+
+        switch directive.commandTarget {
+        case .some(.region(let regionId)):
+            if let region = gameState.map.region(id: regionId),
+               !region.name.isEmpty {
+                return region.name
+            }
+            return identifierDisplayText(regionId.rawValue, fallback: "target sector", suffix: " sector")
+        case .some(.theater(let theaterId)):
+            return identifierDisplayText(theaterId.rawValue, fallback: "target wing", suffix: " wing")
+        case nil:
+            guard let firstRegionId = directive.targetRegionIds.first else {
+                return nil
+            }
+            if let region = gameState.map.region(id: firstRegionId),
+               !region.name.isEmpty {
+                return region.name
+            }
+            return identifierDisplayText(firstRegionId.rawValue, fallback: "target sector", suffix: " sector")
+        }
     }
 
     private func frontZoneDisplayName(_ zoneId: FrontZoneId) -> String {
@@ -1656,6 +1702,43 @@ final class AppContainer: ObservableObject {
             return "Attack Sector"
         case .defend:
             return "Hold Contact Line"
+        }
+    }
+
+    private func tacticDisplayName(_ tactic: TacticName) -> String {
+        guard interactionUsesNapoleonicVocabulary else {
+            return tactic.rawValue
+        }
+
+        switch tactic {
+        case .standardAttack:
+            return "Attack Sector"
+        case .artilleryPreparation:
+            return "Artillery Preparation"
+        case .cavalryCharge:
+            return "Cavalry Charge"
+        case .fireCoverage:
+            return "Covering Fire"
+        case .blitzkrieg:
+            return "Rapid Advance"
+        case .spearhead:
+            return "Column Assault"
+        case .breakthrough:
+            return "Break Contact Line"
+        case .pincerMovement:
+            return "Converging Attack"
+        case .feint:
+            return "Demonstration"
+        case .guerrillaWarfare:
+            return "Harassing Action"
+        case .holdPosition:
+            return "Hold Contact Line"
+        case .elasticDefense:
+            return "Flexible Defense"
+        case .defenseInDepth:
+            return "Reserve Line"
+        case .lastStand:
+            return "Final Defense"
         }
     }
 

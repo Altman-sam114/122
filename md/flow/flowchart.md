@@ -478,12 +478,12 @@ flowchart TD
     TAP["玩家地图点击<br/>RootGameView / BoardScene<br/>选单位、选 region、选目标"]:::input
     MICRO["全微操<br/>AppContainer.submit(Command)<br/>move / attack / hold / resupply"]:::command
     LOCK["微操锁<br/>PlayerCommandState.micromanagedDivisionIds<br/>本回合玩家亲控单位"]:::state
-    GENUI["将军面板<br/>GeneralCommandPanelView<br/>legacy Hold Line / Attack Region<br/>拿战 Corps Command / Hold Contact Line / Attack Sector<br/>最小 attack tactic menu"]:::ui
+    GENUI["将军面板<br/>GeneralCommandPanelView<br/>legacy Hold Line / Attack Region<br/>拿战 Corps Command / Hold Contact Line / Attack Sector<br/>最小 attack tactic menu + tactic brief"]:::ui
     ZD["玩家战区指令<br/>ZoneDirective<br/>defense holdLine 或带 tactic 的 attack selected region"]:::command
     WCE["执行器<br/>WarCommandExecutor.execute(excluding lockedIds)<br/>跳过已微操单位"]:::command
     RE["规则权威<br/>RuleEngine<br/>校验并修改 GameState"]:::rules
     RECORD["记录<br/>WarDirectiveRecord + PlayerPlannedOperation<br/>AI 面板、日志、计划线共用"]:::ui
-    BOARD["视觉反馈<br/>BoardScene<br/>进攻箭头、防御圆环、微操单位金色圈"]:::ui
+    BOARD["视觉反馈<br/>BoardScene<br/>进攻箭头、防御圆环、tactic marker、微操单位金色圈"]:::ui
     PROFILE["将军档案<br/>GeneralProfileView<br/>legacy General Profile<br/>拿战 Commander Profile / Assigned Formations"]:::ui
 
     GJSON --> DL --> DISP

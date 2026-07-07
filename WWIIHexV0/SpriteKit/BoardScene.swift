@@ -670,7 +670,8 @@ final class BoardScene: SKScene {
                 drawOperationArrow(
                     from: sourcePoint,
                     to: targetPoint,
-                    type: operation.directiveType
+                    type: operation.directiveType,
+                    tactic: operation.tactic
                 )
             } else {
                 drawOperationHoldMarker(at: sourcePoint)
@@ -700,13 +701,19 @@ final class BoardScene: SKScene {
         return layout.hexToPixel(hex)
     }
 
-    private func drawOperationArrow(from start: CGPoint, to end: CGPoint, type: DirectiveType) {
+    private func drawOperationArrow(
+        from start: CGPoint,
+        to end: CGPoint,
+        type: DirectiveType,
+        tactic: TacticName?
+    ) {
         let path = CGMutablePath()
         path.move(to: start)
         path.addLine(to: end)
 
+        let color = operationColor(for: type)
         let line = SKShapeNode(path: path)
-        line.strokeColor = operationColor(for: type)
+        line.strokeColor = color
         line.lineWidth = 4
         line.lineCap = .round
         line.zPosition = 26
@@ -730,11 +737,13 @@ final class BoardScene: SKScene {
         headPath.addLine(to: right)
 
         let head = SKShapeNode(path: headPath)
-        head.strokeColor = operationColor(for: type)
+        head.strokeColor = color
         head.lineWidth = 4
         head.lineCap = .round
         head.zPosition = 27
         addChild(head)
+
+        drawOperationTacticMarker(at: end, tactic: tactic, color: color, angle: angle)
     }
 
     private func drawOperationHoldMarker(at point: CGPoint) {
@@ -745,6 +754,74 @@ final class BoardScene: SKScene {
         marker.lineWidth = 4
         marker.zPosition = 26
         addChild(marker)
+    }
+
+    private func drawOperationTacticMarker(
+        at point: CGPoint,
+        tactic: TacticName?,
+        color: SKColor,
+        angle: CGFloat
+    ) {
+        guard let tactic else {
+            return
+        }
+
+        let node = SKNode()
+        node.position = point
+        node.zPosition = 28
+
+        switch tactic {
+        case .artilleryPreparation, .fireCoverage:
+            addDirectiveReticle(to: node, color: color)
+        case .cavalryCharge, .breakthrough, .spearhead, .blitzkrieg:
+            node.zRotation = angle
+            addDirectiveSpearhead(to: node, color: color)
+        case .pincerMovement:
+            node.zRotation = angle
+            addDirectivePincer(to: node, color: color)
+        case .feint, .guerrillaWarfare:
+            node.zRotation = angle
+            addDirectiveFeint(to: node, color: color)
+        case .standardAttack,
+             .holdPosition,
+             .elasticDefense,
+             .defenseInDepth,
+             .lastStand:
+            return
+        }
+
+        addChild(node)
+
+        let label = operationTacticLabel(tactic)
+        guard !label.isEmpty else {
+            return
+        }
+        drawDirectiveReplayLabel(
+            label,
+            at: CGPoint(x: point.x, y: point.y + 17),
+            color: color
+        )
+    }
+
+    private func operationTacticLabel(_ tactic: TacticName) -> String {
+        switch tactic {
+        case .artilleryPreparation, .fireCoverage:
+            return "ART"
+        case .cavalryCharge:
+            return "CAV"
+        case .pincerMovement:
+            return "PIN"
+        case .breakthrough, .spearhead, .blitzkrieg:
+            return "ADV"
+        case .feint, .guerrillaWarfare:
+            return "FEI"
+        case .standardAttack,
+             .holdPosition,
+             .elasticDefense,
+             .defenseInDepth,
+             .lastStand:
+            return ""
+        }
     }
 
     private func operationColor(for type: DirectiveType) -> SKColor {

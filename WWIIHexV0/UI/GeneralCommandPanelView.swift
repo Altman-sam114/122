@@ -124,6 +124,23 @@ struct GeneralCommandPanelView: View {
             }
             .buttonStyle(.bordered)
 
+            if activeFaction.usesNapoleonicLogisticsVocabulary, canAttackRegion {
+                HStack(alignment: .top, spacing: 6) {
+                    Image(systemName: tacticIcon(selectedAttackTactic))
+                        .foregroundStyle(NapoleonicDesignTokens.imperialBlue)
+                        .frame(width: 16)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(tacticDisplayName(selectedAttackTactic))
+                            .font(.caption.weight(.semibold))
+                        Text(tacticSummary(selectedAttackTactic))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .accessibilityElement(children: .combine)
+            }
+
             if !plannedOperations.isEmpty {
                 Text(label("Planned Operations"))
                     .font(.caption.weight(.semibold))
@@ -345,6 +362,63 @@ struct GeneralCommandPanelView: View {
             return "Reserve Line"
         case .lastStand:
             return "Final Defense"
+        }
+    }
+
+    private func tacticIcon(_ tactic: TacticName) -> String {
+        switch tactic {
+        case .artilleryPreparation, .fireCoverage:
+            return "scope"
+        case .cavalryCharge, .blitzkrieg, .spearhead, .breakthrough:
+            return "arrow.up.right.circle.fill"
+        case .pincerMovement:
+            return "arrow.left.and.right"
+        case .feint, .guerrillaWarfare:
+            return "shuffle"
+        case .standardAttack:
+            return "flag.fill"
+        case .holdPosition,
+             .elasticDefense,
+             .defenseInDepth,
+             .lastStand:
+            return "shield.fill"
+        }
+    }
+
+    private func tacticSummary(_ tactic: TacticName) -> String {
+        guard activeFaction.usesNapoleonicLogisticsVocabulary else {
+            return tactic.rawValue
+        }
+
+        switch tactic {
+        case .standardAttack:
+            return "Balanced assault by available front and reserve formations."
+        case .artilleryPreparation:
+            return "Guns and ranged formations fire first; the corps does not advance after the barrage."
+        case .cavalryCharge:
+            return "Cavalry and mobile reserves lead the attack and may exploit a short opening."
+        case .fireCoverage:
+            return "Ranged formations cover the sector while other formations hold back."
+        case .blitzkrieg:
+            return "Rapid advance by mobile formations."
+        case .spearhead:
+            return "Column assault focused on a narrow breakthrough point."
+        case .breakthrough:
+            return "Push through the contact line toward deeper ground."
+        case .pincerMovement:
+            return "Converging attack toward a shared sector."
+        case .feint:
+            return "Limited demonstration meant to draw attention."
+        case .guerrillaWarfare:
+            return "Harassing action by light or mobile formations."
+        case .holdPosition:
+            return "Hold the current line."
+        case .elasticDefense:
+            return "Trade ground while preserving formations."
+        case .defenseInDepth:
+            return "Keep reserves behind the front line."
+        case .lastStand:
+            return "Commit the line to a final defense."
         }
     }
 

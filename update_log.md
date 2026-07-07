@@ -1951,10 +1951,46 @@ guerrillaWarfare 额外参考 infrastructure
 
 遗留风险：
 
-- 玩家 corps command UI 只有最小 tactic menu，尚未提供完整战术说明、快捷键、战术预览、冲锋/炮击动画或更细队形控制。
+- 玩家 corps command UI 只有最小 tactic menu；v3.10 已补当前 tactic 的一句战术意图，但尚未提供完整战术说明、快捷键、战术预览、冲锋/炮击动画或更细队形控制。
 - `cavalryCharge` 当前是骑兵优先的进攻 profile，不是独立冲锋伤害模型；实际限制仍来自现有 `MovementRules` / `CombatRules` 地形和守方修正。
 - `artilleryPreparation` 当前复用 artillery-first attack-only profile，不是完整 Grand Battery 准备阶段、压制状态或多回合炮击系统。
 - 未跑本地重测试或本地轻量检查；构建和静态检查结果需由云端 artifact 核对。
+
+## v3.10 - 玩家军团战术反馈 follow-up
+
+完成日期：2026-07-07
+
+性质：v3.9 玩家 corps command tactic menu 的紧邻 UI / replay 补强。本节增加当前 attack tactic 的简短战术意图说明、提交后的地图 tactic marker 和玩家命令反馈中的 tactic / target 文案，帮助玩家区分 `Attack Sector`、`Artillery Preparation` 和 `Cavalry Charge` 的规则降级方向；不改变 `TacticName` schema、`ZoneDirective`、`WarCommandExecutor` profile、战斗伤害、移动、胜负或数据文件。
+
+核心更新：
+
+- `GeneralCommandPanelView` 在拿战 faction 且当前可发起 attack order 时，于 attack controls 下方显示当前 tactic 的图标、名称和一句战术意图。
+- `Artillery Preparation` 说明当前是炮兵/远程优先并且攻击后不推进；`Cavalry Charge` 说明当前由骑兵/机动预备优先并可短距离 exploitation；`Attack Sector` 说明当前是均衡进攻。
+- `BoardScene` 读取 `PlayerPlannedOperation.tactic`，在玩家 attack planned operation 终点复用 directive replay 的 reticle / spearhead helper，并显示 ART / CAV 等轻量 tactic marker。
+- `AppContainer` 的玩家 corps order feedback 会显示 tactic 名称和目标 sector，例如 Artillery Preparation / Cavalry Charge carried out against 目标 sector；legacy 文案保持旧口径。
+- 说明文本、地图 marker 和反馈文案都只读已选或已记录 tactic，不参与命令生成；玩家提交仍由 `AppContainer` 构造 `ZoneDirective`，再经 `WarCommandExecutor -> RuleEngine` 执行。
+- README、`md/flow/flow.md`、`md/flow/flowchart.md` 和 v3 总提示词已同步当前状态。
+
+关键文件：
+
+- `WWIIHexV0/App/AppContainer.swift`
+- `WWIIHexV0/UI/GeneralCommandPanelView.swift`
+- `WWIIHexV0/SpriteKit/BoardScene.swift`
+- `README.md`
+- `md/flow/flow.md`
+- `md/flow/flowchart.md`
+- `md/prompt/v3.0-拿战迁移/codex-v3.0-拿战aiagent迁移总提示词.md`
+- `update_log.md`
+
+验证记录：
+
+- 本轮按人工要求未运行本地测试、构建、lint、parse、`jq`、`plutil` 或 `git diff --check`。
+- 云端验证需以本轮提交到 `origin/main` 后的 GitHub Actions `WWIIHexV0 CI Results` run 和未加密 artifact 为准。
+
+遗留风险：
+
+- 当前只是文字级战术意图说明、轻量 planned-order marker 和提交反馈，不是交互式战术预览、命中/损失预测、快捷键、炮击/冲锋动画或完整 line / column / square 队形控制。
+- UI 布局、Dynamic Type 换行和实际 SwiftUI 渲染仍需云端 build 与后续人工运行时验收确认。
 
 ## 历史维护记录
 
