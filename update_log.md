@@ -2307,6 +2307,41 @@ guerrillaWarfare 额外参考 infrastructure
 - 本轮未做本机 SwiftUI 渲染、VoiceOver、截图或模拟器验收；Map View picker、UnitInspector Control 行、Archived Campaign picker 和 MapEditor 资源面板的小屏观感仍需云端 build 和后续人工运行时确认。
 - `Dispatch Detail`、`Staff Pace`、`Staff Control`、更多启动/恢复错误消息等发布口径仍可继续审计；本轮只处理 Map View、Briefing、Observed、Staff Record、Campaign settings、Archived Ardennes / 归档阿登资源这些低风险可见文案点。
 
+## v3.20 - Campaign recovery wording follow-up
+
+完成日期：2026-07-07
+
+性质：v3.8 发布候选恢复/保存错误文案补强。本节不改变 `GameSaveSnapshot` schema、`ScenarioCatalog` id、默认 Waterloo 启动流程、将领目录加载流程、保存/继续分支、`UserDefaults` key、命令管线或规则执行，只把启动、继续、新局、保存和坏存档路径中仍偏工程化的 `commander catalog` / `Default scenario failed to load` / `New game failed` / `Save failed` / `Continue failed` / `could not be opened` 文案收口为更面向玩家的 command staff / New campaign could not be opened / Campaign could not be saved / Campaign could not be continued / could not be read 口径。
+
+核心更新：
+
+- `AppContainer.loadGeneralRegistry` 的启动恢复提示从 commander catalog / recovery mode 改为 command staff / limited campaign view。
+- 默认场景读取失败提示从 `Default scenario ... failed to load` 改为 `${defaultScenario.displayName} could not be opened`（当前为 `Waterloo 1815 could not be opened`），仍提示打开 New Campaign 选择其他 campaign。
+- 保存失败提示从 `Save failed` 改为 `Campaign could not be saved`。
+- 继续存档失败提示从 `Continue failed` 改为 `Campaign could not be continued` / `No saved campaign is available`，继续时将领目录读取失败提示改为 `Command staff could not be prepared`；底层仍不打开该存档。
+- 新局数据读取失败提示改为 `New campaign could not be opened`，并对错误详情走 `NapoleonicMessageSanitizer`。
+- `PlaytestSessionSettings` 坏偏好恢复提示改为 `Campaign settings were restored to standard values.`。
+- `NewGameSetupView` Reset 说明从 normal command flow 改为 standard sequence。
+- `GameSaveSnapshot` 坏存档 / 版本不兼容提示从 opened 口径改为 read 口径，避免继续强化 app/version/schema 工程感；schemaVersion 与兼容判断不改。
+
+关键文件：
+
+- `WWIIHexV0/App/AppContainer.swift`
+- `WWIIHexV0/App/GameSaveSnapshot.swift`
+- `WWIIHexV0/App/PlaytestSessionSettings.swift`
+- `WWIIHexV0/UI/NewGameSetupView.swift`
+- `update_log.md`
+
+验证记录：
+
+- 本轮按人工要求未运行本地测试、构建、lint、parse、`jq`、`plutil` 或 `git diff --check`。
+- 云端验证需以本轮提交到 `origin/main` 后的 GitHub Actions `WWIIHexV0 CI Results` run 和未加密 artifact 为准。
+
+遗留风险：
+
+- 本轮未做本机 SwiftUI 渲染、VoiceOver、截图、模拟器或真实坏存档恢复验收；错误消息实际换行和上下文观感需由云端 build 与后续人工运行时确认。
+- DataLoader 的 validation 详情在 Full/错误路径仍可能包含开发者级定位信息；本轮只改善外层玩家可见包装和 sanitizer 覆盖，不重写底层错误模型。
+
 ## 历史维护记录
 
 以下提交不作为正式 v 版本，但影响项目资料完整性：

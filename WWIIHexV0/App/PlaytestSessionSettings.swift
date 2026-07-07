@@ -150,7 +150,7 @@ struct PlaytestSessionSettings: Codable, Equatable {
             return .loaded(try JSONDecoder().decode(PlaytestSessionSettings.self, from: data))
         } catch {
             defaults.removeObject(forKey: defaultsKey)
-            return .resetToStandard("Campaign settings were reset because saved preferences could not be read.")
+            return .resetToStandard("Campaign settings were restored to standard values.")
         }
     }
 

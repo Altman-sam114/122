@@ -69,11 +69,11 @@ flowchart TD
 flowchart TD
     ME["地图编辑器<br/>MapEditor<br/>用来画格子、省份、战区、初始部队"]:::editor
     JSON["游戏数据 JSON<br/>ScenarioDefinition + RegionDataSet<br/>保存地图、单位、省份、初始战区"]:::data
-    SCAT["场景目录<br/>ScenarioCatalog<br/>defaultPlayable 指向 Waterloo 1815 数据切片；Ardennes 作为 legacy 可选剧本保留；defaultPlayerFaction 为 France；目标切片已覆盖 Plancenoit；Wavre Road 是普军后方入口抽象；Papelotte 有 Anglo-Allied 左翼预备；Mont-Saint-Jean 后方 q2,r1 有 Anglo-Allied Rear Road marker；Prussian Approach q4,r0 有开局 screen 和非目标 road marker；q4,r1 目标显示为 Prussian Arrival Road"]:::loader
-    SETUP["新局/继续/设置<br/>NewGameSetupView<br/>New Campaign 默认显示 Waterloo、玩家可见为 Player Power / Power / Opening Turn，底层仍是 Faction；Archived Campaigns 才显示 legacy 新局和旧 legacy 存档详情；AppContainer 按玩家控制权归一拿战 phase；Saved Campaign 可选 Slot 1/2/3，可编辑 campaign name，坏快照/未知 scenario/将领目录失败显示原因并可 Clear Campaign；继续成功后走现有 AI eligibility gate；Status 显示操作结果；Settings 调整 observer、map view、dispatch detail、AI pace、AI control、guide notes、text size"]:::input
-    SAVE["本地试玩快照<br/>GameSaveSnapshot + GameSaveSlot + UserDefaults<br/>schemaVersion 1，保存 scenario / player faction / GameState；内部仍是 3 个 slot，默认显示 Campaign 1/2/3，Slot 1 兼容旧单槽 key；campaign name 独立保存；拿战摘要显示 Current / Your Power；加载区分 missing / loaded / unavailable；恢复后 Staff 模式含 observer + Staff 可续跑 AI，非 observer Manual 需由 End Orders 推进，observer Manual 只读"]:::data
-    PSET["试玩偏好<br/>PlaytestSessionSettings + UserDefaults<br/>observer / map view / replay detail / AI pace / AI control / guide notes / reduce motion / text size；坏设置重置为标准设置并提示"]:::data
-    REPLAY["试玩回放详细度<br/>ReplayDetailLevel<br/>Concise 保留 Staff Summary / Staff Reason / Issue Preview / Recent Dispatch Timeline；Standard / Full 的 Situation 可显示完整 selected staff rationale；控制日志条数、directive limit、metadata、context、明细卡和 Staff Record / raw JSON 审计显示"]:::ui
+    SCAT["场景目录<br/>ScenarioCatalog<br/>defaultPlayable 指向 Waterloo 1815 数据切片；Archived Ardennes 作为 legacy 可选剧本保留；defaultPlayerFaction 为 France；目标切片已覆盖 Plancenoit；Wavre Road 是普军后方入口抽象；Papelotte 有 Anglo-Allied 左翼预备；Mont-Saint-Jean 后方 q2,r1 有 Anglo-Allied Rear Road marker；Prussian Approach q4,r0 有开局 screen 和非目标 road marker；q4,r1 目标显示为 Prussian Arrival Road"]:::loader
+    SETUP["新局/继续/设置<br/>NewGameSetupView<br/>New Campaign 默认显示 Waterloo、玩家可见为 Player Power / Power / Opening Turn，底层仍是 Faction；Archived Campaigns 才显示 legacy 新局和旧 legacy 存档详情；AppContainer 按玩家控制权归一拿战 phase；Saved Campaign 可选 Slot 1/2/3，可编辑 campaign name，坏快照/未知 scenario/command staff 失败显示原因并可 Clear Campaign；继续成功后走现有 AI eligibility gate；Status 显示操作结果；Settings 调整 Observer Mode、Map View、Dispatch Detail、Staff Pace、Staff Control、Guide Notes、Text Size"]:::input
+    SAVE["本地试玩快照<br/>GameSaveSnapshot + GameSaveSlot + UserDefaults<br/>schemaVersion 1，保存 scenario / player faction / GameState；内部仍是 3 个 slot，默认显示 Campaign 1/2/3，Slot 1 兼容旧单槽 key；campaign name 独立保存；拿战摘要显示 Current / Your Power；加载区分 missing / loaded / unavailable；恢复后 Staff 模式含 observer + Staff 可续跑 AI，非 observer Manual 需由 End Orders 推进，observer Manual 为 Observation only / 只读"]:::data
+    PSET["试玩偏好<br/>PlaytestSessionSettings + UserDefaults<br/>Observer Mode / Map View / Dispatch Detail / Staff Pace / Staff Control / Guide Notes / Reduce Motion / Text Size；坏设置重置为标准设置并显示 Campaign settings 提示"]:::data
+    REPLAY["试玩回放详细度<br/>ReplayDetailLevel<br/>Concise 保留 Staff Summary / Staff Reason / Issue Preview / Recent Dispatch Timeline；Standard / Full 的 Situation 可显示完整 selected staff rationale；控制日志条数、directive limit、metadata、context、明细卡和 Staff Record（底层 rawJSON 保留）审计显示"]:::ui
     GUIDE["非阻塞短引导与 AI 反馈<br/>PlaytestGuideCue + playerOrdersStatus + aiNoActionFeedback + aiDiagnosticFeedback<br/>首次 formation / artillery / cavalry / end orders 写入 Staff note；infantry-heavy formation 提示 square-ready Hold Contact Line；玩家无可行动、AI 无有效命令、record-level issue 和 dispatch paused 给可读提示"]:::ui
     DL["数据加载器<br/>DataLoader.loadGameState<br/>校验 initial phase / faction / terrain / victory；把 JSON 变成可运行 GameState"]:::loader
     TERR["运行时地形规则<br/>TerrainRuleSet / GameState.terrainRules<br/>Waterloo 移动/战斗读取 napoleonic_terrain_rules；旧状态 fallback legacy"]:::rules
@@ -291,8 +291,8 @@ flowchart TD
 ```mermaid
 flowchart TD
     START["触发 AI 行动<br/>AppContainer.advanceOrRunAI / runAIIfNeeded<br/>玩家点下一回合、命令后轮到 AI，或继续存档恢复后"]:::input
-    CHECK{"当前 activeFaction 该自动触发 AI 吗?<br/>phase.allowsCommands<br/>AI Control = Staff<br/>非 observer 下不是 playerFaction<br/>observer 可让玩家方也自动跑"}:::decision
-    STOP["不运行 AI<br/>Manual 非 observer 可用 End Orders 推进当前 activeFaction<br/>observer Manual 保持只读"]:::stop
+    CHECK{"当前 activeFaction 该自动触发 AI 吗?<br/>phase.allowsCommands<br/>Staff Control = Staff<br/>非 observer 下不是 playerFaction<br/>observer 可让玩家方也自动跑"}:::decision
+    STOP["不运行 AI<br/>Manual 非 observer 可用 End Orders 推进当前 activeFaction<br/>observer Manual 保持 Observation only / 只读"]:::stop
     REFRESH["行动前刷新运行时战略层<br/>StrategicStateBootstrapper.refreshRuntimeState<br/>避免 AI 读到旧前线/旧部署"]:::rules
     TM["AI 回合编排器<br/>TurnManager.runAITurn<br/>默认 pipelineMode = marshalDirective"]:::rules
     DIPREL["敌我/友军关系查询<br/>DiplomacyState.isHostile / isFriendly<br/>给补给、目标、ZOC、占领和前线统一口径"]:::rules
@@ -352,7 +352,7 @@ flowchart TD
     SCEN["场景 JSON<br/>ScenarioDefinition<br/>保存 hex 地形、控制方、补给、目标、初始单位"]:::data
     REG["省份 JSON<br/>RegionDataSet<br/>保存 hexToRegion、省份、边、初始 theaterId"]:::data
     NEI["自动推导省份邻接<br/>真实 hex 邻接 -> Region.neighbors / RegionEdge<br/>避免手写邻接出错"]:::derived
-    BRIDGE["归档阿登资源桥<br/>MapEditorGameResourceBridge<br/>读取或覆盖 archived Ardennes 地图资源<br/>未知 unit faction 抛错，不再兜底 Allies"]:::loader
+    BRIDGE["归档阿登资源桥<br/>MapEditorGameResourceBridge<br/>读取或覆盖 Archived Ardennes / 归档阿登资源<br/>未知 unit faction 抛错，不再兜底 Allies"]:::loader
     FILES["MapEditor legacy 默认资源<br/>WWIIHexV0/Data<br/>ardennes_v0_scenario.json + ardennes_v02_regions.json<br/>不等于当前 playable 默认入口"]:::data
     LOAD["游戏启动加载<br/>DataLoader.loadGameState<br/>DEBUG 下优先读源码 JSON"]:::loader
     MAP["地图状态<br/>MapState<br/>tiles + hexToRegion + RegionGraph"]:::state
@@ -432,7 +432,7 @@ flowchart TD
     STATE["运行时状态<br/>GameState + EventLog + WarDirectiveRecord"]:::state
     ROOT["主界面<br/>RootGameView + AppContainer interactionLog + CommandPanelView<br/>HUD + map layers + Info tabs<br/>拿战 faction 显示 Sector / Formation / Corps Order / Order result / Command Dispatch<br/>lastCommandMessage 走 NapoleonicMessageSanitizer"]:::ui
     LOG["日志面板<br/>EventLogView<br/>最近 60 条 LogDisplayEntry<br/>拿战分类显示 Engagement / Withdrawal / Logistics / Isolation / Dispatch；事件显示 active wing / Contact sector<br/>Standard / Concise 复用 NapoleonicMessageSanitizer 净化 raw AI、MockAI、legacy pipeline、validation rawValue 和 WWII faction 名；Full 保留 raw 审计值"]:::ui
-    AIUI["AI / 外交 / 将军面板<br/>AgentPanelView + DiplomacyPanelView + GeneralCommandPanelView<br/>Staff Summary + Concise Staff Reason + Issue Preview + Recent Dispatch Timeline + corps order target + relations<br/>拿战显示 Command Dispatch / Staff Summary / Dispatch Issues / Corps Directives<br/>Standard / Concise 净化 raw id / diagnostic / country-bloc id；Full 保留 raw JSON 审计"]:::ui
+    AIUI["AI / 外交 / 将军面板<br/>AgentPanelView + DiplomacyPanelView + GeneralCommandPanelView<br/>Staff Summary + Concise Staff Reason + Issue Preview + Recent Dispatch Timeline + corps order target + relations<br/>拿战显示 Command Dispatch / Staff Summary / Dispatch Issues / Corps Directives<br/>Standard / Concise 净化 raw id / diagnostic / country-bloc id；Full 显示 Staff Record，底层 rawJSON 保留"]:::ui
     BOARD["地图场景<br/>BoardScene + UnitNode<br/>缓存 unit display hex 后排序绘制<br/>拿战单位棋子显示 formation symbols<br/>pending 增援入口显示 RES marker<br/>目标点显示村庄/据点/道路 marker<br/>WarDirectiveRecord 显示 recent replay 线与 tactic marker<br/>玩家 defense planned operation 显示 HOLD marker"]:::ui
     MARSHAL["模拟元帅 / MockAI<br/>MarshalAgent + SimulatedMarshalLLMClient<br/>Waterloo fallback 目标按 objective-aware sorting 排序，只输出指令/命令意图"]:::ai
     ZD["战区指令<br/>ZoneDirective<br/>tactic / focus / intensity"]:::command
@@ -482,7 +482,7 @@ flowchart TD
     ZD["玩家战区指令<br/>ZoneDirective<br/>defense holdLine 或带 tactic 的 attack selected region"]:::command
     WCE["执行器<br/>WarCommandExecutor.execute(excluding lockedIds)<br/>跳过已微操单位"]:::command
     RE["规则权威<br/>RuleEngine<br/>校验并修改 GameState"]:::rules
-    RECORD["记录<br/>WarDirectiveRecord + PlayerPlannedOperation<br/>AI 面板、日志、计划线共用"]:::ui
+    RECORD["记录<br/>WarDirectiveRecord + PlayerPlannedOperation<br/>Staff / Command Dispatch 面板、日志、计划线共用"]:::ui
     BOARD["视觉反馈<br/>BoardScene<br/>进攻箭头、防御圆环 + HOLD marker、tactic marker、微操单位金色圈"]:::ui
     PROFILE["将军档案<br/>GeneralProfileView<br/>legacy General Profile<br/>拿战 Commander Profile / Assigned Formations"]:::ui
 

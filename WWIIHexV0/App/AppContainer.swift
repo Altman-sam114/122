@@ -174,7 +174,7 @@ final class AppContainer: ObservableObject {
                 error.localizedDescription,
                 for: scenario.defaultPlayerFaction
             )
-            let message = "\(operation) commander catalog could not be loaded. Recovery mode opened without assigned commanders. \(detail)"
+            let message = "\(operation) command staff could not be prepared. A limited campaign view opened. Choose another campaign or restore the missing campaign data. \(detail)"
             return (.empty, message)
         }
     }
@@ -191,7 +191,7 @@ final class AppContainer: ObservableObject {
                 error.localizedDescription,
                 for: defaultScenario.defaultPlayerFaction
             )
-            let recoveryMessage = "Default scenario \(defaultScenario.displayName) failed to load. Open New Campaign to choose a playable scenario. \(detail)"
+            let recoveryMessage = "\(defaultScenario.displayName) could not be opened. Open New Campaign and choose another campaign. \(detail)"
             return (
                 recoveryState(for: defaultScenario, errorMessage: recoveryMessage),
                 defaultScenario,
@@ -588,7 +588,7 @@ final class AppContainer: ObservableObject {
             appendInteractionEvent(message)
             return true
         } catch {
-            let message = "Save failed: \(error.localizedDescription)"
+            let message = "Campaign could not be saved: \(error.localizedDescription)"
             lastCommandMessage = message
             appendInteractionEvent(message)
             return false
@@ -613,7 +613,7 @@ final class AppContainer: ObservableObject {
 
         guard let scenario = ScenarioCatalog.entry(for: snapshot.scenarioId) else {
             let recoveryMessage = Self.unavailableScenarioMessage(snapshot.scenarioId)
-            let message = "Continue failed: \(recoveryMessage)"
+            let message = "Campaign could not be continued: \(recoveryMessage)"
             lastCommandMessage = message
             appendInteractionEvent(message)
             setSavedGameStatus(
@@ -627,8 +627,8 @@ final class AppContainer: ObservableObject {
         do {
             nextRegistry = try dataLoader.loadGeneralRegistry(scenario)
         } catch {
-            let recoveryMessage = "Commander catalog could not be loaded. Saved campaign was not opened. \(NapoleonicMessageSanitizer.displayText(error.localizedDescription, for: scenario.defaultPlayerFaction))"
-            let message = "Continue failed: \(recoveryMessage)"
+            let recoveryMessage = "Command staff could not be prepared. Saved campaign was not opened. \(NapoleonicMessageSanitizer.displayText(error.localizedDescription, for: scenario.defaultPlayerFaction))"
+            let message = "Campaign could not be continued: \(recoveryMessage)"
             lastCommandMessage = message
             appendInteractionEvent(message)
             setSavedGameStatus(
@@ -716,7 +716,11 @@ final class AppContainer: ObservableObject {
         do {
             loadedState = try dataLoader.loadGameState(scenario)
         } catch {
-            let message = "New game failed: \(error.localizedDescription)"
+            let detail = NapoleonicMessageSanitizer.displayText(
+                error.localizedDescription,
+                for: scenario.defaultPlayerFaction
+            )
+            let message = "New campaign could not be opened: \(detail)"
             lastCommandMessage = message
             appendInteractionEvent(message)
             return false
@@ -732,7 +736,7 @@ final class AppContainer: ObservableObject {
         do {
             nextRegistry = try dataLoader.loadGeneralRegistry(scenario)
         } catch {
-            let message = "New game failed: commander catalog could not be loaded. \(NapoleonicMessageSanitizer.displayText(error.localizedDescription, for: scenario.defaultPlayerFaction))"
+            let message = "New campaign could not be opened. Command staff could not be prepared. \(NapoleonicMessageSanitizer.displayText(error.localizedDescription, for: scenario.defaultPlayerFaction))"
             lastCommandMessage = message
             appendInteractionEvent(message)
             return false
@@ -840,11 +844,11 @@ final class AppContainer: ObservableObject {
     private static func continueFailureMessage(for status: GameSaveSnapshot.LoadResult) -> String {
         switch status {
         case .missing:
-            return "Continue failed: no saved campaign."
+            return "No saved campaign is available."
         case .loaded:
-            return "Continue failed: saved campaign could not be opened."
+            return "Saved campaign could not be read."
         case let .unavailable(message):
-            return "Continue failed: \(message)"
+            return "Campaign could not be continued: \(message)"
         }
     }
 

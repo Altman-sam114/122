@@ -129,7 +129,7 @@ struct NewGameSetupView: View {
                         Button("Clear Campaign", systemImage: "trash", role: .destructive, action: clearSavedGame)
                     } else if let savedGameSummary = selectedSavedGameSummary {
                         LabeledContent("Campaign", value: savedGameSummary.title)
-                        LabeledContent("Command", value: savedGameSummary.detail)
+                        LabeledContent("Status", value: savedGameSummary.detail)
                         LabeledContent("Last Saved", value: savedGameSummary.savedAt.formatted(date: .abbreviated, time: .shortened))
                         Button("Continue Campaign", systemImage: "play.circle", action: continueSavedGame)
                         Button("Clear Campaign", systemImage: "trash", role: .destructive, action: clearSavedGame)
@@ -225,7 +225,7 @@ struct NewGameSetupView: View {
                 }
 
                 Section("Reset") {
-                    Text("Starting a campaign reloads campaign data, clears selections and dispatch history, and returns orders to the normal command flow.")
+                    Text("Starting a campaign reloads campaign data, clears selections and dispatch history, and returns orders to their standard sequence.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
