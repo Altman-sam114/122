@@ -612,13 +612,14 @@ counterattack:
 hold:
   恢复 2 fatigue
   恢复少量 morale
+  infantry-heavy formation 进入 square-ready hold 口径：仍复用 retreatMode.hold，不新增队形字段
 resupply/rest:
   supplied 恢复 strength、fatigue、ammunition 和 morale
   lowSupply 只恢复少量 fatigue 和 morale
   encircled 不恢复
 ```
 
-疲劳阈值会降低 attack / defense / movement；士气 <= 40 / <= 25 会降低 attack / defense，broken morale 还会触发 retreatable 单位自动撤退。`CommandValidator` 还会用 `.moraleBroken` 拒绝 morale <= `Division.brokenMoraleThreshold` 的 move / attack；hold、allowRetreat 和 resupply/rest 仍作为姿态或恢复路径允许走各自校验。弹药为 0 或 low ammunition 会降低弹药敏感单位的 effective attack。HUD、单位详情、tooltip、Agent D 摘要和 Marshal 前线摘要都会暴露这些警告。
+疲劳阈值会降低 attack / defense / movement；士气 <= 40 / <= 25 会降低 attack / defense，broken morale 还会触发 retreatable 单位自动撤退。`CommandValidator` 还会用 `.moraleBroken` 拒绝 morale <= `Division.brokenMoraleThreshold` 的 move / attack；hold、allowRetreat 和 resupply/rest 仍作为姿态或恢复路径允许走各自校验。弹药为 0 或 low ammunition 会降低弹药敏感单位的 effective attack。v3.11 起 `CombatRules.cavalryAttackAdjustment` 把 infantry-heavy + `retreatMode.hold` 的目标视作最小 square-ready hold，在 plain 上进一步削弱骑兵冲击；这只复用现有 hold 姿态，不新增 `FormationStance` / square 存档字段。HUD、单位详情、tooltip、Agent D 摘要和 Marshal 前线摘要都会暴露这些警告。
 
 ---
 
@@ -1677,7 +1678,7 @@ shouldAttack =
   - `elasticDefense`：压力、补给警告或劣势时弹性防御。
   - `holdPosition`：普通防御 fallback。
 
-`TacticConditionChecker` 不再恒放行：闪电战/游击战要求机动单位，骑兵冲锋要求可行动骑兵，火力覆盖/炮兵准备要求炮兵或远程单位，佯攻要求前线单位，纵深防御要求 depth 预备队；不满足条件会降级为 `holdPosition`。骑兵冲锋的实际效果仍受现有 `MovementRules` / `CombatRules` 的地形和守方修正约束。
+`TacticConditionChecker` 不再恒放行：闪电战/游击战要求机动单位，骑兵冲锋要求可行动骑兵，火力覆盖/炮兵准备要求炮兵或远程单位，佯攻要求前线单位，纵深防御要求 depth 预备队；不满足条件会降级为 `holdPosition`。骑兵冲锋的实际效果仍受现有 `MovementRules` / `CombatRules` 的地形和守方修正约束；v3.11 的 square-ready hold 只是 infantry-heavy + hold 对平地骑兵冲击的最小克制，不是完整方阵/队形系统。
 
 进攻 directive：
 
@@ -2155,7 +2156,7 @@ MapEditorGameResourceBridge.loadLegacyArdennesDocument
 - 统治者层当前只输出战略姿态和审计记录，不能直接输出底层 `Command`，不能直接修改地图、单位、hex controller 或动态战区权威。
 - 当前工作树存在外交/经济/UI 等非 v0.5 方向残留，合并前需要单独审查文件归属和 public API 冲突。
 - `AttackIntensity.infiltration` 已在 `WarCommandExecutor` 中解释为默认低投入上限；`.limitedCounter` 和 `.allOut` 仍主要依赖 tactic profile 与显式 `maxCommittedUnits`。
-- `TacticConditionChecker` 已对机动、骑兵、炮兵/远程、佯攻和纵深防御做最小条件过滤；完整队形、方阵克制、炮兵准备/骑兵冲锋的发布级平衡仍未完成。
+- `TacticConditionChecker` 已对机动、骑兵、炮兵/远程、佯攻和纵深防御做最小条件过滤；v3.11 已把 infantry-heavy + hold 接成 square-ready hold 的最小防骑兵克制，但完整队形、方阵克制、炮兵准备/骑兵冲锋的发布级平衡仍未完成。
 - 战区互助接口 `requestSupport` / `getAvailableForces` / `notifyThreat` 有模型但没有主流程调用方。
 - 攻击不会自动占领目标 hex，只有移动会占领。
 - Legacy Agent D 管线仍保留，不应删除，也不应默认接回主战争 AI。
@@ -2282,7 +2283,7 @@ Data/generals.json
 - HQ 逻辑：不生成占格子的 HQ 单位。`GeneralAssignment.hqRegionId` 指向战区内友方城市或最大 region，`GeneralDispatcher.isHQUnderAttack` 通过 region controller 判断 HQ 是否被夺。
 - 将军养成初步：`GeneralAssignment` 保存 `loyalty`、`satisfaction`、`interventionCount`。玩家直接微操某个将军辖下单位时，记录干预次数并轻微降低满意度。
 - 微操锁：玩家在己方 phase 对具体师执行 move/attack/hold/resupply/allowRetreat 后，该师 id 写入 `PlayerCommandState.micromanagedDivisionIds`。本回合玩家再下达战区宏观命令时，`WarCommandExecutor.execute(... excluding:)` 会跳过这些师，避免同一回合被将军指令覆盖。`endTurn` 或 active faction / turn 改变时清空锁。
-- 半自动指令：`GeneralCommandPanelView` 的 `Hold Line` 生成 defense `ZoneDirective`，`Attack Region` 根据当前选中敌方 region 和相邻玩家 FrontZone 生成 attack `ZoneDirective`，直接复用 `WarCommandExecutor -> RuleEngine`，不通过 `TurnManager.runDirectiveTurn`，因此不会自动结束玩家回合。玩家 attack tactic menu 当前只暴露 `standardAttack`、`artilleryPreparation`、`cavalryCharge` 三类最小选择；菜单按当前 corps sector 的可行动 front/depth/assigned front 单位过滤炮兵/远程与骑兵候选，Attack controls 下方会显示当前 tactic 的简短战术意图，提交后 tactic 会写入 `WarDirectiveRecord` 和 `PlayerPlannedOperation`。`BoardScene` 读取 `PlayerPlannedOperation.tactic`，在玩家计划线终点显示 ART / CAV 等轻量 tactic marker；`AppContainer` 的玩家军团命令反馈也会显示 tactic 和目标 sector。
+- 半自动指令：`GeneralCommandPanelView` 的 `Hold Line` 生成 defense `ZoneDirective`，`Attack Region` 根据当前选中敌方 region 和相邻玩家 FrontZone 生成 attack `ZoneDirective`，直接复用 `WarCommandExecutor -> RuleEngine`，不通过 `TurnManager.runDirectiveTurn`，因此不会自动结束玩家回合。玩家 attack tactic menu 当前只暴露 `standardAttack`、`artilleryPreparation`、`cavalryCharge` 三类最小选择；菜单按当前 corps sector 的可行动 front/depth/assigned front 单位过滤炮兵/远程与骑兵候选，Attack controls 下方会显示当前 tactic 的简短战术意图，提交后 tactic 会写入 `WarDirectiveRecord` 和 `PlayerPlannedOperation`。`BoardScene` 读取 `PlayerPlannedOperation.tactic`，在玩家计划线终点显示 ART / CAV 等轻量 tactic marker；`AppContainer` 的玩家军团命令反馈也会显示 tactic 和目标 sector。步兵重型 formation 进入 Hold Line 后，单位面板、tooltip 和规则日志会显示 square-ready hold 口径，用于解释最小防骑兵克制。
 - 记录与反馈：玩家宏观命令写入 `WarDirectiveRecord` 和 `PlayerPlannedOperation`。`BoardScene` 只读 `PlayerCommandState.plannedOperations`，画源 region 到目标 region 的箭头；防御命令画源点圆环。v3.6 起 `BoardScene` 还只读最近的非玩家 `WarDirectiveRecord`，用轻量 replay 线显示 AI/将领 directive。玩家微操锁定单位在 `UnitNode` 上显示金色底圈。
 - UI：`RootGameView` 新增 `General` tab，Unit tab 也嵌入 `GeneralCommandPanelView`。`GeneralProfileView` 用 sheet 展示将军身份、履历、技能、忠诚/满意度、干预次数、HQ 状态和辖下部队。
 

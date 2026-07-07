@@ -146,7 +146,7 @@ struct CombatRules {
     private func cavalryAttackAdjustment(attackingInto terrain: BaseTerrain, defender: Division) -> Double {
         switch terrain {
         case .plain:
-            return defender.isInfantryHeavy && defender.retreatMode == .hold ? -0.10 : 0.15
+            return defender.isSquareReadyHold ? -0.25 : 0.15
         case .hill:
             return -0.10
         case .forest,
@@ -180,5 +180,11 @@ struct CombatRules {
             return 1
         }
         return Double(strengthDamage) / Double(defender.strength)
+    }
+}
+
+private extension Division {
+    var isSquareReadyHold: Bool {
+        isInfantryHeavy && retreatMode == .hold
     }
 }

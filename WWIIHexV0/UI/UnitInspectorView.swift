@@ -247,6 +247,9 @@ struct UnitInspectorView: View {
         case .retreatable:
             return "Withdrawal allowed"
         case .hold:
+            if division.isInfantryHeavy {
+                return "Square-ready hold"
+            }
             return "Hold line"
         }
     }

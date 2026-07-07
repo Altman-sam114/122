@@ -97,6 +97,9 @@ struct UnitTooltipView: View {
         case .retreatable:
             return "Withdrawal Ordered"
         case .hold:
+            if division.isInfantryHeavy {
+                return "Square-Ready Hold"
+            }
             return "Hold Line"
         }
     }

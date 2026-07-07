@@ -23,7 +23,7 @@ enum PlaytestGuideCue: String, CaseIterable, Codable, Equatable, Hashable {
             return "Staff note: \(name) favors prepared fire against exposed targets; rough ground and strongpoints blunt its effect."
         case .cavalrySelected:
             let name = division?.name ?? "Cavalry"
-            return "Staff note: \(name) is best used for open-ground shock and pursuit; villages, woods, hills, and steady heavy infantry blunt charges."
+            return "Staff note: \(name) is best used for open-ground shock and pursuit; villages, woods, hills, and square-ready Hold Line infantry blunt charges."
         case .endingOrders:
             return "Staff note: ending orders hands initiative to the next faction; staff dispatches and rejected orders remain in replay."
         }

@@ -421,6 +421,9 @@ struct CommandExecutor {
 
     private func holdStanceMessage(for division: Division, in state: GameState) -> String {
         if state.activeFaction.usesNapoleonicLogisticsVocabulary {
+            if division.isInfantryHeavy {
+                return "\(division.name) formed a square-ready Hold Line: no withdrawal, +20% defense, cavalry charges blunted, +20% losses."
+            }
             return "\(division.name) formed a Hold Line order: no withdrawal, +20% defense, +20% losses."
         }
 

@@ -1992,6 +1992,43 @@ guerrillaWarfare 额外参考 infrastructure
 - 当前只是文字级战术意图说明、轻量 planned-order marker 和提交反馈，不是交互式战术预览、命中/损失预测、快捷键、炮击/冲锋动画或完整 line / column / square 队形控制。
 - UI 布局、Dynamic Type 换行和实际 SwiftUI 渲染仍需云端 build 与后续人工运行时验收确认。
 
+## v3.11 - 最小 square-ready hold / 防骑兵姿态 follow-up
+
+完成日期：2026-07-07
+
+性质：v3.9 / v3.10 骑兵冲锋切片的紧邻规则与展示补强。本节把 infantry-heavy formation 的 `Hold Line` 明确为最小 square-ready hold：仍复用既有 `RetreatMode.hold`，不新增 `FormationStance`、不升级存档 schema、不新增 tactic case，不改变 `Command` / `ZoneDirective` / `WarCommandExecutor -> RuleEngine` 收口。
+
+核心更新：
+
+- `CombatRules.cavalryAttackAdjustment` 继续只在现有战斗计算里处理骑兵冲击，但将 plain 上 attacking cavalry vs infantry-heavy hold 的修正从轻度惩罚加强为更明确的防骑兵克制。
+- `CommandExecutor.holdStanceMessage` 在拿战 faction 下把 infantry-heavy HOLD 日志显示为 square-ready Hold Line，说明无撤退、+20% defense、骑兵冲击被削弱和 +20% losses；legacy 文案保持旧口径。
+- `UnitInspectorView` / `UnitTooltipView` 在拿战路径下把 infantry-heavy + hold 显示为 Square-ready hold / Square-Ready Hold，让玩家能在单位面板和 tooltip 中看到防骑兵姿态。
+- `PlaytestGuideCue.cavalrySelected` 补充 square-ready Hold Line infantry 会削弱 cavalry charge 的提示。
+- README、`md/flow/flow.md`、`md/flow/flowchart.md` 和 v3 总提示词已同步：这是最小防骑兵姿态，不是完整 line / column / square 队形系统。
+
+关键文件：
+
+- `WWIIHexV0/Rules/CombatRules.swift`
+- `WWIIHexV0/Rules/CommandExecutor.swift`
+- `WWIIHexV0/UI/UnitInspectorView.swift`
+- `WWIIHexV0/UI/UnitTooltipView.swift`
+- `WWIIHexV0/App/PlaytestGuideCue.swift`
+- `README.md`
+- `md/flow/flow.md`
+- `md/flow/flowchart.md`
+- `md/prompt/v3.0-拿战迁移/codex-v3.0-拿战aiagent迁移总提示词.md`
+- `update_log.md`
+
+验证记录：
+
+- 本轮按人工要求未运行本地测试、构建、lint、parse、`jq`、`plutil` 或 `git diff --check`。
+- 云端验证需以本轮提交到 `origin/main` 后的 GitHub Actions `WWIIHexV0 CI Results` run 和未加密 artifact 为准。
+
+遗留风险：
+
+- square-ready hold 只是 infantry-heavy + `retreatMode.hold` 的最小规则解释，没有新增独立方阵状态、朝向/形成时间、方阵被炮击削弱、线列/纵队切换、阵型动画或完整平衡。
+- 骑兵冲锋仍不是独立伤害模型；实际效果继续由现有 attack profile、地形、士气、疲劳、弹药、反击和撤退规则共同决定。
+
 ## 历史维护记录
 
 以下提交不作为正式 v 版本，但影响项目资料完整性：
