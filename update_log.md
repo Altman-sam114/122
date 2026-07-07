@@ -2160,6 +2160,37 @@ guerrillaWarfare 额外参考 infrastructure
 - 本轮未做本机截图或模拟器视觉验收；`HOLD` marker 的实际地图位置、重叠和小屏观感需后续人工或云端视觉流程确认。
 - 该切片只提升下令前和下令后的可见性，不新增完整方阵、队形切换时间、炮击克制方阵或骑兵冲锋独立伤害模型。
 
+## v3.16 - Concise Staff Reason visibility follow-up
+
+完成日期：2026-07-07
+
+性质：v3.14 selected staff rationale 可见性的 Concise replay 补强。本节不改变 `Command`、`ZoneDirective`、`TheaterDirective` schema、`WarDirectiveRecord` schema、`AgentDecisionRecord` schema、`WarCommandExecutor`、`RuleEngine` 或 `CombatRules`，只在 `AgentPanelView` 中从既有 `AgentDecisionRecord.contextSummary` 派生一行只读摘要。
+
+核心更新：
+
+- `AgentPanelView` 在 `ReplayDetailLevel.concise` 下继续隐藏完整 Situation / context summary 和逐条 command / directive 明细，但若 `contextSummary` 含 `Selected staff rationale:`，会显示一行 `Staff Reason`。
+- `Staff Reason` 复用既有 `NapoleonicMessageSanitizer` / `diagnosticDisplayText` 展示净化，不改底层 `rawJSON`、`contextSummary` 或任何审计记录。
+- README、`md/flow/flow.md`、`md/flow/flowchart.md` 和 v3 总提示词已同步：Standard / Full 仍显示完整 Situation；Concise 只保留单行 rationale 兜底可见性。
+
+关键文件：
+
+- `WWIIHexV0/UI/AgentPanelView.swift`
+- `README.md`
+- `md/flow/flow.md`
+- `md/flow/flowchart.md`
+- `md/prompt/v3.0-拿战迁移/codex-v3.0-拿战aiagent迁移总提示词.md`
+- `update_log.md`
+
+验证记录：
+
+- 本轮按人工要求未运行本地测试、构建、lint、parse、`jq`、`plutil` 或 `git diff --check`。
+- 云端验证需以本轮提交到 `origin/main` 后的 GitHub Actions `WWIIHexV0 CI Results` run 和未加密 artifact 为准。
+
+遗留风险：
+
+- 本轮未做本机 SwiftUI 渲染或截图验收；Concise `Staff Reason` 的实际换行、截断和 Dynamic Type 观感需由云端 build 与后续人工运行时验收确认。
+- 该切片只提升 replay 可见性，不保证每条元帅 directive 都有 rationale，也不改变 Hold Line 是否成功执行。
+
 ## 历史维护记录
 
 以下提交不作为正式 v 版本，但影响项目资料完整性：

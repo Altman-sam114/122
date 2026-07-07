@@ -59,6 +59,18 @@ struct AgentPanelView: View {
                 .font(playtestTextSize.valueFont)
             }
 
+            if replayDetailLevel == .concise,
+               let staffReasonText = conciseStaffReasonText {
+                LabeledContent(label("Staff Reason")) {
+                    Text(staffReasonText)
+                        .font(playtestTextSize.valueFont)
+                        .multilineTextAlignment(.trailing)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                }
+                .font(playtestTextSize.valueFont)
+            }
+
             if hasDispatchSummary {
                 Text(label("Dispatch Summary"))
                     .font(playtestTextSize.captionFont)
@@ -266,6 +278,8 @@ struct AgentPanelView: View {
             return "Intent"
         case "Context":
             return "Situation"
+        case "Staff Reason":
+            return "Staff Reason"
         case "Ruler":
             return "Sovereign"
         case "Posture":
@@ -327,6 +341,21 @@ struct AgentPanelView: View {
 
     private func contextDisplayText(_ summary: String) -> String {
         diagnosticDisplayText(summary)
+    }
+
+    private var conciseStaffReasonText: String? {
+        guard let contextSummary = record?.contextSummary,
+              let markerRange = contextSummary.range(of: "Selected staff rationale:") else {
+            return nil
+        }
+
+        let rationale = contextSummary[markerRange.upperBound...]
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !rationale.isEmpty else {
+            return nil
+        }
+
+        return diagnosticDisplayText(String(rationale))
     }
 
     private func providerDisplayName(_ provider: String?) -> String {
