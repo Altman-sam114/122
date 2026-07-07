@@ -201,7 +201,7 @@ struct UnitInspectorView: View {
 
     private func controlDisplayText(for division: Division) -> String {
         if division.faction == playerFaction {
-            return "Player"
+            return usesNapoleonicVocabulary ? "Direct Orders" : "Player"
         }
         return usesNapoleonicVocabulary ? "Observed" : "Read-only"
     }

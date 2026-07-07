@@ -38,6 +38,8 @@ v3.22 继续补强新局 Settings 的试玩说明：`Dispatch Detail`、`Staff P
 
 v3.23 继续收口 phase 展示口径：`GamePhase.displayName(for:)` 集中处理拿战 faction 下的 `Orders` / `Staff Dispatch` / `Resolution` 文案，HUD fallback、Command panel 和 EventLog phase metadata 复用该 helper，避免各 UI 面板重复维护 switch。该改动只影响 display text，不改 `GamePhase` raw value、存档兼容、turn order、AI eligibility、日志底层结构或规则执行。
 
+v3.24 继续收口短引导和 formation 控制文案：拿战 Guide Notes 选中 formation 时改用 power / orders phase 口径，并对 formation 名称走 `NapoleonicMessageSanitizer`；结束命令提示也从 next faction 收口为 next power。`UnitInspectorView` 的拿战 Control 值把玩家所属 formation 显示为 `Direct Orders`，非玩家仍显示 `Observed`。这些都是展示层文案，不改 `PlaytestGuideCue` case、已送达 cue 记录、`Division`、`playerFaction`、observer 权限、命令校验或规则执行。
+
 当前拿战迁移入口文档：
 
 - `md/prompt/v3.0-拿战迁移/codex-v3.0-拿战aiagent迁移总提示词.md`

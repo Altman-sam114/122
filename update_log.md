@@ -2435,6 +2435,37 @@ guerrillaWarfare 额外参考 infrastructure
 
 - 本轮未做 SwiftUI 运行时截图、VoiceOver 或小屏布局验收；HUD fallback 与 EventLog / Command panel phase 文案的实际显示位置仍需云端 build 与后续人工运行时确认。
 
+## v3.24 - Guide note wording follow-up
+
+完成日期：2026-07-07
+
+性质：拿战短引导与 formation 控制展示收口。本节不改变 `PlaytestGuideCue` case、已送达 cue 记录、`Division`、`playerFaction`、observer 只读权限、`Command` / `WarCommandExecutor` / `RuleEngine` 或保存 schema，只调整 Guide Notes 与 Formation Details 的玩家可见文案。
+
+核心更新：
+
+- 拿战 `PlaytestGuideCue.formationSelected` 不再显示 `faction holds the command phase`，改为 `power holds the orders phase`。
+- 拿战 `PlaytestGuideCue.endingOrders` 不再显示 `next faction`，改为 `next power`。
+- 拿战 formation / artillery / cavalry guide note 中的单位名称先经 `NapoleonicMessageSanitizer`，避免短引导直接暴露 raw legacy 名称。
+- `UnitInspectorView` 的拿战 Control 值把玩家所属 formation 显示为 `Direct Orders`，非玩家 formation 仍显示 `Observed`；legacy 路径继续保留 `Player` / `Read-only`。
+
+关键文件：
+
+- `WWIIHexV0/App/PlaytestGuideCue.swift`
+- `WWIIHexV0/UI/UnitInspectorView.swift`
+- `README.md`
+- `md/flow/flow.md`
+- `md/prompt/v3.0-拿战迁移/codex-v3.0-拿战aiagent迁移总提示词.md`
+- `update_log.md`
+
+验证记录：
+
+- 本轮按人工要求未运行本地测试、构建、lint、parse、`jq`、`plutil` 或 `git diff --check`。
+- 云端验证需以本轮提交到 `origin/main` 后的 GitHub Actions `WWIIHexV0 CI Results` run 和未加密 artifact 为准。
+
+遗留风险：
+
+- 本轮未做 SwiftUI 运行时截图、VoiceOver 或小屏布局验收；短引导在真实事件日志中的换行、formation 名称净化观感和 UnitInspector Control 值仍需云端 build 与后续人工运行时确认。
+
 ## 历史维护记录
 
 以下提交不作为正式 v 版本，但影响项目资料完整性：

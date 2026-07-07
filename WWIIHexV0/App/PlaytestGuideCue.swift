@@ -8,28 +8,32 @@ enum PlaytestGuideCue: String, CaseIterable, Codable, Equatable, Hashable {
 
     func message(for division: Division?, activeFaction: Faction) -> String {
         if activeFaction.usesNapoleonicLogisticsVocabulary {
-            return napoleonicMessage(for: division)
+            return napoleonicMessage(for: division, activeFaction: activeFaction)
         }
         return legacyMessage(for: division)
     }
 
-    private func napoleonicMessage(for division: Division?) -> String {
+    private func napoleonicMessage(for division: Division?, activeFaction: Faction) -> String {
         switch self {
         case .formationSelected:
-            let name = division?.name ?? "formation"
+            let name = displayName(for: division, fallback: "formation", activeFaction: activeFaction)
             if division?.isInfantryHeavy == true {
-                return "Staff note: \(name) can receive direct orders while its faction holds the command phase. Hold Contact Line can form a square-ready defense against open-ground cavalry shock."
+                return "Staff note: \(name) can receive direct orders while its power holds the orders phase. Hold Contact Line can form a square-ready defense against open-ground cavalry shock."
             }
-            return "Staff note: \(name) can receive direct orders while its faction holds the command phase."
+            return "Staff note: \(name) can receive direct orders while its power holds the orders phase."
         case .artillerySelected:
-            let name = division?.name ?? "Artillery"
+            let name = displayName(for: division, fallback: "Artillery", activeFaction: activeFaction)
             return "Staff note: \(name) favors prepared fire against exposed targets; rough ground and strongpoints blunt its effect."
         case .cavalrySelected:
-            let name = division?.name ?? "Cavalry"
+            let name = displayName(for: division, fallback: "Cavalry", activeFaction: activeFaction)
             return "Staff note: \(name) is best used for open-ground shock and pursuit; villages, woods, hills, and square-ready Hold Contact Line infantry blunt charges."
         case .endingOrders:
-            return "Staff note: ending orders hands initiative to the next faction; staff dispatches and rejected orders remain in replay."
+            return "Staff note: ending orders hands initiative to the next power; staff dispatches and rejected orders remain in replay."
         }
+    }
+
+    private func displayName(for division: Division?, fallback: String, activeFaction: Faction) -> String {
+        NapoleonicMessageSanitizer.displayText(division?.name ?? fallback, for: activeFaction)
     }
 
     private func legacyMessage(for division: Division?) -> String {
