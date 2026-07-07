@@ -672,7 +672,7 @@ ScenarioCatalog.napoleonicTarget
   -> napoleonic_generals
 ```
 
-当前 `waterloo_1815_*` JSON、`napoleonic_terrain_rules.json`、`napoleonic_unit_templates.json` 和 `napoleonic_generals.json` 已有小规模 schema slice，并已在 v3.7 加入 iOS / macOS target 的 bundle resources；v3.8 起它们也是默认启动路径，阿登只保留为 legacy 可选场景。`waterloo_1815_scenario.json` 的 release-facing displayName 为 `Waterloo 1815`，`waterloo_1815_regions.json` 的 displayName 为 `Waterloo 1815 Sectors`，小规模数据切片边界写在数据说明 / 文档中，不暴露在默认场景标题里。`waterloo_1815_scenario.json` 当前声明 6 个 scenario objectives；`waterloo_1815_regions.json` 当前声明对应的 6 个 region objectives，用于 region 级摘要、地图/面板展示和后续目标排序口径；Plancenoit 已作为法军持有的地图目标加入，但不在当前 `VictoryRules` 的 Waterloo runtime condition 中；q5,r1 Wavre Road 已作为普军后方 road / supply / reinforcement entry hex 加入，但不新增 objective，不代表完整 Wavre 后方地图；q2,r1 Anglo-Allied Rear Road 已作为 Mont-Saint-Jean 后方 road / supply hex 的非 objective key location marker 加入，scenario 数据说明也记录其非 objective 后方补给路口径，不新增 objective、region、胜负条件或增援触发；`aa_papelotte_left_reserve` 已作为 Anglo-Allied 左翼预备加入 Papelotte 空 hex，复用现有 line infantry 模板和 Wellington 归属，不新增 objective、region 或胜负条件；La Haye Sainte 的 region 将领种子已对齐 `commander_wellington`，初始守军复用既有 `strongpoint_guard` 模板以匹配该据点 / fortress 口径；`fr_napoleon_center` 显示为 French I Corps Detachment，`pr_bulow_iv_corps` 显示为 Prussian IV Corps Vanguard，表达当前只是抽象 playable formation 而非完整 corps 级 OOB；`pr_blucher_approach_screen` 已作为 Prussian Approach q4,r0 前卫 screen 加入非 objective / 非 supply hex，复用 `prussian_vanguard` 模板和 Blucher 归属，不改变 q4,r1 Prussian Arrival Road 触发或 q5,r1 Wavre Road 增援入口；Prussian Approach region 保持后方轴线名称，q4,r1 key location / region objective 显示名与 scenario objective 统一为 Prussian Arrival Road。`napoleonic_generals.json` 当前已有 Napoleon / Wellington / Blucher / Bulow，Bulow 用于 Prussian IV Corps 的增援归属与偏好 region 数据，不代表完整 CorpsCommander Agent。该默认入口仍不是完整战役。v3.3 已新增拿战 `ComponentType` case，`napoleonic_unit_templates.json` 当前使用 `lineInfantry`、`lightInfantry`、`cavalry`、`guard`、`engineer` 和 `artillery` raw value，其中 `guard` 对应 Swift case `guardInfantry`；Waterloo 增援表已开始使用 `cavalry_reserve`，让法国骑兵预备队在默认数据切片中可见，`reserve_infantry_column` 的 guard 权重也达到既有 guard morale 阈值。Waterloo 移动/战斗主路径已读取 `GameState.terrainRules`：`MovementRules` 使用 scenario road / terrain / river movement cost，骑兵进入 hill / forest / city / fortress 会额外消耗 1 点移动、进入 mountain 额外消耗 2 点；`CombatRules` 使用 scenario terrain defense 与 river extra cost；`WarCommandExecutor` 与 `ZoneCommanderAgent` 的 breakthrough / defensive sorting 也同步读取同一 rule set。`BaseTerrain` 仍是旧存档和 legacy fallback，并继续承载 JSON 未覆盖的特化语义，例如 infantry support、cavalry/artillery adjustment、armor slowdown、supply path 和 region path 成本。`CombatRules` 已有最小拿战战术修正：骑兵进攻 plain 有轻量加成，攻击 hill / forest / mountain / city / fortress 受限，HOLD 的重步兵可压制平地骑兵冲击；远程炮兵对 plain / hill 目标略有优势，对复杂/据点地形略受限。`WarCommandExecutor` 的 breakthrough / spearhead 会先按 artillery-first 排序，fire coverage 在存在炮兵或远程单位时只提交这些单位；`MockAIClient` 会把 `cityName` / `fortressName` tile 也视为 objective-like 炮兵目标，避免 hill + cityName 的 Mont-Saint-Jean 被低估；fallback 目标选择会在未控制目标中按 Waterloo 已知 objective id 和当前 faction 做 deterministic objective-aware sorting，再用 kind / name / id 稳定排序，France 优先 Mont-Saint-Jean / La Haye Sainte，Prussia 优先 Prussian Arrival Road / Plancenoit，legacy 和未知 objective 仍回退旧 type 排序；该排序只决定 fallback move 候选顺序，不改 objective 数据、hex/region controller、VictoryRules 或命令执行链；部署 contact reason 在拿战 faction 下优先使用 region name / 格式化 sector 名，不再直接拼 raw region id。`Division` 已有最小 morale 字段，战斗损失、HOLD、resupply/rest、撤退失败和包围损耗会改变 morale，低士气会降低攻防并触发 retreatable 单位撤退。完整 terrain DSL、队形、完整骑兵冲锋和炮兵准备尚未完成。
+当前 `waterloo_1815_*` JSON、`napoleonic_terrain_rules.json`、`napoleonic_unit_templates.json` 和 `napoleonic_generals.json` 已有小规模 schema slice，并已在 v3.7 加入 iOS / macOS target 的 bundle resources；v3.8 起它们也是默认启动路径，阿登只保留为 legacy 可选场景。`waterloo_1815_scenario.json` 的 release-facing displayName 为 `Waterloo 1815`，`waterloo_1815_regions.json` 的 displayName 为 `Waterloo 1815 Sectors`，小规模数据切片边界写在数据说明 / 文档中，不暴露在默认场景标题里。`waterloo_1815_scenario.json` 当前声明 6 个 scenario objectives；`waterloo_1815_regions.json` 当前声明对应的 6 个 region objectives，用于 region 级摘要、地图/面板展示和后续目标排序口径；Plancenoit 已作为法军持有的地图目标加入，但不在当前 `VictoryRules` 的 Waterloo runtime condition 中；q5,r1 Wavre Road 已作为普军后方 road / supply / reinforcement entry hex 加入，但不新增 objective，不代表完整 Wavre 后方地图；q2,r1 Anglo-Allied Rear Road 已作为 Mont-Saint-Jean 后方 road / supply hex 的非 objective key location marker 加入，scenario 数据说明也记录其非 objective 后方补给路口径，不新增 objective、region、胜负条件或增援触发；`aa_papelotte_left_reserve` 已作为 Anglo-Allied 左翼预备加入 Papelotte 空 hex，复用现有 line infantry 模板和 Wellington 归属，不新增 objective、region 或胜负条件；La Haye Sainte 的 region 将领种子已对齐 `commander_wellington`，初始守军复用既有 `strongpoint_guard` 模板以匹配该据点 / fortress 口径；`fr_napoleon_center` 显示为 French I Corps Detachment，`pr_bulow_iv_corps` 显示为 Prussian IV Corps Vanguard，表达当前只是抽象 playable formation 而非完整 corps 级 OOB；`pr_blucher_approach_screen` 已作为 Prussian Approach q4,r0 前卫 screen 加入非 objective / 非 supply hex，复用 `prussian_vanguard` 模板和 Blucher 归属，不改变 q4,r1 Prussian Arrival Road 触发或 q5,r1 Wavre Road 增援入口；Prussian Approach region 保持后方轴线名称，q4,r1 key location / region objective 显示名与 scenario objective 统一为 Prussian Arrival Road。`napoleonic_generals.json` 当前已有 Napoleon / Wellington / Blucher / Bulow，Bulow 用于 Prussian IV Corps 的增援归属与偏好 region 数据，不代表完整 CorpsCommander Agent。该默认入口仍不是完整战役。v3.3 已新增拿战 `ComponentType` case，`napoleonic_unit_templates.json` 当前使用 `lineInfantry`、`lightInfantry`、`cavalry`、`guard`、`engineer` 和 `artillery` raw value，其中 `guard` 对应 Swift case `guardInfantry`；Waterloo 增援表已开始使用 `cavalry_reserve`，让法国骑兵预备队在默认数据切片中可见，`reserve_infantry_column` 的 guard 权重也达到既有 guard morale 阈值。Waterloo 移动/战斗主路径已读取 `GameState.terrainRules`：`MovementRules` 使用 scenario road / terrain / river movement cost，骑兵进入 hill / forest / city / fortress 会额外消耗 1 点移动、进入 mountain 额外消耗 2 点；`CombatRules` 使用 scenario terrain defense 与 river extra cost；`WarCommandExecutor` 与 `ZoneCommanderAgent` 的 breakthrough / defensive sorting 也同步读取同一 rule set。`BaseTerrain` 仍是旧存档和 legacy fallback，并继续承载 JSON 未覆盖的特化语义，例如 infantry support、cavalry/artillery adjustment、armor slowdown、supply path 和 region path 成本。`CombatRules` 已有最小拿战战术修正：骑兵进攻 plain 有轻量加成，攻击 hill / forest / mountain / city / fortress 受限，HOLD 的重步兵可压制平地骑兵冲击；远程炮兵对 plain / hill 目标略有优势，对复杂/据点地形略受限。`WarCommandExecutor` 的 breakthrough / spearhead 会先按 artillery-first 排序，fire coverage 在存在炮兵或远程单位时只提交这些单位；v3.9 新增 `artilleryPreparation` 和 `cavalryCharge` 最小 tactic，前者要求炮兵/远程单位并复用炮兵优先、只攻击不推进 profile，后者要求可行动骑兵并在机动候选中优先骑兵、允许短深度 exploitation。`MockAIClient` 会把 `cityName` / `fortressName` tile 也视为 objective-like 炮兵目标，避免 hill + cityName 的 Mont-Saint-Jean 被低估；fallback 目标选择会在未控制目标中按 Waterloo 已知 objective id 和当前 faction 做 deterministic objective-aware sorting，再用 kind / name / id 稳定排序，France 优先 Mont-Saint-Jean / La Haye Sainte，Prussia 优先 Prussian Arrival Road / Plancenoit，legacy 和未知 objective 仍回退旧 type 排序；该排序只决定 fallback move 候选顺序，不改 objective 数据、hex/region controller、VictoryRules 或命令执行链；部署 contact reason 在拿战 faction 下优先使用 region name / 格式化 sector 名，不再直接拼 raw region id。`Division` 已有最小 morale 字段，战斗损失、HOLD、resupply/rest、撤退失败和包围损耗会改变 morale，低士气会降低攻防并触发 retreatable 单位撤退。完整 terrain DSL、队形、发布级骑兵冲锋/炮兵准备视觉路径和平衡规则尚未完成。
 旧 `DataLoader.loadInitialGameState()` 仍可作为 legacy / probe API 读取老阿登路径，但主 app 默认启动不再用它兜底。
 
 v3.7 起 `AppContainer` 还维护当前新局配置：
@@ -1548,7 +1548,7 @@ AppContainer.runAIIfNeeded
 
 `MarshalAgent` 是元帅层，不是单位，也不是新规则执行器。它只读取降维摘要并输出 `TheaterDirectiveEnvelope` JSON：
 
-`MarshalBattlefieldSummarizer` 的 `MarshalBattlefieldSummary` 当前 schemaVersion 为 6；每个 `MarshalFrontSummary` 除兵力、压力、目标和 supply warning 外，还带 `fatigueWarningCount` 与 `ammunitionWarningCount`，供元帅层在选择攻守和防御优先级时看到战术消耗风险。
+`MarshalBattlefieldSummarizer` 的 `MarshalBattlefieldSummary` 当前 schemaVersion 为 7；每个 `MarshalFrontSummary` 除兵力、压力、目标和 supply warning 外，还带 `fatigueWarningCount`、`ammunitionWarningCount` 与可选 `cavalryUnitCount`，供元帅层在选择攻守、防御优先级和骑兵冲锋战术时看到战术消耗与兵种风险。
 
 ```text
 TheaterDirectiveEnvelope
@@ -1663,8 +1663,10 @@ shouldAttack =
 
 - offense：
   - `blitzkrieg`：机动兵力占比高且 adjustedRatio >= 1.65。
+  - `cavalryCharge`：骑兵/机动优势明显且 adjustedRatio >= 1.65，优先提交骑兵与机动纵深。
   - `spearhead`：机动兵力可用，adjustedRatio >= 1.35，且有可见敌 region；用于定点矛头。
   - `breakthrough`：adjustedRatio >= 1.35，向弱点突破。
+  - `artilleryPreparation`：炮兵/远程支援可用、弹药警告不高且优势不足或需先压制时，先炮兵准备。
   - `fireCoverage`：炮兵/远程支援可用但优势不足，先火力覆盖。
   - `feint`：优势不足但需要牵制时少量佯攻。
   - `guerrillaWarfare`：机动兵力可用、敌 region 多、优势有限时袭扰纵深。
@@ -1675,7 +1677,7 @@ shouldAttack =
   - `elasticDefense`：压力、补给警告或劣势时弹性防御。
   - `holdPosition`：普通防御 fallback。
 
-`TacticConditionChecker` 不再恒放行：闪电战/游击战要求机动单位，火力覆盖要求炮兵或远程单位，佯攻要求前线单位，纵深防御要求 depth 预备队；不满足条件会降级为 `holdPosition`。
+`TacticConditionChecker` 不再恒放行：闪电战/游击战要求机动单位，骑兵冲锋要求可行动骑兵，火力覆盖/炮兵准备要求炮兵或远程单位，佯攻要求前线单位，纵深防御要求 depth 预备队；不满足条件会降级为 `holdPosition`。骑兵冲锋的实际效果仍受现有 `MovementRules` / `CombatRules` 的地形和守方修正约束。
 
 进攻 directive：
 
@@ -1694,7 +1696,7 @@ ZoneDirective(
     exploitDepth
   ),
   category: .offense,
-  tactic: blitzkrieg / spearhead / breakthrough / pincerMovement / fireCoverage / feint / guerrillaWarfare / standardAttack,
+  tactic: blitzkrieg / cavalryCharge / spearhead / breakthrough / pincerMovement / artilleryPreparation / fireCoverage / feint / guerrillaWarfare / standardAttack,
   commandTarget: .region(focusRegionId) 或 .theater(target)
 )
 ```
@@ -1762,7 +1764,7 @@ func execute(_ directive: ZoneDirective, in state: GameState) -> WarCommandExecu
 
 ```text
 如果 directive.tactic 存在:
-  standardAttack / blitzkrieg / spearhead / breakthrough / pincerMovement / fireCoverage / feint / guerrillaWarfare
+  standardAttack / blitzkrieg / cavalryCharge / spearhead / breakthrough / pincerMovement / artilleryPreparation / fireCoverage / feint / guerrillaWarfare
     -> executeAttack(tactic)
   holdPosition / elasticDefense / defenseInDepth / lastStand
     -> executeDefense(tactic)
@@ -1810,6 +1812,13 @@ segments = 指向 targetZone 的 frontSegments，若为空则用全部 frontSegm
     mobileOnlyWhenAvailable = true
     weakPointFocus = true
     holdNonCommittedFront = true
+  cavalryCharge:
+    includeDepthUnits = true
+    mobileOnlyWhenAvailable = true
+    cavalryFirst = true
+    weakPointFocus = true
+    allowDeepTarget = true
+    holdNonCommittedFront = true
   breakthrough:
     includeDepthUnits = true
     weakPointFocus = true
@@ -1817,7 +1826,7 @@ segments = 指向 targetZone 的 frontSegments，若为空则用全部 frontSegm
     includeDepthUnits = true
     mobileOnlyWhenAvailable = true
     convergenceRegionId 可作为深目标
-  fireCoverage:
+  fireCoverage / artilleryPreparation:
     artilleryFirst = true
     attackOnly = true；没有射程目标则 hold，不主动推进
   feint:
@@ -1832,7 +1841,7 @@ attackingUnitIds =
   + profile.includeDepthUnits ? unitsDepth : unitsFront 为空时 fallback unitsDepth
   -> 过滤可行动单位
   -> 需要时优先机动单位
-  -> 按 artillery / mobile / attack / movement / strength 排序
+  -> 按 artillery / cavalry / mobile / attack / movement / strength 排序
   -> 应用 maxCommittedUnits
 
 对每个可行动单位:
@@ -2146,7 +2155,7 @@ MapEditorGameResourceBridge.loadLegacyArdennesDocument
 - 统治者层当前只输出战略姿态和审计记录，不能直接输出底层 `Command`，不能直接修改地图、单位、hex controller 或动态战区权威。
 - 当前工作树存在外交/经济/UI 等非 v0.5 方向残留，合并前需要单独审查文件归属和 public API 冲突。
 - `AttackIntensity.infiltration` 已在 `WarCommandExecutor` 中解释为默认低投入上限；`.limitedCounter` 和 `.allOut` 仍主要依赖 tactic profile 与显式 `maxCommittedUnits`。
-- `TacticConditionChecker` 当前总是允许现有战术。
+- `TacticConditionChecker` 已对机动、骑兵、炮兵/远程、佯攻和纵深防御做最小条件过滤；完整队形、方阵克制、炮兵准备/骑兵冲锋的发布级平衡仍未完成。
 - 战区互助接口 `requestSupport` / `getAvailableForces` / `notifyThreat` 有模型但没有主流程调用方。
 - 攻击不会自动占领目标 hex，只有移动会占领。
 - Legacy Agent D 管线仍保留，不应删除，也不应默认接回主战争 AI。

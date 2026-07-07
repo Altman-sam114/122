@@ -19,6 +19,7 @@ struct WarCommandExecutor {
         let includeDepthUnits: Bool
         let mobileOnlyWhenAvailable: Bool
         let artilleryFirst: Bool
+        let cavalryFirst: Bool
         let attackOnly: Bool
         let weakPointFocus: Bool
         let allowDeepTarget: Bool
@@ -28,6 +29,7 @@ struct WarCommandExecutor {
 
     private struct AttackUnitSortKey: Comparable {
         let artilleryPriority: Int
+        let cavalryPriority: Int
         let mobilePriority: Int
         let attackPower: Int
         let movement: Int
@@ -37,6 +39,9 @@ struct WarCommandExecutor {
         static func < (lhs: AttackUnitSortKey, rhs: AttackUnitSortKey) -> Bool {
             if lhs.artilleryPriority != rhs.artilleryPriority {
                 return lhs.artilleryPriority > rhs.artilleryPriority
+            }
+            if lhs.cavalryPriority != rhs.cavalryPriority {
+                return lhs.cavalryPriority > rhs.cavalryPriority
             }
             if lhs.mobilePriority != rhs.mobilePriority {
                 return lhs.mobilePriority > rhs.mobilePriority
@@ -147,6 +152,8 @@ struct WarCommandExecutor {
              .breakthrough,
              .pincerMovement,
              .fireCoverage,
+             .artilleryPreparation,
+             .cavalryCharge,
              .feint,
              .guerrillaWarfare:
             guard case .attack(let parameters) = directive.parameters else {
@@ -499,6 +506,19 @@ struct WarCommandExecutor {
                 includeDepthUnits: true,
                 mobileOnlyWhenAvailable: true,
                 artilleryFirst: false,
+                cavalryFirst: false,
+                attackOnly: false,
+                weakPointFocus: true,
+                allowDeepTarget: true,
+                holdNonCommittedFront: true,
+                committedUnitLimit: explicitLimit
+            )
+        case .cavalryCharge:
+            return AttackTacticProfile(
+                includeDepthUnits: true,
+                mobileOnlyWhenAvailable: true,
+                artilleryFirst: false,
+                cavalryFirst: true,
                 attackOnly: false,
                 weakPointFocus: true,
                 allowDeepTarget: true,
@@ -510,6 +530,7 @@ struct WarCommandExecutor {
                 includeDepthUnits: true,
                 mobileOnlyWhenAvailable: false,
                 artilleryFirst: true,
+                cavalryFirst: false,
                 attackOnly: false,
                 weakPointFocus: true,
                 allowDeepTarget: (parameters.exploitDepth ?? 0) > 0,
@@ -521,6 +542,7 @@ struct WarCommandExecutor {
                 includeDepthUnits: true,
                 mobileOnlyWhenAvailable: true,
                 artilleryFirst: true,
+                cavalryFirst: false,
                 attackOnly: false,
                 weakPointFocus: true,
                 allowDeepTarget: true,
@@ -532,17 +554,20 @@ struct WarCommandExecutor {
                 includeDepthUnits: true,
                 mobileOnlyWhenAvailable: true,
                 artilleryFirst: false,
+                cavalryFirst: false,
                 attackOnly: false,
                 weakPointFocus: true,
                 allowDeepTarget: true,
                 holdNonCommittedFront: false,
                 committedUnitLimit: explicitLimit
             )
-        case .fireCoverage:
+        case .fireCoverage,
+             .artilleryPreparation:
             return AttackTacticProfile(
                 includeDepthUnits: true,
                 mobileOnlyWhenAvailable: false,
                 artilleryFirst: true,
+                cavalryFirst: false,
                 attackOnly: true,
                 weakPointFocus: false,
                 allowDeepTarget: false,
@@ -555,6 +580,7 @@ struct WarCommandExecutor {
                 includeDepthUnits: false,
                 mobileOnlyWhenAvailable: false,
                 artilleryFirst: false,
+                cavalryFirst: false,
                 attackOnly: false,
                 weakPointFocus: false,
                 allowDeepTarget: false,
@@ -572,6 +598,7 @@ struct WarCommandExecutor {
                 includeDepthUnits: true,
                 mobileOnlyWhenAvailable: true,
                 artilleryFirst: false,
+                cavalryFirst: false,
                 attackOnly: false,
                 weakPointFocus: true,
                 allowDeepTarget: true,
@@ -592,6 +619,7 @@ struct WarCommandExecutor {
                 includeDepthUnits: false,
                 mobileOnlyWhenAvailable: false,
                 artilleryFirst: false,
+                cavalryFirst: false,
                 attackOnly: false,
                 weakPointFocus: false,
                 allowDeepTarget: false,
@@ -742,6 +770,7 @@ struct WarCommandExecutor {
         guard let division = state.division(id: unitId) else {
             return AttackUnitSortKey(
                 artilleryPriority: 0,
+                cavalryPriority: 0,
                 mobilePriority: 0,
                 attackPower: 0,
                 movement: 0,
@@ -752,6 +781,7 @@ struct WarCommandExecutor {
 
         return AttackUnitSortKey(
             artilleryPriority: profile.artilleryFirst && division.isArtillery ? 1 : 0,
+            cavalryPriority: profile.cavalryFirst && division.isCavalry ? 1 : 0,
             mobilePriority: isMobile(division) ? 1 : 0,
             attackPower: division.attack,
             movement: division.movement,

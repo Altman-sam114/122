@@ -499,9 +499,10 @@ final class BoardScene: SKScene {
         node.zPosition = 24.2
 
         switch tactic {
-        case .fireCoverage:
+        case .fireCoverage,
+             .artilleryPreparation:
             addDirectiveReticle(to: node, color: color)
-        case .breakthrough, .spearhead, .blitzkrieg:
+        case .breakthrough, .spearhead, .blitzkrieg, .cavalryCharge:
             node.zRotation = angle
             addDirectiveSpearhead(to: node, color: color)
         case .pincerMovement:
@@ -603,8 +604,11 @@ final class BoardScene: SKScene {
         }
 
         switch record.tactic {
-        case .fireCoverage:
+        case .fireCoverage,
+             .artilleryPreparation:
             return "ART"
+        case .cavalryCharge:
+            return "CAV"
         case .pincerMovement:
             return "PIN"
         case .breakthrough, .spearhead, .blitzkrieg:

@@ -17,6 +17,8 @@ enum TacticName: String, Codable, Equatable, CaseIterable {
     case breakthrough
     case pincerMovement
     case fireCoverage
+    case artilleryPreparation
+    case cavalryCharge
     case feint
     case guerrillaWarfare
     case holdPosition
@@ -32,6 +34,8 @@ enum TacticName: String, Codable, Equatable, CaseIterable {
              .breakthrough,
              .pincerMovement,
              .fireCoverage,
+             .artilleryPreparation,
+             .cavalryCharge,
              .feint,
              .guerrillaWarfare:
             return .offense

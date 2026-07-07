@@ -38,11 +38,14 @@ struct TacticConditionChecker {
         case .blitzkrieg,
              .guerrillaWarfare:
             return zoneUnits.contains { isMobile($0) }
+        case .cavalryCharge:
+            return zoneUnits.contains { $0.canAct && $0.isCavalry }
         case .spearhead,
              .breakthrough,
              .pincerMovement:
             return !zoneUnits.filter(\.canAct).isEmpty
-        case .fireCoverage:
+        case .fireCoverage,
+             .artilleryPreparation:
             return zoneUnits.contains { $0.isArtillery || $0.range > 1 }
         case .feint:
             return !zone.unitsFront.isEmpty
@@ -105,7 +108,8 @@ struct BinaryTacticClassifier {
         depthStrength: Int = 0,
         pressure: Int = 0,
         supplyWarningCount: Int = 0,
-        visibleEnemyRegionCount: Int = 0
+        visibleEnemyRegionCount: Int = 0,
+        cavalryFriendlyStrength: Int = 0
     ) -> Classification {
         let ratio = visibleEnemyStrength == 0
             ? Double(friendlyStrength)
@@ -130,14 +134,14 @@ struct BinaryTacticClassifier {
             || hasStaticDefense
 
         if shouldAttack {
-            if mobileFriendlyStrength > 0,
+            if cavalryFriendlyStrength > 0,
                mobileRatio >= 0.35,
                adjustedRatio >= 1.65 {
                 return Classification(
                     category: .offense,
-                    tactic: .blitzkrieg,
+                    tactic: .cavalryCharge,
                     confidence: min(1, adjustedRatio / 2.4),
-                    reason: "mobile_superiority"
+                    reason: "cavalry_charge_window"
                 )
             }
             if mobileFriendlyStrength > 0,
@@ -164,7 +168,7 @@ struct BinaryTacticClassifier {
                adjustedRatio < attackThreshold + 0.25 {
                 return Classification(
                     category: .offense,
-                    tactic: .fireCoverage,
+                    tactic: .artilleryPreparation,
                     confidence: min(1, 0.55 + Double(artillerySupportStrength) / Double(max(1, friendlyStrength)) / 2),
                     reason: "artillery_preparation"
                 )
@@ -270,7 +274,8 @@ struct ZoneCommanderAgent: ZoneCommanderProviding {
             depthStrength: friendlyDepthStrength(zone: zone, state: state),
             pressure: zone.pressure,
             supplyWarningCount: supplyWarningCount(zone: zone, state: state),
-            visibleEnemyRegionCount: visibleEnemy.count
+            visibleEnemyRegionCount: visibleEnemy.count,
+            cavalryFriendlyStrength: cavalryFriendlyStrength(zone: zone, state: state)
         )
 
         guard conditionChecker.canUseTactic(classification.tactic, commander: config, zone: zone, state: state) else {
@@ -359,11 +364,13 @@ struct ZoneCommanderAgent: ZoneCommanderProviding {
     private func attackIntensity(for tactic: TacticName) -> AttackIntensity {
         switch tactic {
         case .blitzkrieg,
+             .cavalryCharge,
              .spearhead,
              .pincerMovement,
              .breakthrough:
             return .allOut
         case .fireCoverage,
+             .artilleryPreparation,
              .feint:
             return .limitedCounter
         case .guerrillaWarfare:
@@ -390,6 +397,7 @@ struct ZoneCommanderAgent: ZoneCommanderProviding {
 
         switch tactic {
         case .blitzkrieg,
+             .cavalryCharge,
              .spearhead,
              .breakthrough,
              .pincerMovement,
@@ -398,7 +406,8 @@ struct ZoneCommanderAgent: ZoneCommanderProviding {
                 breakthroughRegionSortKey(for: $0, enemyStrength: visibleEnemy[$0, default: 0], state: state) <
                     breakthroughRegionSortKey(for: $1, enemyStrength: visibleEnemy[$1, default: 0], state: state)
             }.first
-        case .fireCoverage:
+        case .fireCoverage,
+             .artilleryPreparation:
             return weightedRegions.max {
                 visibleEnemy[$0, default: 0] == visibleEnemy[$1, default: 0]
                     ? $0.rawValue > $1.rawValue
@@ -419,8 +428,11 @@ struct ZoneCommanderAgent: ZoneCommanderProviding {
         switch tactic {
         case .feint:
             return max(1, max(zone.unitsFront.count, 1) / 3)
-        case .fireCoverage:
+        case .fireCoverage,
+             .artilleryPreparation:
             return nil
+        case .cavalryCharge:
+            return max(1, zone.unitsFront.count + zone.unitsDepth.count)
         case .blitzkrieg:
             return zone.unitsFront.count + zone.unitsDepth.count
         case .spearhead:
@@ -443,6 +455,8 @@ struct ZoneCommanderAgent: ZoneCommanderProviding {
         switch tactic {
         case .blitzkrieg:
             return 2
+        case .cavalryCharge:
+            return 1
         case .spearhead,
              .breakthrough,
              .pincerMovement,
@@ -450,6 +464,7 @@ struct ZoneCommanderAgent: ZoneCommanderProviding {
             return 1
         case .standardAttack,
              .fireCoverage,
+             .artilleryPreparation,
              .feint,
              .holdPosition,
              .elasticDefense,
@@ -470,10 +485,12 @@ struct ZoneCommanderAgent: ZoneCommanderProviding {
         case .holdPosition,
              .standardAttack,
              .blitzkrieg,
+             .cavalryCharge,
              .spearhead,
              .breakthrough,
              .pincerMovement,
              .fireCoverage,
+             .artilleryPreparation,
              .feint,
              .guerrillaWarfare:
             return 1
@@ -489,10 +506,12 @@ struct ZoneCommanderAgent: ZoneCommanderProviding {
              .holdPosition,
              .standardAttack,
              .blitzkrieg,
+             .cavalryCharge,
              .spearhead,
              .breakthrough,
              .pincerMovement,
              .fireCoverage,
+             .artilleryPreparation,
              .feint,
              .guerrillaWarfare:
             return .holdLine
@@ -510,10 +529,12 @@ struct ZoneCommanderAgent: ZoneCommanderProviding {
              .lastStand,
              .standardAttack,
              .blitzkrieg,
+             .cavalryCharge,
              .spearhead,
              .breakthrough,
              .pincerMovement,
              .fireCoverage,
+             .artilleryPreparation,
              .feint,
              .guerrillaWarfare:
             return nil
@@ -531,10 +552,12 @@ struct ZoneCommanderAgent: ZoneCommanderProviding {
         case .holdPosition,
              .standardAttack,
              .blitzkrieg,
+             .cavalryCharge,
              .spearhead,
              .breakthrough,
              .pincerMovement,
              .fireCoverage,
+             .artilleryPreparation,
              .feint,
              .guerrillaWarfare:
             return nil
@@ -562,6 +585,18 @@ struct ZoneCommanderAgent: ZoneCommanderProviding {
                     && $0.faction == zone.faction
                     && !$0.isDestroyed
                     && isMobile($0)
+            }
+            .reduce(0) { $0 + combatPower($1, mode: .friendly) }
+    }
+
+    private func cavalryFriendlyStrength(zone: FrontZone, state: GameState) -> Int {
+        let unitIds = Set(zone.unitsFront + zone.unitsDepth + zone.frontSegments.flatMap(\.assignedFrontUnitIds))
+        return state.divisions
+            .filter {
+                unitIds.contains($0.id)
+                    && $0.faction == zone.faction
+                    && !$0.isDestroyed
+                    && $0.isCavalry
             }
             .reduce(0) { $0 + combatPower($1, mode: .friendly) }
     }
@@ -990,6 +1025,7 @@ struct MarshalFrontSummary: Codable, Equatable, Identifiable {
     let frontUnitCount: Int
     let depthUnitCount: Int
     let garrisonUnitCount: Int
+    let cavalryUnitCount: Int?
     let supplyWarningCount: Int
     let moraleWarningCount: Int
     let fatigueWarningCount: Int
@@ -1035,7 +1071,7 @@ struct MarshalBattlefieldSummarizer {
         let recentEvents = Array(state.eventLog.suffix(maxRecentEvents)).map(\.message)
 
         return MarshalBattlefieldSummary(
-            schemaVersion: 6,
+            schemaVersion: 7,
             turn: state.turn,
             faction: faction,
             marshalId: config.id,
@@ -1112,6 +1148,7 @@ struct MarshalBattlefieldSummarizer {
             frontUnitCount: zone.unitsFront.count,
             depthUnitCount: zone.unitsDepth.count,
             garrisonUnitCount: zone.unitsGarrison.count,
+            cavalryUnitCount: zoneUnits.filter(\.isCavalry).count,
             supplyWarningCount: supplyWarnings,
             moraleWarningCount: moraleWarnings,
             fatigueWarningCount: fatigueWarnings,
@@ -1452,14 +1489,18 @@ struct SimulatedMarshalLLMClient: MarshalLLMClient {
         }
         if bias == .offensive,
            front.depthUnitCount > 0,
+           (front.cavalryUnitCount ?? 0) > 0,
            front.strengthRatio >= 1.8 {
-            return .breakthrough
+            return .cavalryCharge
         }
         if front.depthUnitCount > 0,
            front.strengthRatio >= 1.35 {
             return .spearhead
         }
         if front.strengthRatio >= 1.15 {
+            if front.ammunitionWarningCount == 0 {
+                return .artilleryPreparation
+            }
             return .breakthrough
         }
         if front.pressure > 0 {

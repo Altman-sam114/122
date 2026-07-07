@@ -1492,7 +1492,7 @@ guerrillaWarfare 额外参考 infrastructure
 - `StrategicPostureEnvelope` 当前来自 deterministic simulated output，尚未进入真实模型 prompt builder。
 - 独立 ChiefOfStaff / CorpsCommander / Diplomat / Coalition Agent 仍未实现。
 - `RulerDecisionRecord` 已写入状态，但 UI 复盘展示还未专门升级。
-- 拿战战术名仍复用部分旧 `TacticName`；完整 line / column / square / cavalry charge / artillery preparation 仍需后续规则切片。
+- 拿战战术名仍复用部分旧 `TacticName`；`artilleryPreparation` / `cavalryCharge` 最小 tactic 已在 v3.9 落地，完整 line / column / square、队形克制、发布级视觉路径和平衡仍需后续切片。
 
 ## v3.5 - 拿战后勤与预备队展示基础
 
@@ -1522,7 +1522,7 @@ guerrillaWarfare 额外参考 infrastructure
 - `CombatRules.effectiveAttack` 新增最小拿战战术地形修正：cavalry 在 plain 有轻量加成，攻击 hill / forest / mountain / city / fortress 受限；HOLD 重步兵可在 plain 压制 cavalry 冲击；ranged artillery 对 plain / hill 目标略有优势，对复杂/据点地形略受限。
 - `CommandExecutor` 已把 move / attack / counterattack / hold 转成 morale / fatigue / ammunition 增减；`CommandValidator` 会用 `.moraleBroken` 拒绝 morale <= `Division.brokenMoraleThreshold` 的 move / attack，hold / allowRetreat / resupply 仍允许走各自校验；`SupplyRules.applyResupplyRest` 已按 supplied / lowSupply / encircled 分支恢复 strength、morale、fatigue 和 ammunition，撤退失败与包围损耗也会降低 morale。
 - `HUDView`、`UnitInspectorView` 和 `UnitTooltipView` 已显示 pending reinforcements、平均 morale、平均 fatigue、readiness、单位 morale / fatigue / ammunition 和 shaken / broken / low ammunition 状态。
-- `AgentContextBuilder` / `AgentPromptBuilder` 已把 morale / fatigue / ammunition 放入 legacy Agent D 摘要；`MarshalBattlefieldSummarizer` 已把 morale / fatigue / ammunition warning count 放入 `MarshalFrontSummary`，summary schema 升到 6，并用于防御优先级和状态说明。
+- `AgentContextBuilder` / `AgentPromptBuilder` 已把 morale / fatigue / ammunition 放入 legacy Agent D 摘要；`MarshalBattlefieldSummarizer` 已把 morale / fatigue / ammunition warning count 放入 `MarshalFrontSummary`，summary schema 在 v3.5 升到 6，并用于防御优先级和状态说明；v3.9 又升到 7，加入可选 `cavalryUnitCount` 供骑兵冲锋战术选择使用。
 - 新增 v3.5 阶段记录，并更新 README、flow、flowchart、plan 和总提示词。
 
 关键文件：
@@ -1583,7 +1583,7 @@ guerrillaWarfare 额外参考 infrastructure
 - `EconomyResources.industry` 在拿战展示层暂时复用为 `Ammunition/Horses` 复合资源；后续若拆真实 ammunition / horses 经济字段，需要 schema 与存档迁移。
 - `ProductionKind.panzerDivision`、`motorizedDivision` raw case 仍保留兼容，源码枚举名尚未迁移；玩家可见层已按拿战 faction 改名。
 - 当前 delayed reinforcement schedule 只支持最小 turn / objective trigger 和安全入口部署；不支持随机迟到、道路阻塞、同盟命令摩擦、多入口优先级或完整普军来援曲线。
-- 完整炮兵准备、显式骑兵冲锋命令、方阵/队形、高级士气、概率式命令拒绝、真实 ammunition / horses 经济账本和完整滑铁卢胜负节奏仍未落地。
+- `artilleryPreparation` / `cavalryCharge` 最小 tactic 已在 v3.9 落地；完整炮兵准备、显式骑兵冲锋命令 UI、方阵/队形、高级士气、概率式命令拒绝、真实 ammunition / horses 经济账本和完整滑铁卢胜负节奏仍未落地。
 - 单文件 `swiftc -parse` 只能确认语法，不等于 Xcode build、SwiftUI 预览或运行时验证。
 
 ## v3.6 - 拿战 UI token 与状态面板可读性基础
@@ -1904,6 +1904,51 @@ guerrillaWarfare 额外参考 infrastructure
 - 默认入口的真实 bundle resource 加载、SwiftUI sheet 行为、SpriteKit 视觉和多回合 AI 稳定性仍需云端 build 或人工授权运行时验证。
 - Legacy 阿登、Germany / Allies、Guderian / Montgomery 等仍保留在兼容场景、历史阶段文档、fallback 或源码兼容名中；发布候选仍需继续做玩家可见残留扫描和资源授权检查。
 - 并发只读扫描仍发现默认 Waterloo 路径的后续数据风险：terrain runtime 已接入但还不是完整 terrain DSL；SupplyRules、RegionMovementRules、RegionSupplyRules 等非主战术路径仍保留独立硬编码或 `BaseTerrain` 语义；Waterloo victory 只完成当前两类条件的 runtime 接入，尚未形成通用 victory condition DSL；Full raw JSON 仍按设计保留 schema raw value 供审计调试。
+
+## v3.9 - 拿战炮兵准备与骑兵冲锋最小战术切片
+
+完成日期：2026-07-07
+
+性质：v3.9 起步记录。本节代表 `artilleryPreparation` 与 `cavalryCharge` 已作为最小 `TacticName` 接入 AI 分类、条件过滤、执行 profile 和回放展示；它们仍降级为既有 `attack / move / hold / allowRetreat`，统一交给 `WarCommandExecutor -> RuleEngine`。不代表完整 line / column / square 队形、方阵克制、发布级炮击/冲锋动画、玩家战术选择 UI 或完整平衡系统已经完成。
+
+核心更新：
+
+- `TacticName` 新增 `artilleryPreparation` 和 `cavalryCharge`，二者都归入 `.offense`，保持 `ZoneDirective` / `WarDirectiveRecord` 的 Codable raw value 路径。
+- `TacticConditionChecker` 新增最小条件：骑兵冲锋要求战区内有可行动 cavalry formation；炮兵准备与火力覆盖要求炮兵或 range > 1 远程单位。
+- `BinaryTacticClassifier` 在机动/骑兵优势窗口可选择 `cavalryCharge`，在炮兵支援且优势不足或需先压制时可选择 `artilleryPreparation`。
+- `SimulatedMarshalLLMClient.offensiveTactic` 可在 offensive posture、纵深单位可用和较高 strength ratio 时选择 `cavalryCharge`，在有优势且无弹药警告时选择 `artilleryPreparation`。
+- `MarshalBattlefieldSummary.schemaVersion` 升到 7，`MarshalFrontSummary` 新增可选 `cavalryUnitCount`；模拟元帅只有在目标 front 有骑兵时才会选 `cavalryCharge`。
+- `ZoneCommanderAgent` 的 attack intensity、focus region、commitment limit、exploit depth、reserve、stance 和 fallback helper 已覆盖两个新 tactic。
+- `WarCommandExecutor.executeTactic` 把两个新 tactic 路由到 `executeAttack(tactic)`；`AttackTacticProfile` 新增 `cavalryFirst` 排序字段，`cavalryCharge` 会优先骑兵/机动纵深并允许深目标，`artilleryPreparation` 与 `fireCoverage` 复用 artillery-first、attack-only profile，不主动推进。
+- `AgentPanelView` 拿战展示区分 `Covering Fire`、`Artillery Preparation` 和 `Cavalry Charge`；`BoardScene` directive replay 中炮兵准备沿用 `ART` reticle，骑兵冲锋显示 `CAV` 并沿用推进 marker。
+- README、`md/flow/flow.md`、`md/flow/flowchart.md`、v3 总提示词和本日志已同步：当前只是最小 tactic slice，完整队形/视觉/平衡仍后置。
+
+关键文件：
+
+- `WWIIHexV0/Commands/WarDirective.swift`
+- `WWIIHexV0/Agents/ZoneCommanderAgent.swift`
+- `WWIIHexV0/Commands/WarCommandExecutor.swift`
+- `WWIIHexV0/UI/AgentPanelView.swift`
+- `WWIIHexV0/SpriteKit/BoardScene.swift`
+- `README.md`
+- `md/flow/flow.md`
+- `md/flow/flowchart.md`
+- `md/prompt/v3.0-拿战迁移/codex-v3.0-拿战aiagent迁移总提示词.md`
+- `update_log.md`
+
+验证记录：
+
+- 本轮按人工要求未运行本地测试、构建、lint、parse、`jq`、`plutil` 或 `git diff --check`。
+- 并发只读子 Agent 扫描 `TacticName` switch / display / executor routing，未发现明显遗漏；只读扫描未修改文件、未运行测试/构建/格式检查。
+- 并发只读子 Agent 扫描 README、flow、flowchart、v3 总提示词和 update_log 的同步点，主 Agent 已按清单更新当前状态与边界。
+- 云端验证需以本轮提交到 `origin/main` 后的 GitHub Actions `WWIIHexV0 CI Results` run 和未加密 artifact 为准。
+
+遗留风险：
+
+- 玩家手写 / UI directive 入口仍默认 `.standardAttack`，尚未提供玩家可点选 `artilleryPreparation` / `cavalryCharge` 的战术控件。
+- `cavalryCharge` 当前是骑兵优先的进攻 profile，不是独立冲锋伤害模型；实际限制仍来自现有 `MovementRules` / `CombatRules` 地形和守方修正。
+- `artilleryPreparation` 当前复用 artillery-first attack-only profile，不是完整 Grand Battery 准备阶段、压制状态或多回合炮击系统。
+- 未跑本地重测试或本地轻量检查；构建和静态检查结果需由云端 artifact 核对。
 
 ## 历史维护记录
 

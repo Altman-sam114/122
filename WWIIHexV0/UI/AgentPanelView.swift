@@ -667,7 +667,11 @@ struct AgentPanelView: View {
         case .pincerMovement:
             return "Converging Attack"
         case .fireCoverage:
+            return "Covering Fire"
+        case .artilleryPreparation:
             return "Artillery Preparation"
+        case .cavalryCharge:
+            return "Cavalry Charge"
         case .feint:
             return "Demonstration"
         case .guerrillaWarfare:
